@@ -14,6 +14,7 @@
 #include "services/ml/mps_protocols_impl.h"
 #include "services/ml/mpscnn_context.h"
 #include "services/ml/public/mojom/constants.mojom.h"
+#include "services/ml/opengl_metal_mac/shared_metal.h"
 
 namespace ml {
 
@@ -147,6 +148,55 @@ void ExecutionImplMPS::CreateOutputMTLBuffer() {
         newBufferWithLength:operand.requiredSize()
                     options:MTLResourceOptionCPUCacheModeWriteCombined]);
   }
+}
+
+void ExecutionImplMPS::SetGpuMemoryBufferHandle(
+    uint32 index,
+    gfx::GpuMemoryBufferHandle buffer_handle) {
+  LOG(ERROR) << "=====ExecutionImplMacMPS::SetGpuMemoryBufferHandle.";
+  base::ScopedCFTypeRef<IOSurfaceRef> io_surface(
+      IOSurfaceLookupFromMachPort(buffer_handle.mach_port.get()));
+  if (!io_surface) {
+    LOG(ERROR) << "Failed to open IOSurface via mach port.";
+  }
+
+  // MTLTextureDescriptor* textureDescriptor = [MTLTextureDescriptor
+  //     texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+  //                                  width:4
+  //                                 height:4
+  //                              mipmapped:NO];
+  // id<MTLTexture> metalTexture = [GetMPSCNNContext().device newTextureWithDescriptor:textureDescriptor
+  //                                              iosurface:io_surface
+  //                                                  plane:0];
+
+  // size_t bytes_per_row = IOSurfaceGetBytesPerRow(io_surface);
+  // const unsigned char* src =
+  //     static_cast<unsigned char*>(IOSurfaceGetBaseAddress(io_surface));
+  // LOG(ERROR) << "======the IOSurfaceGetBytesPerRow = " << bytes_per_row;
+
+  base::ScopedCFTypeRef<CVPixelBufferRef> cv_pixel_buffer;
+  CVPixelBufferCreateWithIOSurface(nullptr, io_surface, nullptr,
+                                   cv_pixel_buffer.InitializeInto());
+
+  CVPixelBufferLockBaseAddress(cv_pixel_buffer, kCVPixelBufferLock_ReadOnly);
+  // // const __fp16* src =
+  //     // static_cast<__fp16*>(CVPixelBufferGetBaseAddress(cv_pixel_buffer));
+  const unsigned char* src =
+      static_cast<unsigned char*>(CVPixelBufferGetBaseAddress(cv_pixel_buffer));
+  const size_t bytesPerRow = CVPixelBufferGetBytesPerRow(cv_pixel_buffer);
+  const size_t cv_height = CVPixelBufferGetHeight(cv_pixel_buffer);
+  const size_t cv_width = CVPixelBufferGetWidth(cv_pixel_buffer);
+  // LOG(ERROR) << "======operand width = " << cv_width << " " << cv_height
+  //            << " format = "
+  //            << CVPixelBufferGetPixelFormatType(cv_pixel_buffer);
+  for (size_t i = 0; i < cv_height; ++i) {
+    for (size_t j = 0; j < cv_width * 4; ++j) {
+      LOG(ERROR) << "======the data = " << static_cast<int>(src[j]);
+    }
+    src += bytesPerRow;
+  }
+
+  CVPixelBufferUnlockBaseAddress(cv_pixel_buffer, kCVPixelBufferLock_ReadOnly);
 }
 
 void ExecutionImplMPS::StartCompute(StartComputeCallback callback) {

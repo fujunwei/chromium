@@ -26,6 +26,7 @@ class ExecutionImplMklDnn : public mojom::Execution {
                       mojom::ExecutionInitParamsPtr params);
   ~ExecutionImplMklDnn() override;
 
+  void SetGpuMemoryBufferHandle(uint32_t index, gfx::GpuMemoryBufferHandle handle) override;
   void StartCompute(StartComputeCallback callback) override;
 
  private:

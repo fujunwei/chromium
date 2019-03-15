@@ -37,6 +37,9 @@ class API_AVAILABLE(macosx(10.13)) ExecutionImplMPS : public mojom::Execution {
   ~ExecutionImplMPS() override;
 
   void StartCompute(StartComputeCallback callback) override;
+  
+  void SetGpuMemoryBufferHandle(
+      uint32 index, gfx::GpuMemoryBufferHandle buffer_handle) override;
 
  private:
   mojom::ExecutionInitParamsPtr params_;

@@ -19,6 +19,11 @@ ExecutionImplMklDnn::ExecutionImplMklDnn(
 
 ExecutionImplMklDnn::~ExecutionImplMklDnn() {}
 
+void ExecutionImplMklDnn::SetGpuMemoryBufferHandle(
+    uint32_t index, gfx::GpuMemoryBufferHandle handle) {
+  NOTREACHED();
+}
+
 void ExecutionImplMklDnn::StartCompute(StartComputeCallback callback) {
   DLOG(INFO) << "ExecutionImplMklDnn::StartCompute";
   mkldnn_status_t status;

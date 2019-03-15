@@ -4,6 +4,8 @@
 
 interface Execution {
   [RaisesException] void setInput(unsigned long index, [AllowShared] ArrayBufferView data);
+  [RaisesException] void setInput(unsigned long index, WebGL2RenderingContext? context, WebGLTexture? texture);
   [RaisesException] void setOutput(unsigned long index, [AllowShared] ArrayBufferView data);
+  [RaisesException] void setOutput(unsigned long index, WebGL2RenderingContext? context, WebGLTexture? texture);
   [CallWith=ScriptState] Promise<long> startCompute();
 };

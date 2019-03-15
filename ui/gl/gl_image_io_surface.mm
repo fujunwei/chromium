@@ -300,6 +300,8 @@ bool GLImageIOSurface::BindTexImageImpl(unsigned internalformat) {
                << CGLErrorString(cgl_error);
     return false;
   }
+  LOG(ERROR) << "===== GLImageIOSurface::BindTexImageImpl " << size_.width() << " " <<
+  size_.height();
 
   return true;
 }

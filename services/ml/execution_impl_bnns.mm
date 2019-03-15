@@ -96,6 +96,11 @@ ExecutionImplBnns::~ExecutionImplBnns() {
   }
 }
 
+void ExecutionImplBnns::SetGpuMemoryBufferHandle(
+    uint32_t index, gfx::GpuMemoryBufferHandle handle) {
+  NOTREACHED();
+}
+
 void ExecutionImplBnns::StartCompute(StartComputeCallback callback) {
   DLOG(INFO) << "ExecutionImplBnns::StartCompute";
   uint32_t mapped_length = 0;
