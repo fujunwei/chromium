@@ -32,4 +32,17 @@ DMLSymbolTable* GetDMLSymbolTable() {
   return dml_symbol_table;
 }
 
+// The DXCore symbols.
+LATE_BINDING_SYMBOL_TABLE_DEFINE_BEGIN(DXCSymbolTable, "dxcore.dll")
+#define X(sym) LATE_BINDING_SYMBOL_TABLE_DEFINE_ENTRY(DXCSymbolTable, sym)
+DXC_SYMBOLS_LIST
+#undef X
+LATE_BINDING_SYMBOL_TABLE_DEFINE_END(DXCSymbolTable)
+
+DXCSymbolTable* GetDXCSymbolTable() {
+  static DXCSymbolTable* dxc_symbol_table = new DXCSymbolTable();
+  dxc_symbol_table->Load();
+  return dxc_symbol_table;
+}
+
 }  // namespace ml

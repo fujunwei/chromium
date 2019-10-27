@@ -109,6 +109,15 @@ class CompiledModelDML : public base::RefCounted<CompiledModelDML> {
   DISALLOW_COPY_AND_ASSIGN(CompiledModelDML);
 };
 
+#ifndef RETURN_IF_FAILED
+#define RETURN_IF_FAILED(hr, message)                                          \
+  if (FAILED(hr)) {                                                            \
+    LOG(ERROR) << message                                                      \
+               << ", Error Message: " << logging::SystemErrorCodeToString(hr); \
+    return hr;                                                                 \
+  }
+#endif
+
 UINT64 DMLCalcBufferTensorSize(DML_TENSOR_DATA_TYPE dataType,
                                UINT dimensionCount,
                                _In_reads_(dimensionCount) const UINT* sizes,

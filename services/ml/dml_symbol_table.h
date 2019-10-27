@@ -49,6 +49,25 @@ DMLSymbolTable* GetDMLSymbolTable();
 #else
 #define DML(sym) sym
 #endif
+
+// The DXCore symbols we need, as an X-Macro list.
+// This list must contain precisely every DXCore function that is used in
+// the Windows Device.
+#define DXC_SYMBOLS_LIST X(DXCoreCreateAdapterFactory)
+
+LATE_BINDING_SYMBOL_TABLE_DECLARE_BEGIN(DXCSymbolTable)
+#define X(sym) LATE_BINDING_SYMBOL_TABLE_DECLARE_ENTRY(DXCSymbolTable, sym)
+DXC_SYMBOLS_LIST
+#undef X
+LATE_BINDING_SYMBOL_TABLE_DECLARE_END(DXCSymbolTable)
+
+DXCSymbolTable* GetDXCSymbolTable();
+
+#if defined(OS_WIN)
+#define DXC(sym) LATESYM_GET(DXCSymbolTable, GetDXCSymbolTable(), sym)
+#else
+#define DXC(sym) sym
+#endif
 }  // namespace ml
 
 #endif  // SERVICES_ML_D3D_SYMBOL_TABLE_H_

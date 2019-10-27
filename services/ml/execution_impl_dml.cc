@@ -12,13 +12,14 @@
 #include "services/ml/common.h"
 #include "services/ml/dml_d3dx12_utils.h"
 #include "services/ml/public/mojom/constants.mojom.h"
+#include "services/ml/dml/float16_compressor.h"
 
 namespace ml {
 
 ExecutionImplDML::ExecutionImplDML(scoped_refptr<CompiledModelDML> dml,
                                    mojom::ExecutionInitParamsPtr params)
     : params_(std::move(params)), dml_(dml) {
-  dml->CreateFormatData();
+  // dml->CreateFormatData();
 }
 
 ExecutionImplDML::~ExecutionImplDML() = default;
@@ -34,11 +35,12 @@ void ExecutionImplDML::StartCompute(StartComputeCallback callback) {
     auto mapping = params_->memory->MapAtOffset(length, offset);
     ComPtr<ID3D12Resource> upload_resource =
         dml_->operand_map_[operand->index]->upload_resource_;
-    ComPtr<ID3D12Resource> format_resource =
-        dml_->operand_map_[operand->index]->format_resource_;
-    hr = UploadTensorResource(static_cast<void*>(mapping.get()), length,
-                              upload_resource, format_resource,
-                              dml_->command_list_);
+    ComPtr<ID3D12Resource> operand_resource =
+        dml_->operand_map_[operand->index]->operand_resource_;   
+    hr = FormatAndUploadResource(static_cast<void*>(mapping.get()),
+                              dml_->operand_map_[operand->index]->dimensions_,
+                              upload_resource, operand_resource,
+                              dml_->command_list_, false);
     if (FAILED(hr)) {
       LOG(ERROR) << "Failed uploading tensor resource for inputs data.";
       std::move(callback).Run(mojom::BAD_DATA);
@@ -46,7 +48,7 @@ void ExecutionImplDML::StartCompute(StartComputeCallback callback) {
     }
   }
   // Format input data from NHWC to NCHW and float16 precision.
-  dml_->FormatInputData();
+  // dml_->FormatInputData();
 
   // Bind and execute the operator on the GPU.
   ID3D12DescriptorHeap* d3D12_descriptor_heaps[] = {
@@ -90,7 +92,7 @@ HRESULT ExecutionImplDML::ExecuteCompiledOperator(
 
 HRESULT ExecutionImplDML::ReadResultBack(uint32_t memory_offset) {
   // Format input data from NCHW to NHWC and float32 precision.
-  dml_->FormatOutputData();
+  // dml_->FormatOutputData();
 
   // The output buffer now contains the result of the identity operator,
   // so read it back if you want the CPU to access it.
@@ -98,7 +100,7 @@ HRESULT ExecutionImplDML::ReadResultBack(uint32_t memory_offset) {
   for (size_t i = 0; i < params_->outputs.size(); ++i) {
     size_t output_index = params_->outputs[i]->index;
     ComPtr<ID3D12Resource> output_resource =
-        dml_->operand_map_[output_index]->format_resource_;
+        dml_->operand_map_[output_index]->operand_resource_;
     ComPtr<ID3D12Resource> readback_buffer =
         dml_->operand_map_[output_index]->readback_resource_;
     CD3DX12_RESOURCE_BARRIER resource_barrier =
@@ -124,14 +126,32 @@ HRESULT ExecutionImplDML::ReadResultBack(uint32_t memory_offset) {
     const uint32_t output_buffer_size = GetRequiredSize(operand);
     memory_offset += output_buffer_size;
     auto mapping = params_->memory->MapAtOffset(output_buffer_size, offset);
-    D3D12_RANGE tensor_buffer_range = {0, output_buffer_size};
+    D3D12_RANGE tensor_buffer_range = {0, dml_->operand_map_[output_index]->SizeInBytes()};
     void* output_buffer_data = nullptr;
     hr = readback_buffer->Map(0, &tensor_buffer_range, &output_buffer_data);
     if (FAILED(hr)) {
       LOG(ERROR) << "Failed map buffer for reading result.";
       return hr;
     }
-    memcpy(mapping.get(), output_buffer_data, output_buffer_size);
+
+    uint16_t* float16_data = static_cast<uint16_t*>(output_buffer_data);
+    float* float32_data = static_cast<float*>(output_buffer_data);
+    std::vector<uint32_t> dimension = dml_->operand_map_[output_index]->dimensions_;
+    std::vector<float> output_data(product(dimension));
+    // NHWC -> NCHW
+    for (size_t n = 0; n < dimension[0]; ++n) {
+      size_t chw_length = dimension[1] * dimension[2] * dimension[3];
+      size_t size = dimension[2] * dimension[3];
+      size_t channel = dimension[1];
+      for (size_t i = 0; i < chw_length; ++i) {
+        if (g_support_f16) {
+          output_data[i + chw_length * n] = Float16Compressor::decompress(float16_data[i % channel * size + i / channel + chw_length * n]);
+        } else {
+          output_data[i + chw_length * n] = float32_data[i % channel * size + i / channel + chw_length * n];
+        }
+      }
+    }
+    memcpy(mapping.get(), output_data.data(), output_buffer_size);
 
     D3D12_RANGE empty_range{0, 0};
     readback_buffer->Unmap(0, &empty_range);

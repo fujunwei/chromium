@@ -191,6 +191,7 @@ HRESULT CloseExecuteResetWait(ComPtr<ID3D12Device> d3D12_device,
   ComPtr<ID3D12Fence> d3D12_fence;
   hr = d3D12_device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
                                  IID_PPV_ARGS(&d3D12_fence));
+  RETURN_IF_FAILED(hr, "Failed creating fence");
 
   HANDLE fence_event_handle = CreateEvent(nullptr, true, false, nullptr);
   if (!fence_event_handle) {
@@ -277,7 +278,7 @@ HRESULT CreateReadbackResource(uint64_t size,
     return hr;
   }
 
-  hr = CreateCommonResource(size, formatted_resource, d3D12_device);
+  hr = CreateOutputResource(size, formatted_resource, d3D12_device);
   if (FAILED(hr)) {
     LOG(ERROR) << "Failed creating resource for formatting output data.";
     return hr;

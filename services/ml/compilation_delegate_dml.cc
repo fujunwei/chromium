@@ -8,12 +8,17 @@
 #include "services/ml/compilation_delegate_dml.h"
 
 #include <dxgi1_4.h>
+// The header file used to init DXCORE_ADAPTER_ATTRIBUTE_D3D12_CORE_COMPUTE.
+#include <initguid.h>
 
 #include "base/logging.h"
 // TODO: Window sdk should be upgraded to 10.0.18361.0 in VS
 // seeing https://chromium-review.googlesource.com/c/chromium/src/+/1054027
 #include "services/ml/common.h"
 #include "services/ml/direct_ml.h"
+// TODO: Window inside perview and sdk should be upgraded to 10.0.18999.0.
+#include "services/ml/dml/dxcore.h"
+#include "services/ml/dml/dxcore_interface.h"
 #include "services/ml/dml_d3dx12_utils.h"
 #include "services/ml/dml_symbol_table.h"
 #include "services/ml/ml_utils_dml.h"
@@ -29,10 +34,11 @@ namespace {
 
 using Microsoft::WRL::ComPtr;
 
-HRESULT InitializeDirect3D12(ComPtr<ID3D12Device>& d3D12_device,
-                             ComPtr<ID3D12CommandQueue>& command_queue,
-                             ComPtr<ID3D12CommandAllocator>& command_allocator,
-                             ComPtr<ID3D12GraphicsCommandList>& command_list) {
+HRESULT InitializeD3D12Device(ComPtr<ID3D12Device>& d3D12_device,
+                              ComPtr<ID3D12CommandQueue>& command_queue,
+                              ComPtr<ID3D12CommandAllocator>& command_allocator,
+                              ComPtr<ID3D12GraphicsCommandList>& command_list,
+                              int32_t preference) {
 #if DEBUG_DIRECT_ML
   ComPtr<ID3D12Debug> d3D12_debug;
   if (FAILED(D3D(D3D12GetDebugInterface)(IID_PPV_ARGS(&d3D12_debug)))) {
@@ -42,57 +48,93 @@ HRESULT InitializeDirect3D12(ComPtr<ID3D12Device>& d3D12_device,
     d3D12_debug->EnableDebugLayer();
   }
 #endif
+  ComPtr<IDXCoreAdapterFactory> adapter_factory;
+  HRESULT hr = DXC(DXCoreCreateAdapterFactory)(IID_PPV_ARGS(&adapter_factory));
+  RETURN_IF_FAILED(hr, "Failed creating adapter factory with DXCore.");
 
-  Microsoft::WRL::ComPtr<IDXGIFactory4> dxgi_factory;
-  HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(&dxgi_factory));
-  if (FAILED(hr)) {
-    LOG(ERROR) << "Failed creating DXGI factory.";
-    return hr;
+  ComPtr<IDXCoreAdapterList> adapter_list;
+  const GUID guids[] = {DXCORE_ADAPTER_ATTRIBUTE_D3D12_CORE_COMPUTE};
+  hr = adapter_factory->CreateAdapterList(ARRAYSIZE(guids), guids,
+                                          IID_PPV_ARGS(&adapter_list));
+  RETURN_IF_FAILED(hr, "Failed creating adapter list.");
+  // GPU Adapter.
+  ComPtr<IDXGIAdapter> dxgi_adapter;
+  D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL_12_0;
+  D3D12_COMMAND_LIST_TYPE command_type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+  // VPU Adapter.
+  ComPtr<IDXCoreAdapter> dxc_adapter;
+  IUnknown* adapter = nullptr;
+  for (size_t i = 0; i < adapter_list->GetAdapterCount(); i++) {
+    dxc_adapter = nullptr;
+    hr = adapter_list->GetAdapter(i, IID_PPV_ARGS(&dxc_adapter));
+    RETURN_IF_FAILED(hr, "Failed getting adapter.");
+    bool is_hardware;
+    hr = dxc_adapter->GetProperty(DXCoreAdapterProperty::IsHardware,
+                                  &is_hardware);
+    RETURN_IF_FAILED(hr, "Failed getting IsHardware property.");
+    if (is_hardware) {
+      size_t description_size;
+      hr = dxc_adapter->GetPropertySize(
+          DXCoreAdapterProperty::DriverDescription, &description_size);
+      RETURN_IF_FAILED(hr, "Failed getting driver description size.")
+      char driver_description[description_size];
+      hr = dxc_adapter->GetProperty(DXCoreAdapterProperty::DriverDescription,
+                                    description_size, driver_description);
+      RETURN_IF_FAILED(hr, "Failed getting driver description.")
+
+      LOG(ERROR) << "The driver description are " << driver_description;
+      if (dxc_adapter->IsAttributeSupported(
+              DXCORE_ADAPTER_ATTRIBUTE_D3D12_GRAPHICS) &&
+          preference == mojom::PREFER_SUSTAINED_SPEED) {
+        // Select GPU Adapter.
+        ComPtr<IDXGIFactory4> dxgi_factory;
+        hr = CreateDXGIFactory1(IID_PPV_ARGS(&dxgi_factory));
+        RETURN_IF_FAILED(hr, "Failed creating DXGI factory.");
+        LUID luid;
+        hr = dxc_adapter->GetProperty(DXCoreAdapterProperty::InstanceLuid,
+                                      &luid);
+        RETURN_IF_FAILED(hr, "Failed getting InstanceLuid property.");
+        hr = dxgi_factory->EnumAdapterByLuid(luid, IID_PPV_ARGS(&dxgi_adapter));
+        RETURN_IF_FAILED(hr, "Failed enum adapter by luid.");
+        adapter = dxgi_adapter.Get();
+        break;
+      } else if (preference == mojom::PREFER_LOW_POWER) {
+        std::string adapter_name = "vpu";
+        std::string driver_description_str = std::string(driver_description);
+        std::transform(driver_description_str.begin(),
+                       driver_description_str.end(),
+                       driver_description_str.begin(), ::tolower);
+        if (strstr(driver_description_str.c_str(), adapter_name.c_str())) {
+          feature_level = D3D_FEATURE_LEVEL_1_0_CORE;
+          command_type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+          adapter = dxc_adapter.Get();
+          break;
+        }
+      }
+    }
   }
 
-  ComPtr<IDXGIAdapter> dxgi_adapter;
-  size_t adapter_index = 0;
-  do {
-    dxgi_adapter = nullptr;
-    hr = dxgi_factory->EnumAdapters(adapter_index, &dxgi_adapter);
-    if (FAILED(hr))
-      return hr;
-    ++adapter_index;
-
-    hr = D3D(D3D12CreateDevice)(dxgi_adapter.Get(), D3D_FEATURE_LEVEL_12_0,
-                                IID_PPV_ARGS(&d3D12_device));
-    if (hr == DXGI_ERROR_UNSUPPORTED)
-      continue;
-    if (FAILED(hr)) {
-      LOG(ERROR) << "Failed creating d3d12 device.";
-      return hr;
-    }
-  } while (hr != S_OK);
-
+  if (adapter == nullptr) {
+    LOG(ERROR) << "There is no adapter to select.";
+    return E_FAIL;
+  }
+  hr = D3D(D3D12CreateDevice)(adapter, feature_level,
+                              IID_PPV_ARGS(&d3D12_device));
+  RETURN_IF_FAILED(hr, "Failed creating device.");
   D3D12_COMMAND_QUEUE_DESC command_queue_desc = {};
-  command_queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+  command_queue_desc.Type = command_type;
   command_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
   hr = d3D12_device->CreateCommandQueue(&command_queue_desc,
                                         IID_PPV_ARGS(&command_queue));
-  if (FAILED(hr)) {
-    LOG(ERROR) << "Failed creating command queue.";
-    return hr;
-  }
+  RETURN_IF_FAILED(hr, "Failed creating command queue.");
 
-  hr = d3D12_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+  hr = d3D12_device->CreateCommandAllocator(command_type,
                                             IID_PPV_ARGS(&command_allocator));
-  if (FAILED(hr)) {
-    LOG(ERROR) << "Failed creating command allocator.";
-    return hr;
-  }
+  RETURN_IF_FAILED(hr, "Failed creating command allocator.");
 
-  hr = d3D12_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-                                       command_allocator.Get(), nullptr,
-                                       IID_PPV_ARGS(&command_list));
-  if (FAILED(hr)) {
-    LOG(ERROR) << "Failed creating command allocator.";
-    return hr;
-  }
+  hr = d3D12_device->CreateCommandList(0, command_type, command_allocator.Get(),
+                                       nullptr, IID_PPV_ARGS(&command_list));
+  RETURN_IF_FAILED(hr, "Failed creating command allocator.");
   return S_OK;
 }
 
@@ -108,23 +150,24 @@ HRESULT CreateCommittedResources(scoped_refptr<CompiledModelDML> dml,
         std::make_unique<OperandDML>(model->operands[index]->dimensions);
     // The input data will be formatted with hsls, so the size of input
     // data is Float32 * product(dimensions).
-    size_t input_data_size =
-        product(model->operands[index]->dimensions) * sizeof(float);
-    hr = CreateUploadResource(
-        input_data_size, dml->operand_map_[index]->upload_resource_,
-        dml->operand_map_[index]->format_resource_, dml->d3d12_device_);
+    // size_t input_data_size =
+    //     product(model->operands[index]->dimensions) * sizeof(float);
+    hr = CreateUploadResource(dml->operand_map_[index]->SizeInBytes(),
+                              dml->operand_map_[index]->upload_resource_,
+                              dml->operand_map_[index]->operand_resource_,
+                              dml->d3d12_device_);
     if (FAILED(hr)) {
       LOG(ERROR) << "Failed creating upload committed resource for inputs.";
       return hr;
     }
     // Create common resource for formatting input data.
-    hr = CreateCommonResource(dml->operand_map_[index]->SizeInBytes(),
-                              dml->operand_map_[index]->operand_resource_,
-                              dml->d3d12_device_);
-    if (FAILED(hr)) {
-      LOG(ERROR) << "Failed creating resource for formatting input data.";
-      return hr;
-    }
+    // hr = CreateCommonResource(dml->operand_map_[index]->SizeInBytes(),
+    //                           dml->operand_map_[index]->operand_resource_,
+    //                           dml->d3d12_device_);
+    // if (FAILED(hr)) {
+    //   LOG(ERROR) << "Failed creating resource for formatting input data.";
+    //   return hr;
+    // }
   }
 
   // Create readback resource for graphic outputs.
@@ -133,21 +176,20 @@ HRESULT CreateCommittedResources(scoped_refptr<CompiledModelDML> dml,
     size_t index = outputs[i];
     dml->operand_map_[index] =
         std::make_unique<OperandDML>(model->operands[index]->dimensions);
-    hr = CreateOutputResource(dml->operand_map_[index]->SizeInBytes(),
-                              dml->operand_map_[index]->operand_resource_,
-                              dml->d3d12_device_);
-    if (FAILED(hr)) {
-      LOG(ERROR) << "Failed creating committed resource for output data.";
-      return hr;
-    }
+    // hr = CreateOutputResource(dml->operand_map_[index]->SizeInBytes(),
+    //                           dml->operand_map_[index]->operand_resource_,
+    //                           dml->d3d12_device_);
+    // if (FAILED(hr)) {
+    //   LOG(ERROR) << "Failed creating committed resource for output data.";
+    //   return hr;
+    // }
 
     // The input data will be formatted with hsls, so the size of input
     // data is Float32 * product(dimensions).
-    size_t output_data_size =
-        product(model->operands[index]->dimensions) * sizeof(float);
-    hr = CreateReadbackResource(
-        output_data_size, dml->operand_map_[index]->readback_resource_,
-        dml->operand_map_[index]->format_resource_, dml->d3d12_device_);
+    hr = CreateReadbackResource(dml->operand_map_[index]->SizeInBytes(),
+                                dml->operand_map_[index]->readback_resource_,
+                                dml->operand_map_[index]->operand_resource_,
+                                dml->d3d12_device_);
     if (FAILED(hr)) {
       LOG(ERROR) << "Failed creating readback committed resource for inputs.";
       return hr;
@@ -391,8 +433,8 @@ HRESULT InitializeOperators(scoped_refptr<CompiledModelDML> dml,
 }
 
 HRESULT BindingTableForExecution(IDMLDevice* dml_device,
-                              OperationDML* operation,
-                              CompiledModelDML* dml) {
+                                 OperationDML* operation,
+                                 CompiledModelDML* dml) {
   // Create a table per executed operator.
   auto binding_props = operation->compiled_operator_->GetBindingProperties();
   DML_BINDING_TABLE_DESC table_desc = {
@@ -433,7 +475,7 @@ HRESULT BindingTableForExecution(IDMLDevice* dml_device,
       input_binding_array[i] = {DML_BINDING_TYPE_NONE, nullptr};
     } else {
       input_buffer_array[i] = {operand->operand_resource_.Get(), 0,
-                                 operand->SizeInBytes()};
+                               operand->SizeInBytes()};
       input_binding_array[i] = {DML_BINDING_TYPE_BUFFER,
                                 &input_buffer_array[i]};
     }
@@ -466,9 +508,9 @@ CompilationDelegateDML::CompilationDelegateDML(
   temp_operand_index_ = model->operands.size();
 
   // Set up Direct3D 12.
-  HRESULT hr =
-      InitializeDirect3D12(dml_->d3d12_device_, dml_->command_queue_,
-                           dml_->command_allocator_, dml_->command_list_);
+  HRESULT hr = InitializeD3D12Device(
+      dml_->d3d12_device_, dml_->command_queue_, dml_->command_allocator_,
+      dml_->command_list_, compilation_->GetPreference());
   if (FAILED(hr)) {
     LOG(ERROR) << "Failed initializing D3D12.";
     return;
@@ -499,6 +541,7 @@ CompilationDelegateDML::CompilationDelegateDML(
     DLOG(INFO) << "Support float16 data type " << g_support_f16;
   }
   g_support_f16 = support_f16.IsSupported;
+  LOG(ERROR) << "Support float16 data type " << g_support_f16;
 }
 
 CompilationDelegateDML::~CompilationDelegateDML() = default;
@@ -562,7 +605,7 @@ int32_t CompilationDelegateDML::Compile() {
 
   for (size_t i = 0; i < dml_->operations_.size(); ++i) {
     hr = BindingTableForExecution(dml_->dml_device_.Get(),
-                               dml_->operations_[i].get(), dml_.get());
+                                  dml_->operations_[i].get(), dml_.get());
     if (FAILED(hr)) {
       LOG(ERROR) << "Failed binding table for execution.";
     }

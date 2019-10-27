@@ -183,6 +183,8 @@ source_set("lib") {
       "compilation_delegate_mkl_dnn.h",
       "compilation_impl.cc",
       "compilation_impl.h",
+      "dml/dxcore.h",
+      "dml/dxcore_interface.h",
       "dml/float16_compressor.h",
       "dml/format_data.cc",
       "dml/format_data.h",
