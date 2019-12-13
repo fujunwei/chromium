@@ -37,9 +37,10 @@ class API_AVAILABLE(macosx(10.13)) ExecutionImplMPS : public mojom::Execution {
   ~ExecutionImplMPS() override;
 
   void StartCompute(StartComputeCallback callback) override;
-  
+
   void SetGpuMemoryBufferHandle(
-      uint32 index, gfx::GpuMemoryBufferHandle buffer_handle) override;
+      uint32 index,
+      gfx::GpuMemoryBufferHandle buffer_handle) override;
 
  private:
   mojom::ExecutionInitParamsPtr params_;
@@ -53,6 +54,9 @@ class API_AVAILABLE(macosx(10.13)) ExecutionImplMPS : public mojom::Execution {
                                std::vector<id<MTLBuffer>>&,
                                const std::vector<uint32_t>&);
   void CreateOutputMTLBuffer();
+  base::scoped_nsobject<MPSImage> CreateImageWithIoSurface(
+      size_t index,
+      base::ScopedCFTypeRef<IOSurfaceRef> io_surface);
 
   void API_AVAILABLE(macos(10_13)) UploadToMPSImage(const MPSImage*,
                                                     const id<MTLBuffer>&,
@@ -66,6 +70,8 @@ class API_AVAILABLE(macosx(10.13)) ExecutionImplMPS : public mojom::Execution {
   API_AVAILABLE(macos(10_13))
   std::vector<base::scoped_nsobject<MPSImage>> constant_mpsimages_;
   API_AVAILABLE(macos(10_13)) std::vector<id<MTLBuffer>> constant_mtlbuffers_;
+  std::map<size_t, base::ScopedCFTypeRef<IOSurfaceRef>> io_surface_;
+  bool create_images_;
 
   DISALLOW_COPY_AND_ASSIGN(ExecutionImplMPS);
 };

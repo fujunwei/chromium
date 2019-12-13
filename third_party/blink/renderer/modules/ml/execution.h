@@ -46,12 +46,14 @@ class Execution final : public ScriptWrappable {
   void setInput(uint32_t,
                 WebGL2RenderingContext*,
                 WebGLTexture*,
+                uint32_t width,
+                uint32_t height,
                 ExceptionState&);
   void setOutput(uint32_t, MaybeShared<DOMArrayBufferView>, ExceptionState&);
   void setOutput(uint32_t,
-                WebGL2RenderingContext*,
-                WebGLTexture*,
-                ExceptionState&);
+                 WebGL2RenderingContext*,
+                 WebGLTexture*,
+                 ExceptionState&);
   ScriptPromise startCompute(ScriptState*);
 
   void Trace(blink::Visitor*) override;

@@ -13,8 +13,8 @@
 #include "services/ml/ml_utils_mac.h"
 #include "services/ml/mps_protocols_impl.h"
 #include "services/ml/mpscnn_context.h"
-#include "services/ml/public/mojom/constants.mojom.h"
 #include "services/ml/opengl_metal_mac/shared_metal.h"
+#include "services/ml/public/mojom/constants.mojom.h"
 
 namespace ml {
 
@@ -105,14 +105,7 @@ ExecutionImplMPS::ExecutionImplMPS(
   SetupOperandInfoForOperands(outputs_info_, compiled_model_->operands_,
                               compiled_model_->outputs_, params_->memory,
                               mapped_length);
-
-  if (@available(macOS 10.13, *)) {
-    SetupMPSImageForOperands(input_mpsimages_, input_mtlbuffers_,
-                             compiled_model_->inputs_);
-    SetupMPSImageForOperands(constant_mpsimages_, constant_mtlbuffers_,
-                             compiled_model_->constants_);
-    CreateOutputMTLBuffer();
-  }
+  create_images_ = false;
 }
 
 ExecutionImplMPS::~ExecutionImplMPS() = default;
@@ -122,6 +115,12 @@ void API_AVAILABLE(macosx(10.13)) ExecutionImplMPS::SetupMPSImageForOperands(
     std::vector<id<MTLBuffer>>& mtl_buffer_array,
     const std::vector<uint32_t>& operands_index_array) {
   for (size_t i = 0; i < operands_index_array.size(); ++i) {
+    size_t index = operands_index_array[i];
+    if (io_surface_.find(index) != io_surface_.end()) {
+      mps_image_array.push_back(
+          CreateImageWithIoSurface(index, io_surface_[index]));
+      continue;
+    }
     const OperandMac& operand =
         compiled_model_->operands_[operands_index_array[i]];
     if (@available(macOS 10.13, *)) {
@@ -139,6 +138,28 @@ void API_AVAILABLE(macosx(10.13)) ExecutionImplMPS::SetupMPSImageForOperands(
   }
 }
 
+base::scoped_nsobject<MPSImage> ExecutionImplMPS::CreateImageWithIoSurface(
+    size_t index,
+    base::ScopedCFTypeRef<IOSurfaceRef> io_surface) {
+  const OperandMac& operand = compiled_model_->operands_[index];
+  uint32_t n, width, height, channels;
+  ml::GetMPSImageInfo(operand, n, width, height, channels);
+
+  MTLTextureDescriptor* textureDescriptor = [MTLTextureDescriptor
+      texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                   width:width
+                                  height:height
+                               mipmapped:NO];
+  id<MTLTexture> metalTexture =
+      [GetMPSCNNContext().device newTextureWithDescriptor:textureDescriptor
+                                                iosurface:io_surface
+                                                    plane:0];
+
+  base::scoped_nsobject<MPSImage> mps_img(
+      [[MPSImage alloc] initWithTexture:metalTexture featureChannels:channels]);
+  return mps_img;
+}
+
 API_AVAILABLE(macosx(10.13))
 void ExecutionImplMPS::CreateOutputMTLBuffer() {
   for (size_t i = 0; i < compiled_model_->outputs_.size(); ++i) {
@@ -153,50 +174,12 @@ void ExecutionImplMPS::CreateOutputMTLBuffer() {
 void ExecutionImplMPS::SetGpuMemoryBufferHandle(
     uint32 index,
     gfx::GpuMemoryBufferHandle buffer_handle) {
-  LOG(ERROR) << "=====ExecutionImplMacMPS::SetGpuMemoryBufferHandle.";
   base::ScopedCFTypeRef<IOSurfaceRef> io_surface(
       IOSurfaceLookupFromMachPort(buffer_handle.mach_port.get()));
   if (!io_surface) {
     LOG(ERROR) << "Failed to open IOSurface via mach port.";
   }
-
-  // MTLTextureDescriptor* textureDescriptor = [MTLTextureDescriptor
-  //     texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
-  //                                  width:4
-  //                                 height:4
-  //                              mipmapped:NO];
-  // id<MTLTexture> metalTexture = [GetMPSCNNContext().device newTextureWithDescriptor:textureDescriptor
-  //                                              iosurface:io_surface
-  //                                                  plane:0];
-
-  // size_t bytes_per_row = IOSurfaceGetBytesPerRow(io_surface);
-  // const unsigned char* src =
-  //     static_cast<unsigned char*>(IOSurfaceGetBaseAddress(io_surface));
-  // LOG(ERROR) << "======the IOSurfaceGetBytesPerRow = " << bytes_per_row;
-
-  base::ScopedCFTypeRef<CVPixelBufferRef> cv_pixel_buffer;
-  CVPixelBufferCreateWithIOSurface(nullptr, io_surface, nullptr,
-                                   cv_pixel_buffer.InitializeInto());
-
-  CVPixelBufferLockBaseAddress(cv_pixel_buffer, kCVPixelBufferLock_ReadOnly);
-  // // const __fp16* src =
-  //     // static_cast<__fp16*>(CVPixelBufferGetBaseAddress(cv_pixel_buffer));
-  const unsigned char* src =
-      static_cast<unsigned char*>(CVPixelBufferGetBaseAddress(cv_pixel_buffer));
-  const size_t bytesPerRow = CVPixelBufferGetBytesPerRow(cv_pixel_buffer);
-  const size_t cv_height = CVPixelBufferGetHeight(cv_pixel_buffer);
-  const size_t cv_width = CVPixelBufferGetWidth(cv_pixel_buffer);
-  // LOG(ERROR) << "======operand width = " << cv_width << " " << cv_height
-  //            << " format = "
-  //            << CVPixelBufferGetPixelFormatType(cv_pixel_buffer);
-  for (size_t i = 0; i < cv_height; ++i) {
-    for (size_t j = 0; j < cv_width * 4; ++j) {
-      LOG(ERROR) << "======the data = " << static_cast<int>(src[j]);
-    }
-    src += bytesPerRow;
-  }
-
-  CVPixelBufferUnlockBaseAddress(cv_pixel_buffer, kCVPixelBufferLock_ReadOnly);
+  io_surface_[index] = io_surface;
 }
 
 void ExecutionImplMPS::StartCompute(StartComputeCallback callback) {
@@ -207,15 +190,26 @@ void ExecutionImplMPS::StartCompute(StartComputeCallback callback) {
       @autoreleasepool {
         id<MTLCommandBuffer> command_buffer =
             [GetMPSCNNContext().command_queue commandBuffer];
+        if (!create_images_) {
+          SetupMPSImageForOperands(input_mpsimages_, input_mtlbuffers_,
+                                   compiled_model_->inputs_);
+          SetupMPSImageForOperands(constant_mpsimages_, constant_mtlbuffers_,
+                                   compiled_model_->constants_);
+          CreateOutputMTLBuffer();
+          create_images_ = true;
+        }
 
         NSMutableArray<MPSImage*>* image_array =
             [NSMutableArray arrayWithCapacity:1];
         for (size_t i = 0; i < compiled_model_->inputs_.size(); ++i) {
           std::unique_ptr<OperandInfo>& input_data = inputs_info_[i];
           MPSImage* mps_img = input_mpsimages_[i].get();
-          const id<MTLBuffer> mtl_buffer = input_mtlbuffers_[i];
-          UploadToMPSImage(mps_img, mtl_buffer, command_buffer,
-                           input_data->mapping.get(), input_data->length);
+          size_t index = compiled_model_->inputs_[i];
+          if (io_surface_.find(index) == io_surface_.end()) {
+            const id<MTLBuffer> mtl_buffer = input_mtlbuffers_[i];
+            UploadToMPSImage(mps_img, mtl_buffer, command_buffer,
+                             input_data->mapping.get(), input_data->length);
+          }
           [image_array addObject:mps_img];
         }
 
