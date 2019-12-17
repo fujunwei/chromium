@@ -105,7 +105,12 @@ ExecutionImplMPS::ExecutionImplMPS(
   SetupOperandInfoForOperands(outputs_info_, compiled_model_->operands_,
                               compiled_model_->outputs_, params_->memory,
                               mapped_length);
-  create_images_ = false;
+
+  SetupMPSImageForOperands(input_mpsimages_, input_mtlbuffers_,
+                           compiled_model_->inputs_);
+  SetupMPSImageForOperands(constant_mpsimages_, constant_mtlbuffers_,
+                           compiled_model_->constants_);
+  CreateOutputMTLBuffer();
 }
 
 ExecutionImplMPS::~ExecutionImplMPS() = default;
@@ -115,12 +120,6 @@ void API_AVAILABLE(macosx(10.13)) ExecutionImplMPS::SetupMPSImageForOperands(
     std::vector<id<MTLBuffer>>& mtl_buffer_array,
     const std::vector<uint32_t>& operands_index_array) {
   for (size_t i = 0; i < operands_index_array.size(); ++i) {
-    size_t index = operands_index_array[i];
-    if (io_surface_.find(index) != io_surface_.end()) {
-      mps_image_array.push_back(
-          CreateImageWithIoSurface(index, io_surface_[index]));
-      continue;
-    }
     const OperandMac& operand =
         compiled_model_->operands_[operands_index_array[i]];
     if (@available(macOS 10.13, *)) {
@@ -138,12 +137,32 @@ void API_AVAILABLE(macosx(10.13)) ExecutionImplMPS::SetupMPSImageForOperands(
   }
 }
 
+id<MTLTexture> ExecutionImplMPS::CreateSharedTexture(
+    size_t index,
+    base::ScopedCFTypeRef<IOSurfaceRef> io_surface) {
+  const OperandMac& operand = compiled_model_->operands_[index];
+  uint32_t n, width, height, channels;
+  ml::GetMPSImageInfo(operand, n, width, height, channels);
+
+  MTLTextureDescriptor* textureDescriptor = [MTLTextureDescriptor
+      texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                   width:width * height
+                                  height:channels
+                               mipmapped:NO];
+  id<MTLTexture> metalTexture =
+      [GetMPSCNNContext().device newTextureWithDescriptor:textureDescriptor
+                                                iosurface:io_surface
+                                                    plane:0];
+  return metalTexture;
+}
+
 base::scoped_nsobject<MPSImage> ExecutionImplMPS::CreateImageWithIoSurface(
     size_t index,
     base::ScopedCFTypeRef<IOSurfaceRef> io_surface) {
   const OperandMac& operand = compiled_model_->operands_[index];
   uint32_t n, width, height, channels;
   ml::GetMPSImageInfo(operand, n, width, height, channels);
+  LOG(ERROR) << "======channles " << width << " " << height << "  " << channels;
 
   MTLTextureDescriptor* textureDescriptor = [MTLTextureDescriptor
       texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
@@ -154,7 +173,6 @@ base::scoped_nsobject<MPSImage> ExecutionImplMPS::CreateImageWithIoSurface(
       [GetMPSCNNContext().device newTextureWithDescriptor:textureDescriptor
                                                 iosurface:io_surface
                                                     plane:0];
-
   base::scoped_nsobject<MPSImage> mps_img(
       [[MPSImage alloc] initWithTexture:metalTexture featureChannels:channels]);
   return mps_img;
@@ -190,14 +208,6 @@ void ExecutionImplMPS::StartCompute(StartComputeCallback callback) {
       @autoreleasepool {
         id<MTLCommandBuffer> command_buffer =
             [GetMPSCNNContext().command_queue commandBuffer];
-        if (!create_images_) {
-          SetupMPSImageForOperands(input_mpsimages_, input_mtlbuffers_,
-                                   compiled_model_->inputs_);
-          SetupMPSImageForOperands(constant_mpsimages_, constant_mtlbuffers_,
-                                   compiled_model_->constants_);
-          CreateOutputMTLBuffer();
-          create_images_ = true;
-        }
 
         NSMutableArray<MPSImage*>* image_array =
             [NSMutableArray arrayWithCapacity:1];
@@ -209,6 +219,10 @@ void ExecutionImplMPS::StartCompute(StartComputeCallback callback) {
             const id<MTLBuffer> mtl_buffer = input_mtlbuffers_[i];
             UploadToMPSImage(mps_img, mtl_buffer, command_buffer,
                              input_data->mapping.get(), input_data->length);
+          } else {
+            ReorderSharedTexture(mps_img,
+                                 CreateSharedTexture(index, io_surface_[index]),
+                                 command_buffer);
           }
           [image_array addObject:mps_img];
         }
@@ -344,6 +358,30 @@ void ExecutionImplMPS::UploadToMPSImage(
     [encoder setComputePipelineState:state];
     [encoder setBuffer:mtl_buffer offset:0 atIndex:0];
     [encoder setTexture:[mps_image texture] atIndex:0];
+    const auto& inputLaunchParams =
+        SpatialPointwiseKernelLaunchParams(state, mps_image);
+    [encoder dispatchThreadgroups:inputLaunchParams.threadgroupsPerGrid
+            threadsPerThreadgroup:inputLaunchParams.threadsPerThreadgroup];
+    [encoder endEncoding];
+  }
+}
+
+void ExecutionImplMPS::ReorderSharedTexture(
+    const MPSImage* mps_image,
+    const id<MTLTexture>& mtl_texture,
+    const id<MTLCommandBuffer>& command_buffer) {
+  if (@available(macOS 10.13, *)) {
+    id<MTLComputeCommandEncoder> encoder =
+        [command_buffer computeCommandEncoder];
+    id<MTLComputePipelineState> state =
+        GetMPSCNNContext().GetSpecializedPipelineState(
+            KernelFor(mps_image, @"reorder_shared_texture",
+                      @"reorder_shared_texture_nonarray"),
+            {{ushort(mps_image.height), ushort(mps_image.width),
+              ushort(mps_image.featureChannels)}});
+    [encoder setComputePipelineState:state];
+    [encoder setTexture:mtl_texture atIndex:0];
+    [encoder setTexture:[mps_image texture] atIndex:1];
     const auto& inputLaunchParams =
         SpatialPointwiseKernelLaunchParams(state, mps_image);
     [encoder dispatchThreadgroups:inputLaunchParams.threadgroupsPerGrid

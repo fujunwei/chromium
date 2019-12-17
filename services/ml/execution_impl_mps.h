@@ -57,12 +57,19 @@ class API_AVAILABLE(macosx(10.13)) ExecutionImplMPS : public mojom::Execution {
   base::scoped_nsobject<MPSImage> CreateImageWithIoSurface(
       size_t index,
       base::ScopedCFTypeRef<IOSurfaceRef> io_surface);
+  id<MTLTexture> CreateSharedTexture(
+      size_t index,
+      base::ScopedCFTypeRef<IOSurfaceRef> io_surface);
 
   void API_AVAILABLE(macos(10_13)) UploadToMPSImage(const MPSImage*,
                                                     const id<MTLBuffer>&,
                                                     const id<MTLCommandBuffer>&,
                                                     const void*,
                                                     size_t);
+  void ReorderSharedTexture(const MPSImage* mps_image,
+                            const id<MTLTexture>& mtl_texture,
+                            const id<MTLCommandBuffer>& command_buffer);
+
   API_AVAILABLE(macos(10_13))
   std::vector<base::scoped_nsobject<MPSImage>> input_mpsimages_;
   API_AVAILABLE(macos(10_13)) std::vector<id<MTLBuffer>> input_mtlbuffers_;
@@ -71,7 +78,6 @@ class API_AVAILABLE(macosx(10.13)) ExecutionImplMPS : public mojom::Execution {
   std::vector<base::scoped_nsobject<MPSImage>> constant_mpsimages_;
   API_AVAILABLE(macos(10_13)) std::vector<id<MTLBuffer>> constant_mtlbuffers_;
   std::map<size_t, base::ScopedCFTypeRef<IOSurfaceRef>> io_surface_;
-  bool create_images_;
 
   DISALLOW_COPY_AND_ASSIGN(ExecutionImplMPS);
 };
