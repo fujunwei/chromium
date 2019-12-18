@@ -215,6 +215,77 @@ out[int(h) * W * C + int(w) * C + int(c)] = cs[idx];  \
 #undef CHWP4_TO_HWC
 }
 
+kernel void reorder_output_texture(texture2d<half, access::read> in[[texture(0)]],
+                               texture2d_array<half, access::write> out[[texture(1)]],
+                               ushort3 gid[[thread_position_in_grid]]) {
+    const ushort H = ushort_arg_0;
+    const ushort W = ushort_arg_1;
+    const ushort C = ushort_arg_2;
+    if (gid.x >= W || gid.y >= H) {
+        return;
+    }
+    
+    const ushort n = gid.z / divRoundUp(C, 4);
+    const ushort c = gid.z - n * divRoundUp(C, 4);
+    
+    // TODO: are the `else` branches needed?
+    // TODO: trick the optimizer for case where C == 4?
+#define HWC_TO_CHWP4(idx, n, c_, c, y, x)                                     \
+if ((c) < C) {                                                          \
+  const ushort shared_texture_x = idx / 2 + c_ / 2; \
+  const ushort shared_texture_row = x + y * W; \
+  const ushort shared_texture_y = shared_texture_row / 2; \
+  const ushort shared_texture_c = (shared_texture_row % 2) * 2; \
+  half4 cs = in.read({shared_texture_x, shared_texture_y});       \
+  trns[idx] = cs[c + shared_texture_c]; \
+} else {                                                                 \
+trns[idx] = 0.0h;                                                      \
+}
+    
+    half4 trns;
+    HWC_TO_CHWP4(0, n, c * 4, 0, gid.y, gid.x);
+    HWC_TO_CHWP4(1, n, c * 4, 1, gid.y, gid.x);
+    HWC_TO_CHWP4(2, n, c * 4, 0, gid.y, gid.x);
+    HWC_TO_CHWP4(3, n, c * 4, 1, gid.y, gid.x);
+#undef HWC_TO_CHWP4
+    
+    out.write(trns, gid.xy, gid.z);
+}
+
+kernel void reorder_output_texture_nonarray(texture2d<half, access::read> in[[texture(0)]],
+                                        texture2d<half, access::write> out[[texture(1)]],
+                                        ushort2 gid[[thread_position_in_grid]]) {
+    const ushort H = ushort_arg_0;
+    const ushort W = ushort_arg_1;
+    const ushort C = ushort_arg_2;
+    
+    if (gid.x >= W || gid.y >= H) {
+        return;
+    }
+    
+    half4 trns;
+    // TODO: are the `else` branches needed?
+    // TODO: trick the optimizer for case where C % 4 == 0?
+  // Unpack for 2 * 2
+    
+#define HWC_TO_CHWP4(idx, c, y, x)                      \
+if ((c) < C) {                                          \
+  half4 cs = in.read({x, y}); \
+  trns[idx] = cs[idx]; \
+} else {                                                \
+  trns[idx] = 0.0h;                                     \
+}
+    
+    HWC_TO_CHWP4(0, 0, gid.y, gid.x);
+    // HWC_TO_CHWP4(1, 1, gid.y, gid.x);
+    // HWC_TO_CHWP4(2, 0, gid.y, gid.x);
+    // HWC_TO_CHWP4(3, 1, gid.y, gid.x);
+
+#undef HWC_TO_CHWP4
+    
+    out.write(trns, gid.xy);
+}
+
 )V0G0N";
 
 MPSCNNContext::MPSCNNContext() = default;

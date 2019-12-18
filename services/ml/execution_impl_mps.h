@@ -58,7 +58,6 @@ class API_AVAILABLE(macosx(10.13)) ExecutionImplMPS : public mojom::Execution {
       size_t index,
       base::ScopedCFTypeRef<IOSurfaceRef> io_surface);
   id<MTLTexture> CreateSharedTexture(
-      size_t index,
       base::ScopedCFTypeRef<IOSurfaceRef> io_surface);
 
   void API_AVAILABLE(macos(10_13)) UploadToMPSImage(const MPSImage*,
@@ -67,6 +66,9 @@ class API_AVAILABLE(macosx(10.13)) ExecutionImplMPS : public mojom::Execution {
                                                     const void*,
                                                     size_t);
   void ReorderSharedTexture(const MPSImage* mps_image,
+                            const id<MTLTexture>& mtl_texture,
+                            const id<MTLCommandBuffer>& command_buffer);
+  void ReorderOutputTexture(const MPSImage* mps_image,
                             const id<MTLTexture>& mtl_texture,
                             const id<MTLCommandBuffer>& command_buffer);
 

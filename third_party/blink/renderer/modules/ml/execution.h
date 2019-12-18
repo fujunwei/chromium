@@ -53,6 +53,9 @@ class Execution final : public ScriptWrappable {
   void setOutput(uint32_t,
                  WebGL2RenderingContext*,
                  WebGLTexture*,
+
+                 uint32_t width,
+                 uint32_t height,
                  ExceptionState&);
   ScriptPromise startCompute(ScriptState*);
 
@@ -70,9 +73,12 @@ class Execution final : public ScriptWrappable {
   WTF::Vector<std::unique_ptr<OperandInfo>> outputs_;
 
   HeapHashSet<Member<ScriptPromiseResolver>> requests_;
-  std::map<uint32_t, mojo::ScopedSharedBufferHandle> input_shared_buffers_;
-  std::map<uint32_t, mojo::ScopedSharedBufferHandle> output_shared_buffers_;
   HeapVector<Member<DOMArrayBufferView>> output_buffer_views_;
+  GLuint output_texture_;
+  uint32_t output_texture_width_;
+  uint32_t output_texture_height_;
+  std::unique_ptr<gfx::GpuMemoryBuffer> output_gpu_memory_buffer_;
+  DrawingBuffer* drawing_buffer_;
 };
 
 }  // namespace blink
