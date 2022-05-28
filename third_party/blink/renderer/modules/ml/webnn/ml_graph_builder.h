@@ -42,6 +42,8 @@ class MLGraphBuilder final : public ScriptWrappable {
 
   void Trace(Visitor* visitor) const override;
 
+  MLContext* GetContext() const;
+
   // ml_graph_builder.idl
   MLOperand* input(String name,
                    const MLOperandDescriptor* desc,
@@ -79,8 +81,7 @@ class MLGraphBuilder final : public ScriptWrappable {
 
   MLOperand* softmax(const MLOperand*, ExceptionState&);
 
-  MLGraph* build(const MLNamedOperands& outputs,
-                 ExceptionState& exception_state);
+  MLGraph* build(ScriptState*, const MLNamedOperands&, ExceptionState&);
 
  private:
   MLOperand* BuildElementWiseBinary(MLOperator::OpKind,

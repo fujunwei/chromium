@@ -10,18 +10,33 @@ blink_modules_sources("webnn") {
     "ml_graph.h",
     "ml_graph_builder.cc",
     "ml_graph_builder.h",
-    "ml_graph_xnnpack.cc",
-    "ml_graph_xnnpack.h",
     "ml_operand.cc",
     "ml_operand.h",
     "ml_operator.cc",
     "ml_operator.h",
+    "webnn_client.cc",
+    "webnn_client.h",
+    "webnn_context.cc",
+    "webnn_context.h",
+    "webnn_object.cc",
+    "webnn_object.h",
   ]
 
-  deps = [
-    "//third_party/blink/renderer/modules/ml",
-    "//third_party/cpuinfo",
-    "//third_party/pthreadpool",
-    "//third_party/xnnpack",
-  ]
+  deps = [ "//third_party/blink/renderer/modules/ml" ]
+  if (is_linux) {
+    sources += [
+      "ml_graph_xnnpack.cc",
+      "ml_graph_xnnpack.h",
+    ]
+    deps = [
+      "//third_party/cpuinfo",
+      "//third_party/pthreadpool",
+      "//third_party/xnnpack",
+    ]
+  } else if (is_win) {
+    sources += [
+      "webnn_graph.cc",
+      "webnn_graph.h",
+    ]
+  }
 }

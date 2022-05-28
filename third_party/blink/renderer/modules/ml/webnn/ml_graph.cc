@@ -8,14 +8,9 @@
 
 namespace blink {
 
-MLGraph::MLGraph(MLContext* context) : ml_context_(context) {}
+MLGraph::MLGraph(MLContext* context) : WebnnObject(context) {}
 
 MLGraph::~MLGraph() = default;
-
-void MLGraph::Trace(Visitor* visitor) const {
-  visitor->Trace(ml_context_);
-  ScriptWrappable::Trace(visitor);
-}
 
 void MLGraph::compute(const MLNamedArrayInputs& inputs,
                       const MLNamedArrayOutputs& outputs,

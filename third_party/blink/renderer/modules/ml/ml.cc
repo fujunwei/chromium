@@ -4,13 +4,19 @@
 
 #include "third_party/blink/renderer/modules/ml/ml.h"
 
+#include "build/buildflag.h"
 #include "components/ml/mojom/web_platform_model.mojom-blink.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_context_options.h"
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/core/inspector/console_message.h"
-#include "third_party/blink/renderer/modules/ml/ml_context_xnnpack.h"
+#include "third_party/blink/renderer/modules/ml/webnn/webnn_client.h"
+#include "third_party/blink/renderer/modules/ml/webnn/webnn_context.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
+
+#if BUILDFLAG(IS_LINUX)
+#include "third_party/blink/renderer/modules/ml/ml_context_xnnpack.h"
+#endif
 
 namespace blink {
 
@@ -41,38 +47,42 @@ void ML::Trace(Visitor* visitor) const {
   visitor->Trace(execution_context_);
   visitor->Trace(remote_service_);
 
+  // Webnn
+  webnn_client_->Trace(visitor);
+
   ScriptWrappable::Trace(visitor);
 }
 
-MLContext* ML::createContext(ScriptState* script_state,
-                             MLContextOptions* option,
-                             ExceptionState& exception_state) {
+ScriptPromise ML::createContext(ScriptState* script_state,
+                                MLContextOptions* option,
+                                ExceptionState& exception_state) {
   if (!script_state->ContextIsValid()) {
     exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
                                       "Invalid script state");
-    return nullptr;
+    return ScriptPromise();
   }
 
   // Notice that currently, we just create the context in the renderer. In the
   // future we may add backend query ability to check whether a context is
   // supportable or not. At that time, this function will be truly asynced.
-
-  MLContext* ml_context;
+  ScriptPromiseResolver* resolver =
+      MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  auto promise = resolver->Promise();
+  MLContext* ml_context = nullptr;
   if (option->type() == V8MLContextType::Enum::kWebnn) {
     // Create MLContext for WebNN
     if (option->devicePreference().AsEnum() ==
             V8MLDevicePreference::Enum::kDefault ||
         option->devicePreference().AsEnum() ==
-            V8MLDevicePreference::Enum::kAuto ||
-        option->devicePreference().AsEnum() ==
             V8MLDevicePreference::Enum::kCpu) {
       // Create XNNPACK backed MLContext for WebNN
+#if BUILDFLAG(IS_LINUX)
       MLContextXnnpack* ml_context_xnnpack =
           MakeGarbageCollected<MLContextXnnpack>(option->numThreads(), this);
       if (!ml_context_xnnpack->Initialize()) {
         exception_state.ThrowDOMException(DOMExceptionCode::kOperationError,
                                           "failed to initialize XNNPACK");
-        return nullptr;
+        return ScriptPromise();
       }
       execution_context_->AddConsoleMessage(
           MakeGarbageCollected<ConsoleMessage>(
@@ -82,18 +92,26 @@ MLContext* ML::createContext(ScriptState* script_state,
                   String::Number(pthreadpool_get_threads_count(
                       ml_context_xnnpack->Pthreadpool()))));
       ml_context = ml_context_xnnpack;
+      resolver->Resolve(ml_context);
+#endif
     } else {
-      exception_state.ThrowDOMException(DOMExceptionCode::kNotSupportedError,
-                                        "GPU device type is not supported yet");
-      return nullptr;
+      if (!webnn_client_) {
+        webnn_client_ = WebnnClient::Create(execution_context_);
+      }
+      DCHECK_NE(webnn_client_, nullptr);
+      ml_context = MakeGarbageCollected<WebnnContext>(
+          WrapPersistent(script_state), WrapPersistent(resolver),
+          option->powerPreference(), this, webnn_client_);
     }
   } else {
     // Create MLContext for Model Loader
     ml_context = MakeGarbageCollected<MLContext>(
         option->devicePreference(), option->powerPreference(),
         option->modelFormat(), option->numThreads(), this);
+    resolver->Resolve(ml_context);
   }
-  return ml_context;
+
+  return promise;
 }
 
 bool ML::BootstrapMojoConnectionIfNeeded(ScriptState* script_state,

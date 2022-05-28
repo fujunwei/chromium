@@ -1,0 +1,32 @@
+// Copyright 2022 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+module ml.webnn.mojom;
+
+[Stable]
+interface Operand {};
+
+[Stable, Extensible]
+enum OperandType {
+  kFloat32,
+  kFloat16,
+  kInt32,
+  kUint32,
+  kInt8,
+  kUint8,
+};
+
+// Represents the `MLOperandDescriptor`.
+struct OperandDescriptor {
+  // The type of the operand.
+  OperandType data_type;
+  // The dimensions of the operand.
+  array<uint32> dimensions;
+};
+
+// Corresponds to the `MLGraph` object in the WebIDL definition.
+interface Graph {
+  input(string name, OperandDescriptor desc)
+      => (pending_remote<Operand>? remote);
+};

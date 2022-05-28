@@ -10,7 +10,10 @@
 namespace blink {
 
 MLOperand::MLOperand(MLGraphBuilder* builder, KindEnum kind)
-    : builder_(builder), kind_(kind), dimensions_({1}) {}
+    : WebnnObject(builder->GetContext()),
+      builder_(builder),
+      kind_(kind),
+      dimensions_({1}) {}
 
 MLOperand::~MLOperand() = default;
 
@@ -67,7 +70,7 @@ void MLOperand::Trace(Visitor* visitor) const {
   visitor->Trace(builder_);
   visitor->Trace(operator_);
   visitor->Trace(array_buffer_view_);
-  ScriptWrappable::Trace(visitor);
+  WebnnObject::Trace(visitor);
 }
 
 }  // namespace blink

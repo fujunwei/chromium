@@ -32,7 +32,7 @@ class SharedXnnpackContext : public ThreadSafeRefCounted<SharedXnnpackContext> {
   SharedXnnpackContext& operator=(const SharedXnnpackContext&) = delete;
 
   bool Initialize() {
-    WTF::MutexLocker locker(mutex_);
+    // WTF::MutexLocker locker(mutex_);
     if (initialized_) {
       return true;
     }
@@ -60,7 +60,7 @@ class SharedXnnpackContext : public ThreadSafeRefCounted<SharedXnnpackContext> {
   friend class ThreadSafeRefCounted<SharedXnnpackContext>;
 
   ~SharedXnnpackContext() {
-    WTF::MutexLocker locker(mutex_);
+    // WTF::MutexLocker locker(mutex_);
 #if BUILDFLAG(IS_WIN)
     xnn_deinitialize();
 #endif
@@ -72,7 +72,7 @@ class SharedXnnpackContext : public ThreadSafeRefCounted<SharedXnnpackContext> {
 
   static SharedXnnpackContext* instance_;
 
-  WTF::Mutex mutex_;
+  // WTF::Mutex mutex_;
   bool initialized_;
   size_t num_threads_;
   pthreadpool_t pthreadpool_;

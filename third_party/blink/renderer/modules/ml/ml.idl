@@ -13,5 +13,5 @@
   Exposed=Window
 ] interface ML {
   [CallWith=ScriptState, RaisesException]
-      MLContext createContext(optional MLContextOptions options = {});
+      Promise<MLContext> createContext(optional MLContextOptions options = {});
 };

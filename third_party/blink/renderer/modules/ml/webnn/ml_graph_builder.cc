@@ -12,12 +12,18 @@
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph.h"
-#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_xnnpack.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operator.h"
+#include "third_party/blink/renderer/modules/ml/webnn/webnn_context.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_deque.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_set.h"
+
+#if BUILDFLAG(IS_LINUX)
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_xnnpack.h"
+#elif BUILDFLAG(IS_WIN)
+#include "third_party/blink/renderer/modules/ml/webnn/webnn_graph.h"
+#endif
 
 namespace blink {
 
@@ -88,6 +94,10 @@ MLGraphBuilder::~MLGraphBuilder() = default;
 void MLGraphBuilder::Trace(Visitor* visitor) const {
   visitor->Trace(ml_context_);
   ScriptWrappable::Trace(visitor);
+}
+
+MLContext* MLGraphBuilder::GetContext() const {
+  return ml_context_.Get();
 }
 
 MLOperand* MLGraphBuilder::input(String name,
@@ -600,7 +610,8 @@ MLOperand* MLGraphBuilder::BuildPool2d(MLOperator::OpKind kind,
   return output;
 }
 
-MLGraph* MLGraphBuilder::build(const MLNamedOperands& named_outputs,
+MLGraph* MLGraphBuilder::build(ScriptState* script_state,
+                               const MLNamedOperands& named_outputs,
                                ExceptionState& exception_state) {
   HeapVector<Member<const MLOperand>> inputs;
   HeapVector<Member<const MLOperand>> constants;
@@ -639,12 +650,26 @@ MLGraph* MLGraphBuilder::build(const MLNamedOperands& named_outputs,
       nodes_to_do.pop_back();
     }
   }
+
+#if BUILDFLAG(IS_LINUX)
   auto* graph = MakeGarbageCollected<MLGraphXnnpack>(ml_context_);
   if (!graph->BuildImpl(named_outputs, inputs, constants, sorted_operators,
                         exception_state)) {
     return nullptr;
   }
   return graph;
+#elif BUILDFLAG(IS_WIN)
+  auto* execution_context = ExecutionContext::From(script_state);
+  auto* graph =
+      MakeGarbageCollected<WebnnGraph>(ml_context_, execution_context);
+  if (!graph->BuildImpl(named_outputs, inputs, constants, sorted_operators,
+                        exception_state)) {
+    return nullptr;
+  }
+  return graph;
+#else
+  return nullptr;
+#endif
 }
 
 }  // namespace blink
