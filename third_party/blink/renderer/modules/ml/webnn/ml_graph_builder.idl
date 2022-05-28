@@ -79,12 +79,13 @@ dictionary MLClampOptions {
                                             optional MLPool2dOptions options = {});
 
   [RaisesException] MLOperand relu(MLOperand input);
-  [RaisesException] MLOperand relu();
+  [RaisesException] MLOperator relu();
 
   [RaisesException] MLOperand reshape(MLOperand input, sequence<long> newShape);
 
   [RaisesException] MLOperand softmax(MLOperand input);
 
   // Should be restricted in worker
-  [RaisesException] MLGraph build(MLNamedOperands outputs);
+  [CallWith=ScriptState, RaisesException] MLGraph build(MLNamedOperands outputs);
+  [CallWith=ScriptState, RaisesException] Promise<MLGraph> buildAsync(MLNamedOperands outputs);
 };

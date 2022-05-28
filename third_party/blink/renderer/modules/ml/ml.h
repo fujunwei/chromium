@@ -5,7 +5,12 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_ML_ML_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_ML_ML_H_
 
+#include <memory>
+
+#include "base/memory/scoped_refptr.h"
 #include "components/ml/mojom/ml_service.mojom-blink.h"
+#include "components/ml/webnn/mojom/webnn_service.mojom-blink.h"
+#include "third_party/blink/renderer/bindings/core/v8/script_promise.h"
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
 #include "third_party/blink/renderer/core/frame/navigator.h"
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
@@ -16,8 +21,11 @@
 
 namespace blink {
 
+class MLContext;
 class MLContextOptions;
 class ScriptState;
+class ScriptPromise;
+class WebnnWireClient;
 
 // This class represents the "Machine Learning" object "navigator.ml" and will
 // be shared between the Model Loader API and WebNN API.
@@ -40,9 +48,9 @@ class ML final : public ScriptWrappable {
   void Trace(blink::Visitor*) const override;
 
   // IDL interface:
-  MLContext* createContext(ScriptState* state,
-                           MLContextOptions* option,
-                           ExceptionState& exception_state);
+  ScriptPromise createContext(ScriptState* state,
+                              MLContextOptions* option,
+                              ExceptionState& exception_state);
 
  private:
   // Binds the Mojo connection to browser process if needed.
@@ -52,9 +60,13 @@ class ML final : public ScriptWrappable {
   bool BootstrapMojoConnectionIfNeeded(ScriptState* script_state,
                                        ExceptionState& exception_state);
 
+  bool ConnectWebnnServiceIfNeeded();
+  void OnWebnnServiceConnectionError();
+
   Member<ExecutionContext> execution_context_;
 
   HeapMojoRemote<ml::model_loader::mojom::blink::MLService> remote_service_;
+  scoped_refptr<WebnnWireClient> webnn_wire_client_;
 };
 
 }  // namespace blink

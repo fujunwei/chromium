@@ -24,6 +24,7 @@ class MLGraph;
 class MLPool2dOptions;
 class MLOperand;
 class MLOperandDescriptor;
+class ScriptPromise;
 
 typedef HeapVector<std::pair<String, Member<MLOperand>>> MLNamedOperands;
 
@@ -41,6 +42,8 @@ class MLGraphBuilder final : public ScriptWrappable {
   ~MLGraphBuilder() override;
 
   void Trace(Visitor* visitor) const override;
+
+  MLContext* GetContext() const;
 
   // ml_graph_builder.idl
   MLOperand* input(String name,
@@ -79,8 +82,10 @@ class MLGraphBuilder final : public ScriptWrappable {
 
   MLOperand* softmax(const MLOperand*, ExceptionState&);
 
-  MLGraph* build(const MLNamedOperands& outputs,
-                 ExceptionState& exception_state);
+  MLGraph* build(ScriptState*, const MLNamedOperands&, ExceptionState&);
+  ScriptPromise buildAsync(ScriptState*,
+                           const MLNamedOperands&,
+                           ExceptionState&);
 
  private:
   MLOperand* BuildElementWiseBinary(MLOperator::OpKind,

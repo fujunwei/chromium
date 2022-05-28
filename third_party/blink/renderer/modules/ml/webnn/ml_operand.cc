@@ -9,8 +9,31 @@
 
 namespace blink {
 
+namespace {
+
+size_t GetBytesPerElement(V8MLOperandType::Enum datatype) {
+  switch (datatype) {
+    case V8MLOperandType::Enum::kFloat32:
+      return 4;
+    case V8MLOperandType::Enum::kFloat16:
+      return 2;
+    case V8MLOperandType::Enum::kInt32:
+      return 4;
+    case V8MLOperandType::Enum::kUint32:
+      return 4;
+    case V8MLOperandType::Enum::kInt8:
+      return 1;
+    case V8MLOperandType::Enum::kUint8:
+      return 1;
+  }
+}
+
+}  // namespace
 MLOperand::MLOperand(MLGraphBuilder* builder, KindEnum kind)
-    : builder_(builder), kind_(kind), dimensions_({1}) {}
+    : WebnnObject(builder->GetContext()),
+      builder_(builder),
+      kind_(kind),
+      dimensions_({1}) {}
 
 MLOperand::~MLOperand() = default;
 
@@ -54,6 +77,14 @@ const Vector<int32_t>& MLOperand::Dimensions() const {
   return dimensions_;
 }
 
+size_t MLOperand::GetByteLength() const {
+  size_t elements = 1;
+  for (auto& d : Dimensions()) {
+    elements = elements * d;
+  }
+  return elements * GetBytesPerElement(Type());
+}
+
 void MLOperand::SetArrayBufferView(
     const DOMArrayBufferView* array_buffer_view) {
   array_buffer_view_ = array_buffer_view;
@@ -67,7 +98,7 @@ void MLOperand::Trace(Visitor* visitor) const {
   visitor->Trace(builder_);
   visitor->Trace(operator_);
   visitor->Trace(array_buffer_view_);
-  ScriptWrappable::Trace(visitor);
+  WebnnObject::Trace(visitor);
 }
 
 }  // namespace blink

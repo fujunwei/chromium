@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
 
+#include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_clamp_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_conv_2d_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_gemm_options.h"
@@ -12,12 +13,18 @@
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph.h"
-#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_xnnpack.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operator.h"
+#include "third_party/blink/renderer/modules/ml/webnn/webnn_context.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_deque.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_set.h"
+
+#if BUILDFLAG(IS_LINUX)
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_xnnpack.h"
+#elif BUILDFLAG(IS_WIN)
+#include "third_party/blink/renderer/modules/ml/webnn/webnn_graph.h"
+#endif
 
 namespace blink {
 
@@ -74,6 +81,45 @@ void CalculatePaddingForAutoPad(V8MLAutoPad::Enum autoPad,
   }
 }
 
+void SortOperators(const MLNamedOperands& named_outputs,
+                   HeapVector<Member<const MLOperand>>& inputs,
+                   HeapVector<Member<const MLOperand>>& constants,
+                   HeapVector<Member<const MLOperator>>& sorted_operators) {
+  HeapDeque<Member<const MLOperator>> nodes_to_do;
+  HeapHashSet<Member<const MLOperator>> nodes_done;
+  for (const auto& output : named_outputs) {
+    nodes_to_do.push_back(output.second->Operator());
+  }
+  while (nodes_to_do.size() > 0) {
+    const auto& node = nodes_to_do.back();
+    if (!nodes_done.Contains(node.Get())) {
+      bool can_add = true;
+      for (const auto& input : node->Inputs()) {
+        if (input->Operator()) {
+          if (!nodes_done.Contains(input->Operator())) {
+            can_add = false;
+            nodes_to_do.push_back(input->Operator());
+          }
+        } else {
+          if (input->Kind() == MLOperand::KindEnum::kInput) {
+            inputs.push_back(input.Get());
+          } else {
+            DCHECK(input->Kind() == MLOperand::KindEnum::kConstant);
+            constants.push_back(input.Get());
+          }
+        }
+      }
+      if (can_add) {
+        sorted_operators.push_back(node.Get());
+        nodes_done.insert(node.Get());
+        nodes_to_do.pop_back();
+      }
+    } else {
+      nodes_to_do.pop_back();
+    }
+  }
+}
+
 }  // namespace
 
 // static
@@ -88,6 +134,10 @@ MLGraphBuilder::~MLGraphBuilder() = default;
 void MLGraphBuilder::Trace(Visitor* visitor) const {
   visitor->Trace(ml_context_);
   ScriptWrappable::Trace(visitor);
+}
+
+MLContext* MLGraphBuilder::GetContext() const {
+  return ml_context_.Get();
 }
 
 MLOperand* MLGraphBuilder::input(String name,
@@ -600,51 +650,56 @@ MLOperand* MLGraphBuilder::BuildPool2d(MLOperator::OpKind kind,
   return output;
 }
 
-MLGraph* MLGraphBuilder::build(const MLNamedOperands& named_outputs,
+MLGraph* MLGraphBuilder::build(ScriptState* script_state,
+                               const MLNamedOperands& named_outputs,
                                ExceptionState& exception_state) {
   HeapVector<Member<const MLOperand>> inputs;
   HeapVector<Member<const MLOperand>> constants;
   HeapVector<Member<const MLOperator>> sorted_operators;
 
-  HeapDeque<Member<const MLOperator>> nodes_to_do;
-  HeapHashSet<Member<const MLOperator>> nodes_done;
-  for (const auto& output : named_outputs) {
-    nodes_to_do.push_back(output.second->Operator());
-  }
-  while (nodes_to_do.size() > 0) {
-    const auto& node = nodes_to_do.back();
-    if (!nodes_done.Contains(node.Get())) {
-      bool can_add = true;
-      for (const auto& input : node->Inputs()) {
-        if (input->Operator()) {
-          if (!nodes_done.Contains(input->Operator())) {
-            can_add = false;
-            nodes_to_do.push_back(input->Operator());
-          }
-        } else {
-          if (input->Kind() == MLOperand::KindEnum::kInput) {
-            inputs.push_back(input.Get());
-          } else {
-            DCHECK(input->Kind() == MLOperand::KindEnum::kConstant);
-            constants.push_back(input.Get());
-          }
-        }
-      }
-      if (can_add) {
-        sorted_operators.push_back(node.Get());
-        nodes_done.insert(node.Get());
-        nodes_to_do.pop_back();
-      }
-    } else {
-      nodes_to_do.pop_back();
-    }
-  }
+  SortOperators(named_outputs, inputs, constants, sorted_operators);
+
+#if BUILDFLAG(IS_LINUX)
   auto* graph = MakeGarbageCollected<MLGraphXnnpack>(ml_context_);
   if (!graph->BuildImpl(named_outputs, inputs, constants, sorted_operators,
                         exception_state)) {
     return nullptr;
   }
   return graph;
+#elif BUILDFLAG(IS_WIN)
+  NOTREACHED();
+  return nullptr;
+#else
+  return nullptr;
+#endif
+}
+
+ScriptPromise MLGraphBuilder::buildAsync(ScriptState* script_state,
+                                         const MLNamedOperands& named_outputs,
+                                         ExceptionState& exception_state) {
+  HeapVector<Member<const MLOperand>> inputs;
+  HeapVector<Member<const MLOperand>> constants;
+  HeapVector<Member<const MLOperator>> sorted_operators;
+
+  SortOperators(named_outputs, inputs, constants, sorted_operators);
+
+  ScriptPromiseResolver* resolver =
+      MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  auto promise = resolver->Promise();
+#if BUILDFLAG(IS_LINUX)
+  // TODO:: Add the condition of CPU context
+  auto* graph = MakeGarbageCollected<MLGraphXnnpack>(ml_context_);
+  if (!graph->BuildImpl(named_outputs, inputs, constants, sorted_operators,
+                        exception_state)) {
+    return ScriptPromise();
+  }
+  resolver->Resolve(graph);
+#elif BUILDFLAG(IS_WIN)
+  MakeGarbageCollected<WebnnGraph>(
+      script_state, resolver, ml_context_, std::move(named_outputs),
+      std::move(inputs), std::move(constants), std::move(sorted_operators));
+#endif
+  return promise;
 }
 
 }  // namespace blink

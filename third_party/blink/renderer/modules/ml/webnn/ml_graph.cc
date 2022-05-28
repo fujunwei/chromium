@@ -8,19 +8,21 @@
 
 namespace blink {
 
-MLGraph::MLGraph(MLContext* context) : ml_context_(context) {}
+MLGraph::MLGraph(MLContext* context) : WebnnObject(context) {}
 
 MLGraph::~MLGraph() = default;
-
-void MLGraph::Trace(Visitor* visitor) const {
-  visitor->Trace(ml_context_);
-  ScriptWrappable::Trace(visitor);
-}
 
 void MLGraph::compute(const MLNamedArrayInputs& inputs,
                       const MLNamedArrayOutputs& outputs,
                       ExceptionState& exception_state) {
   ComputeImpl(inputs, outputs, exception_state);
+}
+
+ScriptPromise MLGraph::computeAsync(ScriptState* script_state,
+                                    const MLNamedArrayInputs& inputs,
+                                    const MLNamedArrayOutputs& outputs,
+                                    ExceptionState& exception_state) {
+  return ComputeAsyncImpl(script_state, inputs, outputs, exception_state);
 }
 
 }  // namespace blink

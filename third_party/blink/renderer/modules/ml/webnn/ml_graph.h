@@ -10,6 +10,7 @@
 #include "third_party/blink/renderer/core/typed_arrays/array_buffer_view_helpers.h"
 #include "third_party/blink/renderer/core/typed_arrays/dom_array_buffer_view.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
+#include "third_party/blink/renderer/modules/ml/webnn/webnn_object.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_vector.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
@@ -25,7 +26,7 @@ typedef HeapVector<std::pair<
     Member<V8UnionArrayBufferAllowSharedOrArrayBufferViewAllowShared>>>
     MLNamedArrayOutputs;
 
-class MLGraph : public ScriptWrappable {
+class MLGraph : public WebnnObject {
   DEFINE_WRAPPERTYPEINFO();
 
  public:
@@ -36,12 +37,14 @@ class MLGraph : public ScriptWrappable {
 
   ~MLGraph() override;
 
-  void Trace(Visitor* visitor) const override;
-
   // ml_graph.idl
   void compute(const MLNamedArrayInputs& inputs,
                const MLNamedArrayOutputs& outputs,
                ExceptionState& exception_state);
+  ScriptPromise computeAsync(ScriptState* script_state,
+                             const MLNamedArrayInputs& inputs,
+                             const MLNamedArrayOutputs& outputs,
+                             ExceptionState& exception_state);
 
   virtual bool BuildImpl(
       const MLNamedOperands& named_outputs,
@@ -54,8 +57,10 @@ class MLGraph : public ScriptWrappable {
                            const MLNamedArrayOutputs& outputs,
                            ExceptionState& exception_state) = 0;
 
- protected:
-  Member<MLContext> ml_context_;
+  virtual ScriptPromise ComputeAsyncImpl(ScriptState* script_state,
+                                         const MLNamedArrayInputs& inputs,
+                                         const MLNamedArrayOutputs& outputs,
+                                         ExceptionState& exception_state) = 0;
 };
 
 }  // namespace blink

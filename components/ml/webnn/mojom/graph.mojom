@@ -1,0 +1,160 @@
+// Copyright 2022 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+module ml.webnn.mojom;
+
+[Stable]
+interface Operand {};
+
+[Stable, Extensible]
+enum OperandType {
+  kFloat32,
+  kFloat16,
+  kInt32,
+  kUint32,
+  kInt8,
+  kUint8,
+};
+
+enum BinaryOperandType {
+  kAdd = 0,
+  kSub,
+  kMul,
+  kDiv,
+  kMax,
+  kMin,
+  kMatMul,
+  kPower,
+};
+
+enum UnaryOperandType {
+  kRelu = 0,
+  kSoftmax,
+  kSigmoid,
+};
+
+// Represents the `MLOperandDescriptor`.
+struct OperandDescriptor {
+  // The type of the operand.
+  OperandType data_type;
+  // The dimensions of the operand.
+  array<int32> dimensions;
+  // The object id of the operand.
+  uint32 object_id;
+};
+
+// Represents the `MLInputOperandLayout`.
+enum InputOperandLayout { kNchw, kNhwc };
+
+// Represents the `MLConv2dFilterOperandLayout`.
+enum Conv2dFilterOperandLayout { kOihw, kHwio, kOhwi, kIhwo };
+
+// Represents the `MLAutoPad`.
+enum AutoPad { kExplicit, kSameUpper, kSameLower };
+
+enum FusionType { kClamp, kRelu };
+struct FusionOperator {
+  uint32 object_id;
+  FusionType fusion_type;
+};
+
+// Represents the `MLConv2dOptions`.
+struct Conv2dOptions {
+  array<int32> padding;
+  array<int32> strides;
+  array<int32> dilations;
+  AutoPad auto_pad = AutoPad.kExplicit;
+  int32 groups = 1;
+  InputOperandLayout inputLayout = InputOperandLayout.kNchw;
+  Conv2dFilterOperandLayout filterLayout = Conv2dFilterOperandLayout.kOihw;
+  uint32 bias_id;
+  FusionOperator? activation;
+};
+
+// Represents the `MLGemmOptions`.
+struct GemmOptions {
+  uint32 c_id;
+  float alpha = 1.0;
+  float beta = 1.0;
+  bool a_transpose = false;
+  bool b_transpose = false;
+};
+
+enum Pool2dType { kAveragePool2d, kMaxPool2d, kL2Pool2d };
+enum RoundingType { kFloor, kCeil };
+
+// Represents the `MLPool2dOptions`.
+struct Pool2dOptions {
+  array<int32> window_dimensions;
+  array<int32> padding;
+  array<int32> strides;
+  array<int32> dilations;
+  AutoPad auto_pad = AutoPad.kExplicit;
+  InputOperandLayout layout = InputOperandLayout.kNchw;
+  RoundingType rounding_type = RoundingType.kFloor;
+  array<int32> output_sizes;
+};
+
+// Represents the `MLClampOptions`.
+struct ClampOptions {
+  float minValue;
+  float maxValue;
+};
+
+struct MemoryInfo {
+  uint64 byte_offset;
+  uint64 byte_length;
+};
+
+struct NamedInputs {
+  map<string, MemoryInfo> inputs;
+  handle<shared_buffer> memory;
+};
+
+struct NamedOutputs {
+  map<string, MemoryInfo> outputs;
+  handle<shared_buffer> memory;
+};
+
+// Used by `Build()` of interface Graph.
+enum BuildResult {
+  kOk,
+  kUnknownError,
+  kMissingInput,
+};
+
+// Used by `Compute()` of interface Graph.
+enum ComputeResult {
+  kOk,
+  kUnknownError,
+  // The number of inputs is different from that required by the model.
+  kIncorrectNumberOfInputs,
+  // Some needed inputs are missing.
+  kMissingInput,
+  // The size of some input buffer is wrong.
+  kInvalidInputBufferSize,
+};
+
+// Corresponds to the `MLGraph` object in the WebIDL definition.
+interface Graph {
+  AddInput(string name, OperandDescriptor desc);
+  AddConstant(OperandDescriptor desc, array<uint8> array_buffer);
+  AddOutput(string name, uint32 operand_id);
+  AddElementWiseBinary(uint32 a_id, uint32 b_id, BinaryOperandType type,
+          OperandDescriptor desc);
+  AddClamp(uint32 input_id, ClampOptions options, OperandDescriptor desc);
+  AddConv2d(uint32 input_id, uint32 filter_id, Conv2dOptions options,
+            OperandDescriptor desc);
+  AddReshape(uint32 input_id, OperandDescriptor desc);
+  AddGemm(uint32 a_id, uint32 b_id, GemmOptions options, OperandDescriptor desc);
+  AddPool2d(uint32 input_id, Pool2dOptions options, Pool2dType type,
+      OperandDescriptor desc);
+  AddUnary(uint32 input_id, UnaryOperandType type, OperandDescriptor desc);
+
+  AddFusionClamp(ClampOptions options, uint32 operator_id);
+
+  BuildAsync() => (BuildResult result);
+  ComputeAsync(NamedInputs named_inputs) => (ComputeResult result,
+                                    NamedOutputs? named_outputs);
+};

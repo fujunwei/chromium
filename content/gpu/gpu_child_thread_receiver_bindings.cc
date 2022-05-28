@@ -21,6 +21,10 @@
 #include "media/mojo/mojom/media_service.mojom.h"
 #endif
 
+#include "components/ml/webnn/mojom/webnn_service.mojom.h"
+#include "content/browser/ml/webnn/webnn_service.h"
+#include "services/shape_detection/public/mojom/shape_detection_service.mojom.h"  // nogncheck
+
 namespace content {
 
 void GpuChildThread::BindServiceInterface(
@@ -52,6 +56,12 @@ void GpuChildThread::BindServiceInterface(
     return;
   }
 #endif
+
+  if (auto webnn_receiver = receiver.As<ml::webnn::mojom::WebnnService>()) {
+    static base::NoDestructor<webnn::WebnnService> service{
+        std::move(webnn_receiver)};
+    return;
+  }
 }
 
 }  // namespace content
