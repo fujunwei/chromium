@@ -121,6 +121,7 @@ DevicePreference ConvertBlinkDevicePreferenceToMojo(
     const V8MLDevicePreference& device_preference_blink) {
   switch (device_preference_blink.AsEnum()) {
     case V8MLDevicePreference::Enum::kAuto:
+    case V8MLDevicePreference::Enum::kDefault:
       return DevicePreference::kAuto;
     case V8MLDevicePreference::Enum::kCpu:
       return DevicePreference::kCpu;

@@ -1,0 +1,17 @@
+// Copyright 2022 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// https://www.w3.org/TR/webnn/
+
+// TODO: support MLArrayInput
+typedef record<DOMString, ([AllowShared] ArrayBufferView or MLTensor)> MLNamedArrayInputs;
+typedef record<DOMString, ([AllowShared] ArrayBufferView or [AllowShared] ArrayBuffer)> MLNamedArrayOutputs;
+
+[
+  RuntimeEnabled=MachineLearningNeuralNetwork,
+  Exposed=Window
+] interface MLGraph {
+  // Should be restricted in worker
+  [RaisesException] void compute(MLNamedArrayInputs inputs, MLNamedArrayOutputs outputs);
+};

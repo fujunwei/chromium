@@ -16,7 +16,7 @@ namespace blink {
 
 class ML;
 
-class MLContext final : public ScriptWrappable {
+class MLContext : public ScriptWrappable {
   DEFINE_WRAPPERTYPEINFO();
 
  public:
@@ -40,7 +40,7 @@ class MLContext final : public ScriptWrappable {
 
   void Trace(Visitor* visitor) const override;
 
- private:
+ protected:
   V8MLDevicePreference device_preference_;
   V8MLPowerPreference power_preference_;
   V8MLModelFormat model_format_;

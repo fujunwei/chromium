@@ -202,6 +202,10 @@
 #include "ui/base/ui_base_switches.h"
 #endif
 
+#if BUILDFLAG(IS_LINUX)
+#include "third_party/xnnpack/src/include/xnnpack.h"
+#endif
+
 base::LazyInstance<ChromeContentGpuClient>::DestructorAtExit
     g_chrome_content_gpu_client = LAZY_INSTANCE_INITIALIZER;
 base::LazyInstance<ChromeContentRendererClient>::DestructorAtExit
@@ -1059,6 +1063,13 @@ void ChromeMainDelegate::PreSandboxStartup() {
   // Create an instance of the CPU class to parse /proc/cpuinfo and cache
   // cpu_brand info.
   base::CPU cpu_info;
+#endif
+
+#if BUILDFLAG(IS_LINUX)
+  // cpuinfo needs to parse /cpu/cpuinfo
+  if (xnn_initialize(NULL) != xnn_status_success) {
+    LOG(ERROR) << "Failed to initialize XNNPACK";
+  }
 #endif
 
   // Initialize the user data dir for any process type that needs it.

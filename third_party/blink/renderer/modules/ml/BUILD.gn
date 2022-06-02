@@ -10,6 +10,8 @@ blink_modules_sources("ml") {
     "ml.h",
     "ml_context.cc",
     "ml_context.h",
+    "ml_context_xnnpack.cc",
+    "ml_context_xnnpack.h",
     "ml_model.cc",
     "ml_model.h",
     "ml_model_loader.cc",
@@ -18,5 +20,10 @@ blink_modules_sources("ml") {
     "navigator_ml.h",
   ]
 
-  deps = [ "//components/ml/mojom:mojom_blink" ]
+  deps = [
+    "//components/ml/mojom:mojom_blink",
+    "//third_party/cpuinfo",
+    "//third_party/pthreadpool",
+    "//third_party/xnnpack",
+  ]
 }

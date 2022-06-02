@@ -325,6 +325,15 @@ if (!is_android && !is_mac) {
           "//ui/base",
         ]
       }
+
+      if (is_linux) {
+        deps += [
+          # XNNPACK
+          "//third_party/cpuinfo",
+          "//third_party/pthreadpool",
+          "//third_party/xnnpack",
+        ]
+      }
     }
 
     if (is_chromeos_ash || is_win) {

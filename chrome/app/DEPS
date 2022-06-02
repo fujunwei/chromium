@@ -50,5 +50,6 @@ include_rules = [
   "+services/service_manager/public",
   "+third_party/breakpad/breakpad",
   "+third_party/crashpad/crashpad",
+  "+third_party/xnnpack/src/include/xnnpack.h",
 ]
 
