@@ -10,6 +10,6 @@ import "components/ml/webnn/mojom/graph.mojom";
 // inferences.
 // Corresponds to the `MLContext` object in the WebIDL definition.
 interface Context {
-  CreateGraph(uint32 self_id, uint32 context_id)
+  CreateGraph(uint32 result_id, uint32 context_id)
       => (pending_remote<Graph>? remote);
 };

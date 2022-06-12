@@ -41,6 +41,10 @@ class MLGraph : public WebnnObject {
   void compute(const MLNamedArrayInputs& inputs,
                const MLNamedArrayOutputs& outputs,
                ExceptionState& exception_state);
+  ScriptPromise computeAsync(ScriptState* script_state,
+                             const MLNamedArrayInputs& inputs,
+                             const MLNamedArrayOutputs& outputs,
+                             ExceptionState& exception_state);
 
   virtual bool BuildImpl(
       const MLNamedOperands& named_outputs,
@@ -52,6 +56,11 @@ class MLGraph : public WebnnObject {
   virtual void ComputeImpl(const MLNamedArrayInputs& inputs,
                            const MLNamedArrayOutputs& outputs,
                            ExceptionState& exception_state) = 0;
+
+  virtual ScriptPromise ComputeAsyncImpl(ScriptState* script_state,
+                                         const MLNamedArrayInputs& inputs,
+                                         const MLNamedArrayOutputs& outputs,
+                                         ExceptionState& exception_state) = 0;
 };
 
 }  // namespace blink

@@ -5,13 +5,14 @@
 #include "content/browser/ml/webnn/dml/context_dml_impl.h"
 
 #include "base/memory/ptr_util.h"
+#include "content/browser/ml/webnn/dml/graph_dml_impl.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 
 namespace content {
 
 namespace {
 
-using ml::webnn::mojom::Context;
+using ml::webnn::mojom::Graph;
 
 }  // namespace
 
@@ -30,9 +31,11 @@ ContextDMLImpl::ContextDMLImpl() = default;
 void ContextDMLImpl::CreateGraph(uint32_t self_id,
                                  uint32_t context_id,
                                  CreateGraphCallback callback) {
-  // TODO(crbug.com/1273291): Supporting Webnn Service on the platform.
-  std::move(callback).Run(mojo::NullRemote());
-  DLOG(ERROR) << "Platform not supported for Webnn Service.";
+  // The remote sent to the renderer.
+  mojo::PendingRemote<Graph> blink_remote;
+  // The receiver bind to ContextDMLImpl.
+  GraphDMLImpl::Create(blink_remote.InitWithNewPipeAndPassReceiver());
+  std::move(callback).Run(std::move(blink_remote));
 }
 
 }  // namespace webnn

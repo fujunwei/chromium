@@ -17,16 +17,66 @@ enum OperandType {
   kUint8,
 };
 
+enum BinaryOperandType {
+  kAdd = 0,
+  kSub,
+  kMul,
+  kDiv,
+  kMax,
+  kMin,
+  kMatMul,
+  kPower,
+};
+
 // Represents the `MLOperandDescriptor`.
 struct OperandDescriptor {
   // The type of the operand.
   OperandType data_type;
   // The dimensions of the operand.
-  array<uint32> dimensions;
+  array<int32> dimensions;
+  // The object id of the operand.
+  uint32 object_id;
+};
+
+// Represents the `MLClampOptions`.
+struct ClampOptions {
+  float minValue;
+  float maxValue;
+};
+
+// Used by `Build()` of interface Graph.
+enum BuildResult {
+  kOk,
+  kUnknownError,
+  kMissingInput,
+};
+
+// Used by `Compute()` of interface Graph.
+enum ComputeResult {
+  kOk,
+  kUnknownError,
+  // The number of inputs is different from that required by the model.
+  kIncorrectNumberOfInputs,
+  // Some needed inputs are missing.
+  kMissingInput,
+  // The size of some input buffer is wrong.
+  kInvalidInputBufferSize,
 };
 
 // Corresponds to the `MLGraph` object in the WebIDL definition.
 interface Graph {
-  input(string name, OperandDescriptor desc)
-      => (pending_remote<Operand>? remote);
+  AddInput(string name, OperandDescriptor desc);
+  AddConstant(OperandDescriptor desc, array<uint8> array_buffer);
+  AddOutput(string name, uint32 operand_id);
+  AddElementWiseBinary(uint32 a_id, uint32 b_id, BinaryOperandType type,
+          OperandDescriptor desc);
+  AddClamp(uint32 input_id, ClampOptions? options, OperandDescriptor desc);
+  BuildAsync() => (BuildResult result);
+
+  // The backend/frontend should already know the dimension needed for each
+  // input/output tensors. So we only need to know the buffer content of the
+  // input/output tensors.
+  ComputeAsync(map<string, array<uint8>> named_inputs,
+      array<string> output_names) => (ComputeResult result,
+                                    array<array<uint8>>? output_buffers);
 };

@@ -1271,6 +1271,11 @@ source_set("browser") {
     "ml/ml_service_impl.h",
     "ml/webnn/dml/context_dml_impl.cc",
     "ml/webnn/dml/context_dml_impl.h",
+    "ml/webnn/dml/graph_dml_impl.cc",
+    "ml/webnn/dml/graph_dml_impl.h",
+    "ml/webnn/dml/native/DMLUtils.h",
+    "ml/webnn/dml/native/GraphDML.cc",
+    "ml/webnn/dml/native/GraphDML.h",
     "ml/webnn/dml/neural_network_dml_impl.cc",
     "ml/webnn/dml/neural_network_dml_impl.h",
     "ml/webnn/neural_network_impl.cc",
@@ -2268,6 +2273,20 @@ source_set("browser") {
     ]
   }
 
+  if (is_win) {
+    include_dirs = [ "//third_party/microsoft.ai.directml.1.8.2/include" ]
+
+    lib_dirs = [ "//third_party/microsoft.ai.directml.1.8.2/bin/x64-win" ]
+
+    libs = [
+      "dxgi.lib",
+      "d3d12.lib",
+      "directml.lib",
+    ]
+
+    data_deps = [ ":copy_dml_dll" ]
+  }
+
   if (is_android) {
     sources += [
       "android/android_overlay_provider_impl.cc",
@@ -3256,5 +3275,15 @@ group("for_internal_webauthn") {
 if (is_android) {
   java_cpp_enum("client_data_json_generated_enum") {
     sources = [ "webauth/client_data_json.h" ]
+  }
+}
+
+if (is_win) {
+  dml_dll = "DirectML.dll"
+  os_folder = "x64-win"
+  dml_dll_path = "//third_party/microsoft.ai.directml.1.8.2/bin/${os_folder}"
+  copy("copy_dml_dll") {
+    sources = [ "${dml_dll_path}/${dml_dll}" ]
+    outputs = [ "$root_out_dir/{{source_file_part}}" ]
   }
 }

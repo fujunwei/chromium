@@ -18,4 +18,11 @@ void MLGraph::compute(const MLNamedArrayInputs& inputs,
   ComputeImpl(inputs, outputs, exception_state);
 }
 
+ScriptPromise MLGraph::computeAsync(ScriptState* script_state,
+                                    const MLNamedArrayInputs& inputs,
+                                    const MLNamedArrayOutputs& outputs,
+                                    ExceptionState& exception_state) {
+  return ComputeAsyncImpl(script_state, inputs, outputs, exception_state);
+}
+
 }  // namespace blink

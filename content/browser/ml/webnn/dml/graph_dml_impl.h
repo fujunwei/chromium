@@ -1,0 +1,62 @@
+// Copyright 2022 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#ifndef CONTENT_BROWSER_ML_WEBNN_DML_GRAPH_DML_IMPL_H_
+#define CONTENT_BROWSER_ML_WEBNN_DML_GRAPH_DML_IMPL_H_
+
+#include "components/ml/webnn/mojom/graph.mojom.h"
+#include "mojo/public/cpp/bindings/pending_receiver.h"
+#include "mojo/public/cpp/system/handle.h"
+
+namespace content {
+
+namespace {
+
+using ml::webnn::mojom::BinaryOperandType;
+using ml::webnn::mojom::ClampOptionsPtr;
+using ml::webnn::mojom::OperandDescriptorPtr;
+
+}  // namespace
+
+namespace webnn {
+
+class GraphDMLNativeImpl;
+
+class GraphDMLImpl : public ml::webnn::mojom::Graph {
+ public:
+  ~GraphDMLImpl() override;
+  static void Create(mojo::PendingReceiver<ml::webnn::mojom::Graph> receiver);
+
+  GraphDMLImpl(const GraphDMLImpl&) = delete;
+  GraphDMLImpl& operator=(const GraphDMLImpl&) = delete;
+
+ protected:
+  GraphDMLImpl();
+
+ private:
+  // ml::webnn::mojom::Graph
+  void AddInput(const std::string&, OperandDescriptorPtr) override;
+  void AddConstant(OperandDescriptorPtr, const std::vector<uint8_t>&) override;
+  void AddOutput(const std::string& name, uint32_t operand_id) override;
+  void AddElementWiseBinary(uint32_t,
+                            uint32_t,
+                            BinaryOperandType,
+                            OperandDescriptorPtr) override;
+  void AddClamp(uint32_t input_id,
+                ClampOptionsPtr options,
+                OperandDescriptorPtr desc) override;
+
+  void BuildAsync(BuildAsyncCallback callback) override;
+  void ComputeAsync(
+      const base::flat_map<std::string, std::vector<uint8_t>>& named_inputs,
+      const std::vector<std::string>& output_names,
+      ComputeAsyncCallback callback) override;
+
+  std::unique_ptr<GraphDMLNativeImpl> native_graph_dml_;
+};
+
+}  // namespace webnn
+}  // namespace content
+
+#endif  // CONTENT_BROWSER_ML_WEBNN_DML_GRAPH_DML_IMPL_H_

@@ -16,10 +16,17 @@
 namespace blink {
 
 class ExecutionContext;
+class ScriptPromiseResolver;
 
 class WebnnGraph : public MLGraph {
  public:
-  explicit WebnnGraph(MLContext* context, ExecutionContext* execution_context);
+  WebnnGraph(ScriptState* script_state,
+             ScriptPromiseResolver* resolver,
+             MLContext* context,
+             MLNamedOperands named_outputs,
+             HeapVector<Member<const MLOperand>> inputs,
+             HeapVector<Member<const MLOperand>> constants,
+             HeapVector<Member<const MLOperator>> sorted_operators);
   ~WebnnGraph() override;
 
   void Trace(Visitor* visitor) const override;
@@ -29,17 +36,35 @@ class WebnnGraph : public MLGraph {
                  const HeapVector<Member<const MLOperand>>& constants,
                  const HeapVector<Member<const MLOperator>>& sorted_operators,
                  ExceptionState& exception_state) override;
-
   void ComputeImpl(const MLNamedArrayInputs& inputs,
                    const MLNamedArrayOutputs& outputs,
                    ExceptionState& exception_state) override;
+  ScriptPromise ComputeAsyncImpl(ScriptState* script_state,
+                                 const MLNamedArrayInputs& inputs,
+                                 const MLNamedArrayOutputs& outputs,
+                                 ExceptionState& exception_state) override;
 
  private:
-  void OnGraphCreated(
-      mojo::PendingRemote<ml::webnn::mojom::blink::Graph> pending_remote);
+  bool BuildGraph(const MLNamedOperands& named_outputs,
+                  const HeapVector<Member<const MLOperand>>& inputs,
+                  const HeapVector<Member<const MLOperand>>& constants,
+                  const HeapVector<Member<const MLOperator>>& sorted_operators);
+  void OnGraphCreated(ScriptState*,
+                      ScriptPromiseResolver*,
+                      mojo::PendingRemote<ml::webnn::mojom::blink::Graph>);
+  void OnBuildFinished(ScriptPromiseResolver*,
+                       ml::webnn::mojom::blink::BuildResult);
+  void OnGraphComputed(
+      ScriptPromiseResolver* resolver,
+      ml::webnn::mojom::blink::ComputeResult result,
+      const absl::optional<Vector<Vector<uint8_t>>>& output_buffers);
 
-  Member<ExecutionContext> execution_context_;
   HeapMojoRemote<ml::webnn::mojom::blink::Graph> remote_graph_;
+  MLNamedOperands named_outputs_;
+  HeapVector<Member<const MLOperand>> inputs_;
+  HeapVector<Member<const MLOperand>> constants_;
+  HeapVector<Member<const MLOperator>> sorted_operators_;
+  MLNamedArrayOutputs named_array_outputs_;
 };
 
 }  // namespace blink

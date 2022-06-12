@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/modules/ml/webnn/webnn_graph.h"
 
+#include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_clamp_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_conv_2d_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_gemm_options.h"
@@ -23,14 +24,50 @@
 
 namespace blink {
 
-WebnnGraph::WebnnGraph(MLContext* context, ExecutionContext* execution_context)
+namespace {
+
+using ml::webnn::mojom::blink::BinaryOperandType;
+using ml::webnn::mojom::blink::BuildResult;
+using ml::webnn::mojom::blink::ComputeResult;
+using ml::webnn::mojom::blink::OperandType;
+
+OperandType ConvertBlinkOperandTypeToMojo(V8MLOperandType::Enum type) {
+  switch (type) {
+    case V8MLOperandType::Enum::kFloat32:
+      return OperandType::kFloat32;
+    case V8MLOperandType::Enum::kFloat16:
+      return OperandType::kFloat16;
+    case V8MLOperandType::Enum::kInt32:
+      return OperandType::kInt32;
+    case V8MLOperandType::Enum::kUint32:
+      return OperandType::kUint32;
+    case V8MLOperandType::Enum::kInt8:
+      return OperandType::kInt8;
+    case V8MLOperandType::Enum::kUint8:
+      return OperandType::kUint8;
+  }
+}
+
+}  // namespace
+
+WebnnGraph::WebnnGraph(ScriptState* script_state,
+                       ScriptPromiseResolver* resolver,
+                       MLContext* context,
+                       MLNamedOperands named_outputs,
+                       HeapVector<Member<const MLOperand>> inputs,
+                       HeapVector<Member<const MLOperand>> constants,
+                       HeapVector<Member<const MLOperator>> sorted_operators)
     : MLGraph(context),
-      execution_context_(execution_context),
-      remote_graph_(execution_context) {
+      remote_graph_(ExecutionContext::From(script_state)),
+      named_outputs_(named_outputs),
+      inputs_(inputs),
+      constants_(constants),
+      sorted_operators_(sorted_operators) {
   WebnnContext* webnn_context = static_cast<WebnnContext*>(context);
   webnn_context->CreateGraph(
       GetObjectId(), webnn_context->GetObjectId(),
-      WTF::Bind(&WebnnGraph::OnGraphCreated, WrapPersistent(this)));
+      WTF::Bind(&WebnnGraph::OnGraphCreated, WrapPersistent(this),
+                WrapPersistent(script_state), WrapPersistent(resolver)));
 }
 
 WebnnGraph::~WebnnGraph() {}
@@ -41,223 +78,236 @@ bool WebnnGraph::BuildImpl(
     const HeapVector<Member<const MLOperand>>& constants,
     const HeapVector<Member<const MLOperator>>& sorted_operators,
     ExceptionState& exception_state) {
-  // HashMap<Member<const MLOperand>, uint32_t> tensors_map;
-  // uint32_t external_id = 0;
-  // for (const auto& input : inputs) {
-  //   uint32_t input_id = external_id++;
-  //   tensors_map.insert(input, input_id);
-  //   if (!DefineTensor(subgraph.get(), tensors_map, input, exception_state,
-  //                     true)) {
-  //     return false;
-  //   }
-  //   TensorValueInfo info = {0};
-  //   info.id = input_id;
-  //   info.byte_length = GetByteLength(input);
-  //   inputs_info_.insert(input->Name(), std::move(info));
-  // }
-  // for (const auto& named_output : named_outputs) {
-  //   auto* output = named_output.second.Get();
-  //   uint32_t output_id = external_id++;
-  //   tensors_map.insert(output, output_id);
-  //   if (!DefineTensor(subgraph.get(), tensors_map, output, exception_state,
-  //                     true)) {
-  //     return false;
-  //   }
-  //   TensorValueInfo info = {0};
-  //   info.id = output_id;
-  //   info.byte_length = GetByteLength(output);
-  //   outputs_info_.insert(named_output.first, std::move(info));
-  // }
-  // for (const auto& constant : constants) {
-  //   if (!DefineTensor(subgraph.get(), tensors_map, constant,
-  //   exception_state)) {
-  //     return false;
-  //   }
-  // }
-  // for (const auto& op : sorted_operators) {
-  //   switch (op->Kind()) {
-  //     case MLOperator::OpKind::kClamp: {
-  //       const MLClampOptions* options =
-  //           static_cast<const MLClampOptions*>(op->Options());
-  //       if (!DefineClamp(subgraph.get(), tensors_map, op, options,
-  //                        exception_state)) {
-  //         return false;
-  //       }
-  //       break;
-  //     }
-  //     case MLOperator::OpKind::kConv2d: {
-  //       const MLConv2dOptions* options =
-  //           static_cast<const MLConv2dOptions*>(op->Options());
-  //       if (!DefineConv2d(subgraph.get(), tensors_map, op, options,
-  //                         exception_state)) {
-  //         return false;
-  //       }
-  //       break;
-  //     }
-  //     case MLOperator::OpKind::kAdd: {
-  //       if (!DefineBinary(subgraph.get(), tensors_map, op, exception_state))
-  //       {
-  //         return false;
-  //       }
-  //       break;
-  //     }
-  //     case MLOperator::OpKind::kGemm: {
-  //       const MLGemmOptions* options =
-  //           static_cast<const MLGemmOptions*>(op->Options());
-  //       if (!DefineGemm(subgraph.get(), tensors_map, op, options,
-  //                       exception_state)) {
-  //         return false;
-  //       }
-  //       break;
-  //     }
-  //     case MLOperator::OpKind::kAveragePool2d: {
-  //       const MLPool2dOptions* options =
-  //           static_cast<const MLPool2dOptions*>(op->Options());
-  //       if (!DefinePool2d(subgraph.get(), tensors_map, op, options,
-  //                         exception_state)) {
-  //         return false;
-  //       }
-  //       break;
-  //     }
-  //     case MLOperator::OpKind::kRelu: {
-  //       if (!DefineUnary(subgraph.get(), tensors_map, op, exception_state)) {
-  //         return false;
-  //       }
-  //       break;
-  //     }
-  //     case MLOperator::OpKind::kReshape: {
-  //       if (!DefineReshape(subgraph.get(), tensors_map, op, exception_state))
-  //       {
-  //         return false;
-  //       }
-  //       break;
-  //     }
-  //     case MLOperator::OpKind::kSoftmax: {
-  //       if (!DefineUnary(subgraph.get(), tensors_map, op, exception_state)) {
-  //         return false;
-  //       }
-  //       break;
-  //     }
-  //     default:
-  //       exception_state.ThrowDOMException(DOMExceptionCode::kNotSupportedError,
-  //                                         "the operator (" +
-  //                                             OpKindToString(op->Kind()) +
-  //                                             ") is not supported");
-  //       return false;
-  //   }
-  // }
-  // uint32_t flags = XNN_FLAG_YIELD_WORKERS;
-  // if (xnn_create_runtime_v2(
-  //         subgraph.get(),
-  //         static_cast<MLContextXnnpack*>(ml_context_.Get())->Pthreadpool(),
-  //         flags, &runtime_) != xnn_status_success) {
-  //   exception_state.ThrowDOMException(DOMExceptionCode::kOperationError,
-  //                                     "failed to create XNNPACK runtime");
-  //   return false;
-  // }
+  if (!BuildGraph(named_outputs, inputs, constants, sorted_operators)) {
+    return false;
+  }
+  // remote_graph_->Build();
   return true;
+}
+
+bool WebnnGraph::BuildGraph(
+    const MLNamedOperands& named_outputs,
+    const HeapVector<Member<const MLOperand>>& inputs,
+    const HeapVector<Member<const MLOperand>>& constants,
+    const HeapVector<Member<const MLOperator>>& sorted_operators) {
+  for (const auto& input : inputs) {
+    auto desc = ml::webnn::mojom::blink::OperandDescriptor::New();
+    desc->data_type = ConvertBlinkOperandTypeToMojo(input->Type());
+    desc->dimensions = input->Dimensions();
+    desc->object_id = input->GetObjectId();
+    remote_graph_->AddInput(input->Name(), std::move(desc));
+  }
+  for (const auto& constant : constants) {
+    auto desc = ml::webnn::mojom::blink::OperandDescriptor::New();
+    desc->data_type = ConvertBlinkOperandTypeToMojo(constant->Type());
+    desc->dimensions = constant->Dimensions();
+    desc->object_id = constant->GetObjectId();
+
+    auto* array_buffer_view = constant->ArrayBufferView();
+    wtf_size_t size =
+        base::checked_cast<wtf_size_t>(array_buffer_view->byteLength());
+    Vector<uint8_t> tensor(size);
+    memcpy(tensor.data(), array_buffer_view->BaseAddressMaybeShared(), size);
+    remote_graph_->AddConstant(std::move(desc), std::move(tensor));
+  }
+  for (const auto& op : sorted_operators) {
+    auto* output = op->Outputs()[0].Get();
+    auto* input = op->Inputs()[0].Get();
+    auto desc = ml::webnn::mojom::blink::OperandDescriptor::New();
+    desc->dimensions = output->Dimensions();
+    desc->object_id = output->GetObjectId();
+    switch (op->Kind()) {
+      case MLOperator::OpKind::kClamp: {
+        const MLClampOptions* ml_options =
+            static_cast<const MLClampOptions*>(op->Options());
+        const float min = ml_options->hasMinValue()
+                              ? ml_options->minValue()
+                              : -std::numeric_limits<float>::infinity();
+        const float max = ml_options->hasMaxValue()
+                              ? ml_options->maxValue()
+                              : +std::numeric_limits<float>::infinity();
+        auto options = ml::webnn::mojom::blink::ClampOptions::New();
+        options->minValue = min;
+        options->maxValue = max;
+        remote_graph_->AddClamp(input->GetObjectId(), std::move(options),
+                                std::move(desc));
+        break;
+      }
+      case MLOperator::OpKind::kConv2d: {
+        // const MLConv2dOptions* options =
+        //     static_cast<const MLConv2dOptions*>(op->Options());
+        // if (!DefineConv2d(subgraph.get(), tensors_map, op, options,
+        //                   exception_state)) {
+        //   return false;
+        // }
+        break;
+      }
+      case MLOperator::OpKind::kAdd: {
+        auto* input1 = op->Inputs()[1].Get();
+        remote_graph_->AddElementWiseBinary(
+            input->GetObjectId(), input1->GetObjectId(),
+            BinaryOperandType::kAdd, std::move(desc));
+        break;
+      }
+      case MLOperator::OpKind::kGemm: {
+        // const MLGemmOptions* options =
+        //     static_cast<const MLGemmOptions*>(op->Options());
+        // if (!DefineGemm(subgraph.get(), tensors_map, op, options,
+        //                 exception_state)) {
+        //   return false;
+        // }
+        break;
+      }
+      case MLOperator::OpKind::kAveragePool2d: {
+        // const MLPool2dOptions* options =
+        //     static_cast<const MLPool2dOptions*>(op->Options());
+        // if (!DefinePool2d(subgraph.get(), tensors_map, op, options,
+        //                   exception_state)) {
+        //   return false;
+        // }
+        break;
+      }
+      case MLOperator::OpKind::kRelu: {
+        // if (!DefineUnary(subgraph.get(), tensors_map, op, exception_state)) {
+        //   return false;
+        // }
+        break;
+      }
+      case MLOperator::OpKind::kReshape: {
+        // if (!DefineReshape(subgraph.get(), tensors_map, op, exception_state))
+        // {
+        //   return false;
+        // }
+        break;
+      }
+      case MLOperator::OpKind::kSoftmax: {
+        // if (!DefineUnary(subgraph.get(), tensors_map, op, exception_state)) {
+        //   return false;
+        // }
+        break;
+      }
+      default:
+        return false;
+    }
+  }
+  for (const auto& [name, output] : named_outputs) {
+    remote_graph_->AddOutput(name, output->GetObjectId());
+  }
+  return true;
+}
+
+void WebnnGraph::OnBuildFinished(ScriptPromiseResolver* resolver,
+                                 BuildResult result) {
+  switch (result) {
+    case BuildResult::kUnknownError: {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kUnknownError, "Internal error."));
+      return;
+    }
+    case BuildResult::kMissingInput: {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kDataError, "The build operation missing input."));
+      return;
+    }
+    case BuildResult::kOk: {
+      resolver->Resolve(this);
+      return;
+    }
+  }
+}
+
+ScriptPromise WebnnGraph::ComputeAsyncImpl(ScriptState* script_state,
+                                           const MLNamedArrayInputs& inputs,
+                                           const MLNamedArrayOutputs& outputs,
+                                           ExceptionState& exception_state) {
+  HashMap<String, Vector<uint8_t>> input_mojo;
+  for (const auto& input : inputs) {
+    DOMArrayBufferView* array_buffer_view = nullptr;
+    if (input.second->IsArrayBufferViewAllowShared()) {
+      array_buffer_view = input.second->GetAsArrayBufferViewAllowShared().Get();
+    } else if (input.second->IsMLTensor()) {
+      auto* ml_tensor = input.second->GetAsMLTensor();
+      array_buffer_view = ml_tensor->data().Get();
+    }
+    DCHECK(array_buffer_view != nullptr);
+    wtf_size_t size =
+        base::checked_cast<wtf_size_t>(array_buffer_view->byteLength());
+    Vector<uint8_t> tensor(size);
+    memcpy(tensor.data(), array_buffer_view->BaseAddressMaybeShared(), size);
+
+    input_mojo.insert(input.first, std::move(tensor));
+  }
+  Vector<String> output_names;
+  for (const auto& output : outputs) {
+    output_names.push_back(output.first);
+  }
+  ScriptPromiseResolver* resolver =
+      MakeGarbageCollected<ScriptPromiseResolver>(script_state);
+  remote_graph_->ComputeAsync(
+      std::move(input_mojo), std::move(output_names),
+      WTF::Bind(&WebnnGraph::OnGraphComputed, WrapPersistent(this),
+                WrapPersistent(resolver)));
+  named_array_outputs_ = std::move(outputs);
+  return resolver->Promise();
 }
 
 void WebnnGraph::ComputeImpl(const MLNamedArrayInputs& inputs,
                              const MLNamedArrayOutputs& outputs,
-                             ExceptionState& exception_state) {
-  // Vector<xnn_external_value> external_values;
-  // if (inputs.size() != inputs_info_.size()) {
-  //   exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
-  //                                     "The number of inputs is invalid");
-  //   return;
-  // }
-  // if (outputs.size() != outputs_info_.size()) {
-  //   exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
-  //                                     "The number of outputs is invalid");
-  //   return;
-  // }
-  // for (const auto& input : inputs) {
-  //   auto iter = inputs_info_.find(input.first);
-  //   if (iter == inputs_info_.end()) {
-  //     exception_state.ThrowDOMException(
-  //         DOMExceptionCode::kDataError,
-  //         "There is unknown input: " + input.first);
-  //     return;
-  //   }
-  //   xnn_external_value value = {0};
-  //   value.id = iter->value.id;
-  //   DOMArrayBufferView* array_buffer_view = nullptr;
-  //   if (input.second->IsArrayBufferViewAllowShared()) {
-  //     array_buffer_view =
-  //     input.second->GetAsArrayBufferViewAllowShared().Get();
-  //   } else if (input.second->IsMLTensor()) {
-  //     auto* ml_tensor = input.second->GetAsMLTensor();
-  //     array_buffer_view = ml_tensor->data().Get();
-  //   }
-  //   DCHECK(array_buffer_view != nullptr);
-  //   if (array_buffer_view->byteLength() < iter->value.byte_length) {
-  //     exception_state.ThrowDOMException(
-  //         DOMExceptionCode::kDataError,
-  //         "The input (" + input.first + ") buffer length is invalid.");
-  //     return;
-  //   }
-  //   value.data = array_buffer_view->BaseAddressMaybeShared();
-  //   external_values.push_back(value);
-  // }
-  // for (const auto& output : outputs) {
-  //   auto iter = outputs_info_.find(output.first);
-  //   if (iter == outputs_info_.end()) {
-  //     exception_state.ThrowDOMException(
-  //         DOMExceptionCode::kDataError,
-  //         "There is unknown output: " + output.first);
-  //     return;
-  //   }
-  //   xnn_external_value value = {0};
-  //   value.id = iter->value.id;
-  //   if (output.second->IsArrayBufferViewAllowShared()) {
-  //     DOMArrayBufferView* array_buffer_view =
-  //         output.second->GetAsArrayBufferViewAllowShared().Get();
-  //     if (array_buffer_view->byteLength() < iter->value.byte_length) {
-  //       exception_state.ThrowDOMException(
-  //           DOMExceptionCode::kDataError,
-  //           "The output (" + output.first + ") buffer length is invalid.");
-  //       return;
-  //     }
-  //     value.data = array_buffer_view->BaseAddressMaybeShared();
-  //   } else if (output.second->IsArrayBufferAllowShared()) {
-  //     DOMArrayBufferBase* array_buffer =
-  //         output.second->GetAsArrayBufferAllowShared();
-  //     if (array_buffer->ByteLength() < iter->value.byte_length) {
-  //       exception_state.ThrowDOMException(
-  //           DOMExceptionCode::kDataError,
-  //           "The output (" + output.first + ") buffer length is invalid.");
-  //       return;
-  //     }
-  //     value.data = array_buffer->DataMaybeShared();
-  //   }
-  //   DCHECK(value.data);
-  //   external_values.push_back(value);
-  // }
-  // if (xnn_setup_runtime(runtime_, external_values.size(),
-  //                       external_values.data()) != xnn_status_success) {
-  //   exception_state.ThrowDOMException(DOMExceptionCode::kOperationError,
-  //                                     "failed to setup runtime");
-  //   return;
-  // }
-  // if (xnn_invoke_runtime(runtime_) != xnn_status_success) {
-  //   exception_state.ThrowDOMException(DOMExceptionCode::kOperationError,
-  //                                     "failed to invoke runtime");
-  //   return;
-  // }
-}
+                             ExceptionState& exception_state) {}
 
 void WebnnGraph::Trace(Visitor* visitor) const {
-  visitor->Trace(execution_context_);
   visitor->Trace(remote_graph_);
+  visitor->Trace(named_outputs_);
+  visitor->Trace(inputs_);
+  visitor->Trace(constants_);
+  visitor->Trace(sorted_operators_);
+  visitor->Trace(named_array_outputs_);
   MLGraph::Trace(visitor);
 }
 
 void WebnnGraph::OnGraphCreated(
+    ScriptState* script_state,
+    ScriptPromiseResolver* resolver,
     mojo::PendingRemote<ml::webnn::mojom::blink::Graph> pending_remote) {
+  auto* execution_context = ExecutionContext::From(script_state);
   remote_graph_.Bind(
       std::move(pending_remote),
-      execution_context_->GetTaskRunner(TaskType::kInternalDefault));
+      execution_context->GetTaskRunner(TaskType::kInternalDefault));
+
+  BuildGraph(named_outputs_, inputs_, constants_, sorted_operators_);
+  remote_graph_->BuildAsync(WTF::Bind(&WebnnGraph::OnBuildFinished,
+                                      WrapPersistent(this),
+                                      WrapPersistent(resolver)));
+  return;
+}
+
+void WebnnGraph::OnGraphComputed(
+    ScriptPromiseResolver* resolver,
+    ComputeResult result,
+    const absl::optional<Vector<Vector<uint8_t>>>& output_buffers) {
+  if (result != ComputeResult::kOk || !output_buffers.has_value()) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kOperationError,
+        "Failed to obtain the computation result."));
+    return;
+  }
+  wtf_size_t i = 0;
+  for (const auto& [_, output] : named_array_outputs_) {
+    void* output_buffer_address = nullptr;
+    if (output->IsArrayBufferViewAllowShared()) {
+      DOMArrayBufferView* array_buffer_view =
+          output->GetAsArrayBufferViewAllowShared().Get();
+      output_buffer_address = array_buffer_view->BaseAddressMaybeShared();
+    } else if (output->IsArrayBufferAllowShared()) {
+      DOMArrayBufferBase* array_buffer = output->GetAsArrayBufferAllowShared();
+      output_buffer_address = array_buffer->DataMaybeShared();
+    }
+    DCHECK(output_buffer_address);
+    const Vector<uint8_t>& output_buffer = output_buffers.value().at(i++);
+    memcpy(output_buffer_address, output_buffer.data(), output_buffer.size());
+  }
+  resolver->Resolve();
+  return;
 }
 
 }  // namespace blink

@@ -22,7 +22,7 @@ interface NeuralNetwork {
   // Called by the renderer to ask the GPU process to create a `MLContext` that
   // represents a global state of neural network compute workload and execution
   // processes.
-  CreateContext(uint32 self_id, ContextOptions options)
+  CreateContext(uint32 result_id, ContextOptions options)
       => (pending_remote<Context>? remote);
 };
 

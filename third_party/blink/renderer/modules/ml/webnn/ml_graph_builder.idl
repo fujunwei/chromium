@@ -87,4 +87,5 @@ dictionary MLClampOptions {
 
   // Should be restricted in worker
   [CallWith=ScriptState, RaisesException] MLGraph build(MLNamedOperands outputs);
+  [CallWith=ScriptState, RaisesException] Promise<MLGraph> buildAsync(MLNamedOperands outputs);
 };

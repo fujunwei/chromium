@@ -4682,6 +4682,14 @@ hooks = [
     ],
     'condition': 'generate_location_tags',
   },
+
+  {
+    # Download the DirectML NuGet package.
+    'name': 'download_dml_unpkg',
+    'pattern': '.',
+    'condition': 'checkout_win',
+    'action': ['python3', 'src/content/browser/ml/webnn/dml/native/download_dml.py'],
+  },
 ]
 
 # Add any corresponding DEPS files from this list to chromium.exclusions in
