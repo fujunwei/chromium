@@ -9,14 +9,15 @@
 
 namespace blink {
 
-WebnnObjectBase::WebnnObjectBase(scoped_refptr<WebnnClient> client)
+WebnnObjectBase::WebnnObjectBase(scoped_refptr<WebnnWireClient> client)
     : webnn_client_(std::move(client)), id_(webnn_client_->GetNewId()) {}
 
 WebnnObjectBase::~WebnnObjectBase() {
   webnn_client_->FreeId(id_);
 }
 
-const scoped_refptr<WebnnClient>& WebnnObjectBase::GetWebnnClient() const {
+const scoped_refptr<WebnnWireClient>& WebnnObjectBase::GetWebnnWireClient()
+    const {
   return webnn_client_;
 }
 
@@ -25,7 +26,8 @@ uint32_t WebnnObjectBase::GetObjectId() const {
 }
 
 WebnnObject::WebnnObject(MLContext* context)
-    : WebnnObjectBase(static_cast<WebnnContext*>(context)->GetWebnnClient()),
+    : WebnnObjectBase(
+          static_cast<WebnnContext*>(context)->GetWebnnWireClient()),
       context_(context) {}
 
 WebnnObject::~WebnnObject() = default;

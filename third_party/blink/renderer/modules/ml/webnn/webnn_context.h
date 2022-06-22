@@ -21,7 +21,7 @@ class ExecutionContext;
 class ML;
 class ScriptState;
 class ScriptPromiseResolver;
-class WebnnClient;
+class WebnnWireClient;
 
 class WebnnContext : public MLContext, public WebnnObjectBase {
  public:
@@ -29,7 +29,7 @@ class WebnnContext : public MLContext, public WebnnObjectBase {
                ScriptPromiseResolver* resolver,
                const V8MLPowerPreference power_preference,
                ML* ml,
-               scoped_refptr<WebnnClient> webnn_client);
+               scoped_refptr<WebnnWireClient> webnn_client);
 
   WebnnContext(const WebnnContext&) = delete;
   WebnnContext& operator=(const WebnnContext&) = delete;

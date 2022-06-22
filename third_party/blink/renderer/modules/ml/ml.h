@@ -25,7 +25,7 @@ class MLContext;
 class MLContextOptions;
 class ScriptState;
 class ScriptPromise;
-class WebnnClient;
+class WebnnWireClient;
 
 // This class represents the "Machine Learning" object "navigator.ml" and will
 // be shared between the Model Loader API and WebNN API.
@@ -66,7 +66,7 @@ class ML final : public ScriptWrappable {
   Member<ExecutionContext> execution_context_;
 
   HeapMojoRemote<ml::model_loader::mojom::blink::MLService> remote_service_;
-  scoped_refptr<WebnnClient> webnn_client_;
+  scoped_refptr<WebnnWireClient> webnn_wire_client_;
 };
 
 }  // namespace blink

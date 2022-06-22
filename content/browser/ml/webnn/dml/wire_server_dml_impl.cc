@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "content/browser/ml/webnn/dml/neural_network_dml_impl.h"
+#include "content/browser/ml/webnn/dml/wire_server_dml_impl.h"
 
 #include "base/memory/ptr_util.h"
 #include "content/browser/ml/webnn/dml/context_dml_impl.h"
@@ -14,27 +14,26 @@ namespace {
 
 using ml::webnn::mojom::Context;
 using ml::webnn::mojom::ContextOptionsPtr;
-using ml::webnn::mojom::NeuralNetwork;
+using ml::webnn::mojom::WireServer;
 
 }  // namespace
 
 namespace webnn {
 
 // static
-void NeuralNetwoekDMLImpl::Create(
-    mojo::PendingReceiver<NeuralNetwork> receiver) {
-  mojo::MakeSelfOwnedReceiver<NeuralNetwork>(
-      base::WrapUnique(new NeuralNetwoekDMLImpl()), std::move(receiver));
+void WireServerDMLImpl::Create(mojo::PendingReceiver<WireServer> receiver) {
+  mojo::MakeSelfOwnedReceiver<WireServer>(
+      base::WrapUnique(new WireServerDMLImpl()), std::move(receiver));
 }
 
-NeuralNetwoekDMLImpl::~NeuralNetwoekDMLImpl() = default;
+WireServerDMLImpl::~WireServerDMLImpl() = default;
 
-NeuralNetwoekDMLImpl::NeuralNetwoekDMLImpl() = default;
+WireServerDMLImpl::WireServerDMLImpl() = default;
 
-void NeuralNetwoekDMLImpl::CreateContext(
+void WireServerDMLImpl::CreateContext(
     uint32_t id,
     ContextOptionsPtr options,
-    NeuralNetwork::CreateContextCallback callback) {
+    WireServer::CreateContextCallback callback) {
   // The remote sent to the renderer.
   mojo::PendingRemote<Context> blink_remote;
   // The receiver bind to ContextDMLImpl.

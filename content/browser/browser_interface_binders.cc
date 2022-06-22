@@ -905,8 +905,7 @@ void PopulateFrameBinders(RenderFrameHostImpl* host, mojo::BinderMap* map) {
     map->Add<ml::model_loader::mojom::MLService>(
         base::BindRepeating(&CreateMLService));
   }
-  map->Add<ml::webnn::mojom::NeuralNetwork>(
-      base::BindRepeating(&BindNeuralNetwork));
+  map->Add<ml::webnn::mojom::WireServer>(base::BindRepeating(&BindWireServer));
 
   if (base::FeatureList::IsEnabled(blink::features::kPendingBeaconAPI)) {
     map->Add<blink::mojom::PendingBeaconHost>(base::BindRepeating(

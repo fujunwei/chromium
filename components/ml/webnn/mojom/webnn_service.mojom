@@ -18,7 +18,7 @@ struct ContextOptions {
 
 // The interface is used to factory interfaces in WebNN such as `MLContext`,
 // `MLNamedInputs` and `MLNamedOutputs`.
-interface NeuralNetwork {
+interface WireServer {
   // Called by the renderer to ask the GPU process to create a `MLContext` that
   // represents a global state of neural network compute workload and execution
   // processes.
@@ -30,5 +30,5 @@ interface NeuralNetwork {
 // to commuicate with renderer process.
 [ServiceSandbox=kWebnnSandbox]
 interface WebnnService {
-  BindNeuralNetwork(pending_receiver<NeuralNetwork> receiver);
+  BindWireServer(pending_receiver<WireServer> receiver);
 };

@@ -12,7 +12,7 @@
 namespace blink {
 
 MLOperator::MLOperator(MLGraphBuilder* builder, MLOperator::OpKind kind)
-    : builder_(builder), kind_(kind) {}
+    : WebnnObject(builder->GetContext()), builder_(builder), kind_(kind) {}
 
 MLOperator::~MLOperator() = default;
 
@@ -21,7 +21,7 @@ void MLOperator::Trace(Visitor* visitor) const {
   visitor->Trace(options_);
   visitor->Trace(inputs_);
   visitor->Trace(outputs_);
-  ScriptWrappable::Trace(visitor);
+  WebnnObject::Trace(visitor);
 }
 
 HeapVector<Member<const MLOperand>>& MLOperator::Inputs() {

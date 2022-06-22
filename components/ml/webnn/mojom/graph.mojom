@@ -70,12 +70,11 @@ interface Graph {
   AddOutput(string name, uint32 operand_id);
   AddElementWiseBinary(uint32 a_id, uint32 b_id, BinaryOperandType type,
           OperandDescriptor desc);
-  AddClamp(uint32 input_id, ClampOptions? options, OperandDescriptor desc);
-  BuildAsync() => (BuildResult result);
+  AddClamp(uint32 input_id, ClampOptions options, OperandDescriptor desc);
 
-  // The backend/frontend should already know the dimension needed for each
-  // input/output tensors. So we only need to know the buffer content of the
-  // input/output tensors.
+  AddFusionClamp(ClampOptions options, uint32 operator_id);
+
+  BuildAsync() => (BuildResult result);
   ComputeAsync(map<string, array<uint8>> named_inputs,
       array<string> output_names) => (ComputeResult result,
                                     array<array<uint8>>? output_buffers);

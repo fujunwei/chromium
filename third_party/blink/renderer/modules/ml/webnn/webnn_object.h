@@ -6,7 +6,7 @@
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_WEBNN_WEBNN_OBJECT_H_
 
 #include "base/memory/scoped_refptr.h"
-#include "third_party/blink/renderer/modules/ml/webnn/webnn_client.h"
+#include "third_party/blink/renderer/modules/ml/webnn/webnn_wire_client.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
 #include "third_party/blink/renderer/platform/heap/visitor.h"
@@ -18,16 +18,16 @@ namespace blink {
 
 class WebnnObjectBase {
  public:
-  explicit WebnnObjectBase(scoped_refptr<WebnnClient> client);
+  explicit WebnnObjectBase(scoped_refptr<WebnnWireClient> client);
 
   ~WebnnObjectBase();
 
-  const scoped_refptr<WebnnClient>& GetWebnnClient() const;
+  const scoped_refptr<WebnnWireClient>& GetWebnnWireClient() const;
 
   uint32_t GetObjectId() const;
 
  private:
-  scoped_refptr<WebnnClient> webnn_client_;
+  scoped_refptr<WebnnWireClient> webnn_client_;
   uint32_t id_;
 };
 

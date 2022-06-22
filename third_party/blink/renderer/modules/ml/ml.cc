@@ -10,8 +10,8 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_context_options.h"
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/core/inspector/console_message.h"
-#include "third_party/blink/renderer/modules/ml/webnn/webnn_client.h"
 #include "third_party/blink/renderer/modules/ml/webnn/webnn_context.h"
+#include "third_party/blink/renderer/modules/ml/webnn/webnn_wire_client.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 
 #if BUILDFLAG(IS_LINUX)
@@ -48,7 +48,7 @@ void ML::Trace(Visitor* visitor) const {
   visitor->Trace(remote_service_);
 
   // Webnn
-  webnn_client_->Trace(visitor);
+  webnn_wire_client_->Trace(visitor);
 
   ScriptWrappable::Trace(visitor);
 }
@@ -95,13 +95,13 @@ ScriptPromise ML::createContext(ScriptState* script_state,
       resolver->Resolve(ml_context);
 #endif
     } else {
-      if (!webnn_client_) {
-        webnn_client_ = WebnnClient::Create(execution_context_);
+      if (!webnn_wire_client_) {
+        webnn_wire_client_ = WebnnWireClient::Create(execution_context_);
       }
-      DCHECK_NE(webnn_client_, nullptr);
+      DCHECK_NE(webnn_wire_client_, nullptr);
       ml_context = MakeGarbageCollected<WebnnContext>(
           WrapPersistent(script_state), WrapPersistent(resolver),
-          option->powerPreference(), this, webnn_client_);
+          option->powerPreference(), this, webnn_wire_client_);
     }
   } else {
     // Create MLContext for Model Loader

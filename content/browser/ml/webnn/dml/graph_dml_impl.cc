@@ -6,6 +6,7 @@
 
 #include "base/memory/ptr_util.h"
 #include "content/browser/ml/webnn/dml/native/GraphDML.h"
+#include "content/browser/ml/webnn/fusion_operators.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 
 namespace content {
@@ -27,7 +28,8 @@ void GraphDMLImpl::Create(mojo::PendingReceiver<Graph> receiver) {
 GraphDMLImpl::~GraphDMLImpl() = default;
 
 GraphDMLImpl::GraphDMLImpl()
-    : native_graph_dml_(std::make_unique<GraphDMLNativeImpl>()) {}
+    : native_graph_dml_(std::make_unique<GraphDMLNativeImpl>()),
+      fusion_operators_(std::make_unique<FusionOperators>()) {}
 
 void GraphDMLImpl::AddInput(const std::string& name,
                             OperandDescriptorPtr desc) {
@@ -59,6 +61,11 @@ void GraphDMLImpl::AddClamp(uint32_t input_id,
                             OperandDescriptorPtr desc) {
   // TODO: return directly if BuildResult has error message.
   native_graph_dml_->AddClamp(input_id, std::move(options), std::move(desc));
+}
+
+void GraphDMLImpl::AddFusionClamp(ClampOptionsPtr options,
+                                  uint32_t operator_id) {
+  fusion_operators_->AddClampOption(operator_id, std::move(options));
 }
 
 void GraphDMLImpl::BuildAsync(BuildAsyncCallback callback) {

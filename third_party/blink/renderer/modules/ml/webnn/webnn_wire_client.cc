@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "third_party/blink/renderer/modules/ml/webnn/webnn_client.h"
+#include "third_party/blink/renderer/modules/ml/webnn/webnn_wire_client.h"
 
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_context_options.h"
@@ -17,34 +17,34 @@ namespace blink {
 namespace {
 
 using ml::webnn::mojom::blink::ContextOptionsPtr;
-using ml::webnn::mojom::blink::NeuralNetwork;
+using ml::webnn::mojom::blink::WireServer;
 
 }  // namespace
 
 // static
-scoped_refptr<WebnnClient> WebnnClient::Create(
+scoped_refptr<WebnnWireClient> WebnnWireClient::Create(
     ExecutionContext* execution_context) {
-  return base::MakeRefCounted<WebnnClient>(execution_context);
+  return base::MakeRefCounted<WebnnWireClient>(execution_context);
 }
 
-WebnnClient::WebnnClient(ExecutionContext* execution_context)
-    : webnn_service_(execution_context) {
-  if (!webnn_service_.is_bound()) {
+WebnnWireClient::WebnnWireClient(ExecutionContext* execution_context)
+    : wire_server_(execution_context) {
+  if (!wire_server_.is_bound()) {
     execution_context->GetBrowserInterfaceBroker().GetInterface(
-        webnn_service_.BindNewPipeAndPassReceiver(
+        wire_server_.BindNewPipeAndPassReceiver(
             execution_context->GetTaskRunner(TaskType::kInternalDefault)));
 
-    // webnn_service_.set_disconnect_handler(WTF::Bind(
-    //     &WebnnClient::OnWebnnServiceConnectionError,
+    // wire_server_.set_disconnect_handler(WTF::Bind(
+    //     &WebnnWireClient::OnWebnnServiceConnectionError,
     //     WrapWeakPersistent(this)));
   }
 }
 
-void WebnnClient::Trace(Visitor* visitor) const {
-  visitor->Trace(webnn_service_);
+void WebnnWireClient::Trace(Visitor* visitor) const {
+  visitor->Trace(wire_server_);
 }
 
-uint32_t WebnnClient::GetNewId() {
+uint32_t WebnnWireClient::GetNewId() {
   if (free_ids_.empty()) {
     return current_id_++;
   }
@@ -53,20 +53,20 @@ uint32_t WebnnClient::GetNewId() {
   return id;
 }
 
-void WebnnClient::FreeId(uint32_t id) {
+void WebnnWireClient::FreeId(uint32_t id) {
   free_ids_.push_back(id);
 }
 
-void WebnnClient::CreateWebnnContext(
+void WebnnWireClient::CreateWebnnContext(
     uint32_t context_id,
     ContextOptionsPtr options,
-    NeuralNetwork::CreateContextCallback callback) {
-  webnn_service_->CreateContext(context_id, std::move(options),
-                                std::move(callback));
+    WireServer::CreateContextCallback callback) {
+  wire_server_->CreateContext(context_id, std::move(options),
+                              std::move(callback));
 }
 
-void WebnnClient::OnWebnnServiceConnectionError() {
-  webnn_service_.reset();
+void WebnnWireClient::OnWebnnServiceConnectionError() {
+  wire_server_.reset();
 }
 
 }  // namespace blink

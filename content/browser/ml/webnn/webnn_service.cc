@@ -9,9 +9,9 @@
 #include "mojo/public/cpp/bindings/remote.h"
 
 #if BUILDFLAG(IS_WIN)
-#include "content/browser/ml/webnn/dml/neural_network_dml_impl.h"
+#include "content/browser/ml/webnn/dml/wire_server_dml_impl.h"
 #else
-#include "content/browser/ml/webnn/neural_network_impl.h"
+#include "content/browser/ml/webnn/wire_server_impl.h"
 #endif
 
 namespace content {
@@ -30,9 +30,9 @@ ml::webnn::mojom::WebnnService* GetWebnnService() {
   return remote->get();
 }
 
-void BindNeuralNetwork(
-    mojo::PendingReceiver<ml::webnn::mojom::NeuralNetwork> receiver) {
-  GetWebnnService()->BindNeuralNetwork(std::move(receiver));
+void BindWireServer(
+    mojo::PendingReceiver<ml::webnn::mojom::WireServer> receiver) {
+  GetWebnnService()->BindWireServer(std::move(receiver));
 }
 
 namespace webnn {
@@ -43,12 +43,12 @@ WebnnService::WebnnService(
 
 WebnnService::~WebnnService() = default;
 
-void WebnnService::BindNeuralNetwork(
-    mojo::PendingReceiver<ml::webnn::mojom::NeuralNetwork> receiver) {
+void WebnnService::BindWireServer(
+    mojo::PendingReceiver<ml::webnn::mojom::WireServer> receiver) {
 #if BUILDFLAG(IS_WIN)
-  NeuralNetwoekDMLImpl::Create(std::move(receiver));
+  WireServerDMLImpl::Create(std::move(receiver));
 #else
-  NeuralNetwoekImpl::Create(std::move(receiver));
+  WireServerImpl::Create(std::move(receiver));
 #endif
 }
 

@@ -14,12 +14,12 @@ blink_modules_sources("webnn") {
     "ml_operand.h",
     "ml_operator.cc",
     "ml_operator.h",
-    "webnn_client.cc",
-    "webnn_client.h",
     "webnn_context.cc",
     "webnn_context.h",
     "webnn_object.cc",
     "webnn_object.h",
+    "webnn_wire_client.cc",
+    "webnn_wire_client.h",
   ]
 
   deps = [ "//third_party/blink/renderer/modules/ml" ]

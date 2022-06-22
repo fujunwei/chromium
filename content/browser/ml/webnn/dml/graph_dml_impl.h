@@ -21,6 +21,7 @@ using ml::webnn::mojom::OperandDescriptorPtr;
 
 namespace webnn {
 
+class FusionOperators;
 class GraphDMLNativeImpl;
 
 class GraphDMLImpl : public ml::webnn::mojom::Graph {
@@ -47,6 +48,8 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
                 ClampOptionsPtr options,
                 OperandDescriptorPtr desc) override;
 
+  void AddFusionClamp(ClampOptionsPtr options, uint32_t operator_id) override;
+
   void BuildAsync(BuildAsyncCallback callback) override;
   void ComputeAsync(
       const base::flat_map<std::string, std::vector<uint8_t>>& named_inputs,
@@ -54,6 +57,7 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
       ComputeAsyncCallback callback) override;
 
   std::unique_ptr<GraphDMLNativeImpl> native_graph_dml_;
+  std::unique_ptr<FusionOperators> fusion_operators_;
 };
 
 }  // namespace webnn

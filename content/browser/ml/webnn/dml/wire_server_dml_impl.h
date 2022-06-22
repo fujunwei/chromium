@@ -12,20 +12,20 @@ namespace content {
 
 namespace webnn {
 
-class NeuralNetwoekDMLImpl : public ml::webnn::mojom::NeuralNetwork {
+class WireServerDMLImpl : public ml::webnn::mojom::WireServer {
  public:
-  ~NeuralNetwoekDMLImpl() override;
+  ~WireServerDMLImpl() override;
   static void Create(
-      mojo::PendingReceiver<ml::webnn::mojom::NeuralNetwork> receiver);
+      mojo::PendingReceiver<ml::webnn::mojom::WireServer> receiver);
 
-  NeuralNetwoekDMLImpl(const NeuralNetwoekDMLImpl&) = delete;
-  NeuralNetwoekDMLImpl& operator=(const NeuralNetwoekDMLImpl&) = delete;
+  WireServerDMLImpl(const WireServerDMLImpl&) = delete;
+  WireServerDMLImpl& operator=(const WireServerDMLImpl&) = delete;
 
  protected:
-  NeuralNetwoekDMLImpl();
+  WireServerDMLImpl();
 
  private:
-  // ml::webnn::mojom::NeuralNetwork
+  // ml::webnn::mojom::WireServer
   void CreateContext(uint32_t id,
                      ml::webnn::mojom::ContextOptionsPtr options,
                      CreateContextCallback callback) override;

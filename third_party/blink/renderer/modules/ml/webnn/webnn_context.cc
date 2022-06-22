@@ -27,7 +27,7 @@ WebnnContext::WebnnContext(ScriptState* script_state,
                            ScriptPromiseResolver* resolver,
                            const V8MLPowerPreference power_preference,
                            ML* ml,
-                           scoped_refptr<WebnnClient> webnn_client)
+                           scoped_refptr<WebnnWireClient> webnn_client)
     : MLContext(V8MLDevicePreference(V8MLDevicePreference::Enum::kGpu),
                 power_preference,
                 V8MLModelFormat(V8MLModelFormat::Enum::kTflite),
@@ -38,7 +38,7 @@ WebnnContext::WebnnContext(ScriptState* script_state,
   auto options = ml::webnn::mojom::blink::ContextOptions::New();
   // TODO: set the power preference to the context options
   // mojo::ScopedHandle(mojo::Handle(static_cast<MojoHandle>(GetObjectId())))
-  GetWebnnClient()->CreateWebnnContext(
+  GetWebnnWireClient()->CreateWebnnContext(
       GetObjectId(), std::move(options),
       WTF::Bind(&WebnnContext::OnContextCreated, WrapPersistent(this),
                 WrapPersistent(script_state), WrapPersistent(resolver)));

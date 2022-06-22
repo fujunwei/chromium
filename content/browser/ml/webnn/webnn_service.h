@@ -11,7 +11,7 @@
 
 namespace content {
 
-void BindNeuralNetwork(mojo::PendingReceiver<ml::webnn::mojom::NeuralNetwork>);
+void BindWireServer(mojo::PendingReceiver<ml::webnn::mojom::WireServer>);
 
 namespace webnn {
 
@@ -24,8 +24,8 @@ class WebnnService : public ml::webnn::mojom::WebnnService {
   WebnnService(const WebnnService&) = delete;
   WebnnService& operator=(const WebnnService&) = delete;
 
-  void BindNeuralNetwork(
-      mojo::PendingReceiver<ml::webnn::mojom::NeuralNetwork> receiver) override;
+  void BindWireServer(
+      mojo::PendingReceiver<ml::webnn::mojom::WireServer> receiver) override;
 
  private:
   mojo::Receiver<ml::webnn::mojom::WebnnService> receiver_;

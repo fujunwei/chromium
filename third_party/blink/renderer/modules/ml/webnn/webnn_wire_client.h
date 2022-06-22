@@ -21,19 +21,19 @@ class MLContext;
 class MLContextOptions;
 class ScriptState;
 
-class WebnnClient final : public RefCounted<WebnnClient> {
+class WebnnWireClient final : public RefCounted<WebnnWireClient> {
  public:
-  static scoped_refptr<WebnnClient> Create(ExecutionContext*);
+  static scoped_refptr<WebnnWireClient> Create(ExecutionContext*);
 
-  explicit WebnnClient(ExecutionContext*);
+  explicit WebnnWireClient(ExecutionContext*);
 
-  WebnnClient(const WebnnClient&) = delete;
-  WebnnClient& operator=(const WebnnClient&) = delete;
+  WebnnWireClient(const WebnnWireClient&) = delete;
+  WebnnWireClient& operator=(const WebnnWireClient&) = delete;
 
   void CreateWebnnContext(
       uint32_t,
       ml::webnn::mojom::blink::ContextOptionsPtr,
-      ml::webnn::mojom::blink::NeuralNetwork::CreateContextCallback);
+      ml::webnn::mojom::blink::WireServer::CreateContextCallback);
 
   void Trace(Visitor* visitor) const;
 
@@ -44,7 +44,7 @@ class WebnnClient final : public RefCounted<WebnnClient> {
  private:
   void OnWebnnServiceConnectionError();
 
-  HeapMojoRemote<ml::webnn::mojom::blink::NeuralNetwork> webnn_service_;
+  HeapMojoRemote<ml::webnn::mojom::blink::WireServer> wire_server_;
 
   uint32_t current_id_ = 1;
   std::vector<uint32_t> free_ids_;
