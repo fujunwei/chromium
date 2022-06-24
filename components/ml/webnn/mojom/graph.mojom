@@ -38,6 +38,34 @@ struct OperandDescriptor {
   uint32 object_id;
 };
 
+// Represents the `MLInputOperandLayout`.
+enum InputOperandLayout { kNchw, kNhwc };
+
+// Represents the `MLConv2dFilterOperandLayout`.
+enum Conv2dFilterOperandLayout { kOihw, kHwio, kOhwi, kIhwo };
+
+// Represents the `MLAutoPad`.
+enum AutoPad { kExplicit, kSameUpper, kSameLower };
+
+enum FusionType { kClamp, kRelu };
+struct FusionOperator {
+  uint32 object_id;
+  FusionType fusion_type;
+};
+
+// Represents the `MLConv2dOptions`.
+struct Conv2dOptions {
+  array<int32> padding;
+  array<int32> strides;
+  array<int32> dilations;
+  AutoPad autoPad = AutoPad.kExplicit;
+  int32 groups = 1;
+  InputOperandLayout inputLayout = InputOperandLayout.kNchw;
+  Conv2dFilterOperandLayout filterLayout = Conv2dFilterOperandLayout.kOihw;
+  uint32 bias_id;
+  FusionOperator? activation;
+};
+
 // Represents the `MLClampOptions`.
 struct ClampOptions {
   float minValue;
@@ -71,6 +99,8 @@ interface Graph {
   AddElementWiseBinary(uint32 a_id, uint32 b_id, BinaryOperandType type,
           OperandDescriptor desc);
   AddClamp(uint32 input_id, ClampOptions options, OperandDescriptor desc);
+  AddConv2d(uint32 input_id, uint32 filter_id, Conv2dOptions options,
+            OperandDescriptor desc);
 
   AddFusionClamp(ClampOptions options, uint32 operator_id);
 

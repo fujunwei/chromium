@@ -26,9 +26,13 @@ namespace blink {
 
 namespace {
 
+using ml::webnn::mojom::blink::AutoPad;
 using ml::webnn::mojom::blink::BinaryOperandType;
 using ml::webnn::mojom::blink::BuildResult;
 using ml::webnn::mojom::blink::ComputeResult;
+using ml::webnn::mojom::blink::Conv2dFilterOperandLayout;
+using ml::webnn::mojom::blink::FusionType;
+using ml::webnn::mojom::blink::InputOperandLayout;
 using ml::webnn::mojom::blink::OperandType;
 
 OperandType ConvertBlinkOperandTypeToMojo(V8MLOperandType::Enum type) {
@@ -45,6 +49,55 @@ OperandType ConvertBlinkOperandTypeToMojo(V8MLOperandType::Enum type) {
       return OperandType::kInt8;
     case V8MLOperandType::Enum::kUint8:
       return OperandType::kUint8;
+  }
+}
+
+InputOperandLayout ConvertBlinkInputOperandLayoutToMojo(
+    V8MLInputOperandLayout::Enum type) {
+  switch (type) {
+    case V8MLInputOperandLayout::Enum::kNchw:
+      return InputOperandLayout::kNchw;
+    case V8MLInputOperandLayout::Enum::kNhwc:
+      return InputOperandLayout::kNhwc;
+  }
+}
+
+Conv2dFilterOperandLayout ConvertBlinkConv2dFilterOperandLayoutToMojo(
+    V8MLConv2dFilterOperandLayout::Enum type) {
+  switch (type) {
+    case V8MLConv2dFilterOperandLayout::Enum::kOihw:
+      return Conv2dFilterOperandLayout::kOihw;
+    case V8MLConv2dFilterOperandLayout::Enum::kHwio:
+      return Conv2dFilterOperandLayout::kHwio;
+    case V8MLConv2dFilterOperandLayout::Enum::kOhwi:
+      return Conv2dFilterOperandLayout::kOhwi;
+    case V8MLConv2dFilterOperandLayout::Enum::kIhwo:
+      return Conv2dFilterOperandLayout::kIhwo;
+  }
+}
+
+AutoPad ConvertBlinkAutoPadToMojo(V8MLAutoPad::Enum type) {
+  switch (type) {
+    case V8MLAutoPad::Enum::kExplicit:
+      return AutoPad::kExplicit;
+    case V8MLAutoPad::Enum::kSameUpper:
+      return AutoPad::kSameUpper;
+    case V8MLAutoPad::Enum::kSameLower:
+      return AutoPad::kSameLower;
+  }
+}
+
+FusionType ConvertBlinkFusionTypeToMojo(MLOperator::OpKind type) {
+  switch (type) {
+    case MLOperator::OpKind::kClamp:
+      return FusionType::kClamp;
+    case MLOperator::OpKind::kRelu:
+      return FusionType::kRelu;
+    default: {
+      // TODO: how to deal with the default.
+      assert(0);
+      return FusionType::kRelu;
+    }
   }
 }
 
@@ -134,12 +187,35 @@ bool WebnnGraph::BuildGraph(
         break;
       }
       case MLOperator::OpKind::kConv2d: {
-        // const MLConv2dOptions* options =
-        //     static_cast<const MLConv2dOptions*>(op->Options());
-        // if (!DefineConv2d(subgraph.get(), tensors_map, op, options,
-        //                   exception_state)) {
-        //   return false;
-        // }
+        const MLConv2dOptions* ml_options =
+            static_cast<const MLConv2dOptions*>(op->Options());
+        auto options = ml::webnn::mojom::blink::Conv2dOptions::New();
+        options->padding = ml_options->hasPadding() ? ml_options->padding()
+                                                    : Vector<int32_t>(4, 0);
+        options->strides = ml_options->hasStrides() ? ml_options->strides()
+                                                    : Vector<int32_t>(2, 1);
+        options->dilations = ml_options->hasDilations()
+                                 ? ml_options->dilations()
+                                 : Vector<int32_t>(2, 1);
+        options->autoPad =
+            ConvertBlinkAutoPadToMojo(ml_options->autoPad().AsEnum());
+        options->groups = ml_options->groups();
+        options->inputLayout = ConvertBlinkInputOperandLayoutToMojo(
+            ml_options->inputLayout().AsEnum());
+        options->filterLayout = ConvertBlinkConv2dFilterOperandLayoutToMojo(
+            ml_options->filterLayout().AsEnum());
+        options->bias_id =
+            ml_options->hasBias() ? ml_options->bias()->GetObjectId() : 0;
+        if (ml_options->hasActivation()) {
+          options->activation = ml::webnn::mojom::blink::FusionOperator::New();
+          options->activation->object_id =
+              ml_options->activation()->GetObjectId();
+          options->activation->fusion_type =
+              ConvertBlinkFusionTypeToMojo(ml_options->activation()->Kind());
+        }
+        auto* filter = op->Inputs()[1].Get();
+        remote_graph_->AddConv2d(input->GetObjectId(), filter->GetObjectId(),
+                                 std::move(options), std::move(desc));
         break;
       }
       case MLOperator::OpKind::kAdd: {

@@ -27,6 +27,7 @@ namespace content {
 namespace webnn {
 namespace utils {
 using namespace Microsoft::WRL;
+using ml::webnn::mojom::AutoPad;
 
 template <typename T>
 T RoundUpToMultiple(T value, T multiple) {
@@ -125,76 +126,71 @@ void CloseExecuteResetWait(ComPtr<ID3D12GraphicsCommandList> commandList,
   WEBNN_CHECK(commandList->Reset(commandAllocator.Get(), nullptr));
 }
 
-// template <typename T>
-// void ComputeImplicitPaddingForAutoPad(wnn::AutoPad autoPad,
-//                                       T dilation,
-//                                       T inputSize,
-//                                       T filterSize,
-//                                       T stride,
-//                                       T& paddingBegin,
-//                                       T& paddingEnd) {
-//     T outSize = (inputSize + stride - 1) / stride;
-//     T dilatedFilter = (filterSize - 1) * dilation + 1;
-//     T neededInput = (outSize - 1) * stride + dilatedFilter;
-//     T totalPadding = neededInput > inputSize ? neededInput - inputSize : 0;
-//     switch (autoPad) {
-//         case wnn::AutoPad::SameUpper:
-//             paddingBegin = totalPadding / 2;
-//             paddingEnd = (totalPadding + 1) / 2;
-//             break;
-//         case wnn::AutoPad::SameLower:
-//             paddingBegin = (totalPadding + 1) / 2;
-//             paddingEnd = totalPadding / 2;
-//             break;
-//         default:
-//             DAWN_UNREACHABLE();
-//     }
-// }
+template <typename T>
+void ComputeImplicitPaddingForAutoPad(AutoPad autoPad,
+                                      T dilation,
+                                      T inputSize,
+                                      T filterSize,
+                                      T stride,
+                                      T& paddingBegin,
+                                      T& paddingEnd) {
+  T outSize = (inputSize + stride - 1) / stride;
+  T dilatedFilter = (filterSize - 1) * dilation + 1;
+  T neededInput = (outSize - 1) * stride + dilatedFilter;
+  T totalPadding = neededInput > inputSize ? neededInput - inputSize : 0;
+  switch (autoPad) {
+    case AutoPad::kSameUpper:
+      paddingBegin = totalPadding / 2;
+      paddingEnd = (totalPadding + 1) / 2;
+      break;
+    case AutoPad::kSameLower:
+      paddingBegin = (totalPadding + 1) / 2;
+      paddingEnd = totalPadding / 2;
+      break;
+    default:
+      assert(0);
+  }
+}
 
-// template <typename S, typename T>
-// std::vector<T> ComputeImplicitPaddingForAutoPad(const S* options,
-//                                                 std::vector<T> inputSize,
-//                                                 std::vector<T> filterSize) {
-//     std::vector<T> padding(4);
-//     utils::ComputeImplicitPaddingForAutoPad<T>(options->autoPad,
-//     options->dilations[0],
-//                                                inputSize[0], filterSize[0],
-//                                                options->strides[0],
-//                                                padding[0], padding[1]);
-//     utils::ComputeImplicitPaddingForAutoPad<T>(options->autoPad,
-//     options->dilations[1],
-//                                                inputSize[1], filterSize[1],
-//                                                options->strides[1],
-//                                                padding[2], padding[3]);
-//     return padding;
-// }
+template <typename S, typename T>
+std::vector<T> ComputeImplicitPaddingForAutoPad(const S* options,
+                                                std::vector<T> inputSize,
+                                                std::vector<T> filterSize) {
+  std::vector<T> padding(4);
+  ComputeImplicitPaddingForAutoPad<T>(
+      options->autoPad, options->dilations[0], inputSize[0], filterSize[0],
+      options->strides[0], padding[0], padding[1]);
+  ComputeImplicitPaddingForAutoPad<T>(
+      options->autoPad, options->dilations[1], inputSize[1], filterSize[1],
+      options->strides[1], padding[2], padding[3]);
+  return padding;
+}
 
-// template <typename T>
-// void ComputeImplicitPaddingForConvTranspose2dAutoPad(wnn::AutoPad autoPad,
-//                                                      T dilation,
-//                                                      T inputSize,
-//                                                      T filterSize,
-//                                                      T stride,
-//                                                      T outputPadding,
-//                                                      T& paddingBegin,
-//                                                      T& paddingEnd) {
-//     T outSize = inputSize * stride;
-//     T totalPadding =
-//         stride * (inputSize - 1) + outputPadding + ((filterSize - 1) *
-//         dilation + 1) - outSize;
-//     switch (autoPad) {
-//         case wnn::AutoPad::SameUpper:
-//             paddingBegin = totalPadding / 2;
-//             paddingEnd = totalPadding - totalPadding / 2;
-//             break;
-//         case wnn::AutoPad::SameLower:
-//             paddingBegin = totalPadding - totalPadding / 2;
-//             paddingEnd = totalPadding / 2;
-//             break;
-//         default:
-//             DAWN_UNREACHABLE();
-//     }
-// }
+template <typename T>
+void ComputeImplicitPaddingForConvTranspose2dAutoPad(AutoPad autoPad,
+                                                     T dilation,
+                                                     T inputSize,
+                                                     T filterSize,
+                                                     T stride,
+                                                     T outputPadding,
+                                                     T& paddingBegin,
+                                                     T& paddingEnd) {
+  T outSize = inputSize * stride;
+  T totalPadding = stride * (inputSize - 1) + outputPadding +
+                   ((filterSize - 1) * dilation + 1) - outSize;
+  switch (autoPad) {
+    case AutoPad::kSameUpper:
+      paddingBegin = totalPadding / 2;
+      paddingEnd = totalPadding - totalPadding / 2;
+      break;
+    case AutoPad::kSameLower:
+      paddingBegin = totalPadding - totalPadding / 2;
+      paddingEnd = totalPadding / 2;
+      break;
+    default:
+      assert(0);
+  }
+}
 
 // template <typename T>
 // std::vector<T> ComputeImplicitPaddingForConvTranspose2dAutoPad(

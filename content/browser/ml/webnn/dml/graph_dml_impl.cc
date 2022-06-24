@@ -6,7 +6,6 @@
 
 #include "base/memory/ptr_util.h"
 #include "content/browser/ml/webnn/dml/native/GraphDML.h"
-#include "content/browser/ml/webnn/fusion_operators.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 
 namespace content {
@@ -28,8 +27,7 @@ void GraphDMLImpl::Create(mojo::PendingReceiver<Graph> receiver) {
 GraphDMLImpl::~GraphDMLImpl() = default;
 
 GraphDMLImpl::GraphDMLImpl()
-    : native_graph_dml_(std::make_unique<GraphDMLNativeImpl>()),
-      fusion_operators_(std::make_unique<FusionOperators>()) {}
+    : native_graph_dml_(std::make_unique<GraphDMLNativeImpl>()) {}
 
 void GraphDMLImpl::AddInput(const std::string& name,
                             OperandDescriptorPtr desc) {
@@ -63,9 +61,18 @@ void GraphDMLImpl::AddClamp(uint32_t input_id,
   native_graph_dml_->AddClamp(input_id, std::move(options), std::move(desc));
 }
 
+void GraphDMLImpl::AddConv2d(uint32_t input_id,
+                             uint32_t filter_id,
+                             Conv2dOptionsPtr options,
+                             OperandDescriptorPtr desc) {
+  // TODO: return directly if BuildResult has error message.
+  native_graph_dml_->AddConv2d(input_id, filter_id, std::move(options),
+                               std::move(desc));
+}
+
 void GraphDMLImpl::AddFusionClamp(ClampOptionsPtr options,
                                   uint32_t operator_id) {
-  fusion_operators_->AddClampOption(operator_id, std::move(options));
+  native_graph_dml_->AddFusionClamp(std::move(options), operator_id);
 }
 
 void GraphDMLImpl::BuildAsync(BuildAsyncCallback callback) {

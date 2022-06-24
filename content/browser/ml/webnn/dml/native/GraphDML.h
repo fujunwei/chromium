@@ -33,10 +33,14 @@ namespace webnn {
 using namespace Microsoft::WRL;
 using ml::webnn::mojom::BinaryOperandType;
 using ml::webnn::mojom::BuildResult;
+using ml::webnn::mojom::ClampOptions;
 using ml::webnn::mojom::ClampOptionsPtr;
 using ml::webnn::mojom::ComputeResult;
+using ml::webnn::mojom::Conv2dOptionsPtr;
+using ml::webnn::mojom::FusionOperator;
 using ml::webnn::mojom::OperandDescriptorPtr;
-class GraphDMLImpl;
+
+class FusionOperators;
 
 // Represent the DirectML tensor description.
 struct DmlTensorDesc {
@@ -92,7 +96,7 @@ class GraphDMLNativeImpl {
                             uint32_t,
                             BinaryOperandType,
                             OperandDescriptorPtr);
-  // virtual MaybeError AddConv2d(const op::Conv2d* conv2d) override;
+  void AddConv2d(uint32_t, uint32_t, Conv2dOptionsPtr, OperandDescriptorPtr);
   // virtual MaybeError AddConvTranspose2d(const op::ConvTranspose2d*
   // convTranspose2d) override; virtual MaybeError AddPad(const op::Pad* pad)
   // override; virtual MaybeError AddPool2d(const op::Pool2d* pool2d) override;
@@ -108,6 +112,7 @@ class GraphDMLNativeImpl {
   // virtual MaybeError AddGru(const op::Gru* Gru) override;
   // virtual MaybeError AddConcat(const op::Concat* concat) override;
   void AddClamp(uint32_t, ClampOptionsPtr, OperandDescriptorPtr);
+  void AddFusionClamp(ClampOptionsPtr options, uint32_t operator_id);
   // virtual MaybeError AddInstanceNorm(const op::InstanceNorm* instanceNorm)
   // override;
   BuildResult CompileImpl();
@@ -131,16 +136,14 @@ class GraphDMLNativeImpl {
   //       DML_TENSOR_DATA_TYPE dataType = DML_TENSOR_DATA_TYPE_FLOAT32,
   //       DML_TENSOR_FLAGS tensorFlag = DML_TENSOR_FLAG_OWNED_BY_DML);
   std::shared_ptr<EdgeInfoBase> Clamp(std::shared_ptr<EdgeInfoBase> inputEdge,
-                                      ClampOptionsPtr options);
+                                      const ClampOptions* options);
   //   MaybeError HardSwish(std::shared_ptr<EdgeInfoBase>& inputEdge,
   //                        const std::vector<UINT>& inputDims);
-  //   MaybeError EmulateFusedOperator(FusionOperatorBase* activation,
-  //                                   std::shared_ptr<EdgeInfoBase>& inputEdge,
-  //                                   const std::vector<UINT>& inputDims);
-  //   MaybeError TransposeOutputToNhwc(std::shared_ptr<EdgeInfoBase>&
-  //   inputEdge,
-  //                                    const std::vector<UINT>&
-  //                                    nchwOutputDims);
+  void EmulateFusedOperator(const FusionOperator* activation,
+                            std::shared_ptr<EdgeInfoBase>& inputEdge,
+                            const std::vector<UINT>& inputDims);
+  void TransposeOutputToNhwc(std::shared_ptr<EdgeInfoBase>& inputEdge,
+                             const std::vector<UINT>& nchwOutputDims);
 
  private:
   BuildResult Finish();
@@ -204,10 +207,9 @@ class GraphDMLNativeImpl {
   // std::unordered_set<const OperandBase*> mConstantSet;
   std::vector<std::unique_ptr<char>> mConstantsBuffer;
 
-  std::vector<UINT> Dimensions(uint32_t operand_id);
-  std::map<uint32_t, std::vector<UINT>> operand_dimensions_map_;
   std::string error_messages_;
   BuildResult build_result_;
+  std::unique_ptr<FusionOperators> fusion_operators_;
 };
 
 }  // namespace webnn

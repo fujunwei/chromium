@@ -19,6 +19,7 @@
 #include "DMLUtils.h"
 #include "base/logging.h"
 #include "content/browser/ml/webnn/dml/graph_dml_impl.h"
+#include "content/browser/ml/webnn/fusion_operators.h"
 // #include "webnn/native/NamedInputs.h"
 // #include "webnn/native/NamedOutputs.h"
 // #include "webnn/native/Utils.h"
@@ -26,10 +27,32 @@
 namespace content {
 namespace webnn {
 
+namespace {
+
+using ml::webnn::mojom::AutoPad;
+using ml::webnn::mojom::Conv2dFilterOperandLayout;
+using ml::webnn::mojom::Conv2dOptions;
+using ml::webnn::mojom::Conv2dOptionsPtr;
+using ml::webnn::mojom::FusionOperator;
+using ml::webnn::mojom::FusionOperatorPtr;
+using ml::webnn::mojom::FusionType;
+using ml::webnn::mojom::InputOperandLayout;
+using ml::webnn::mojom::OperandType;
+
+std::vector<UINT> Dimensions(std::shared_ptr<EdgeInfoBase> edge) {
+  const DML_BUFFER_TENSOR_DESC* desc =
+      reinterpret_cast<const DML_BUFFER_TENSOR_DESC*>(
+          edge->outputTensorDESC.Desc);
+
+  // std::vector<UINT> dimensions;
+  // dimensions.assign(desc->Sizes, desc->Sizes + desc->DimensionCount);
+  return std::vector<UINT>(desc->Sizes, desc->Sizes + desc->DimensionCount);
+}
+
+}  // namespace
+
 DmlTensorDesc::DmlTensorDesc() = default;
 DmlTensorDesc::~DmlTensorDesc() = default;
-
-using ml::webnn::mojom::OperandType;
 
 #define DAWN_INTERNAL_ERROR(MESSAGE)            \
   do {                                          \
@@ -241,76 +264,75 @@ std::vector<UINT> transposeDimensions(TransposeType transposeType,
   return newInputDims;
 }
 
-// std::vector<UINT> transposeFilterDimensionsAsOihw(
-//     wnn::Conv2dFilterOperandLayout filterLayout,
-//     const std::vector<UINT>& filterDims) {
-//   std::vector<UINT> newFilterDims(4);
-//   switch (filterLayout) {
-//     case wnn::Conv2dFilterOperandLayout::Ohwi:
-//       newFilterDims.resize(4);
-//       newFilterDims[0] = filterDims[0];
-//       newFilterDims[1] = filterDims[3];
-//       newFilterDims[2] = filterDims[1];
-//       newFilterDims[3] = filterDims[2];
-//       break;
-//     case wnn::Conv2dFilterOperandLayout::Hwio:
-//       newFilterDims[0] = filterDims[3];
-//       newFilterDims[1] = filterDims[2];
-//       newFilterDims[2] = filterDims[0];
-//       newFilterDims[3] = filterDims[1];
-//       break;
-//     case wnn::Conv2dFilterOperandLayout::Ihwo:
-//       newFilterDims[0] = filterDims[3];
-//       newFilterDims[1] = filterDims[0];
-//       newFilterDims[2] = filterDims[1];
-//       newFilterDims[3] = filterDims[2];
-//       break;
-//     default:
-//       assert(0);
-//       break;
-//   }
-//   return newFilterDims;
-// }
+std::vector<UINT> transposeFilterDimensionsAsOihw(
+    Conv2dFilterOperandLayout filterLayout,
+    const std::vector<UINT>& filterDims) {
+  std::vector<UINT> newFilterDims(4);
+  switch (filterLayout) {
+    case Conv2dFilterOperandLayout::kOhwi:
+      newFilterDims.resize(4);
+      newFilterDims[0] = filterDims[0];
+      newFilterDims[1] = filterDims[3];
+      newFilterDims[2] = filterDims[1];
+      newFilterDims[3] = filterDims[2];
+      break;
+    case Conv2dFilterOperandLayout::kHwio:
+      newFilterDims[0] = filterDims[3];
+      newFilterDims[1] = filterDims[2];
+      newFilterDims[2] = filterDims[0];
+      newFilterDims[3] = filterDims[1];
+      break;
+    case Conv2dFilterOperandLayout::kIhwo:
+      newFilterDims[0] = filterDims[3];
+      newFilterDims[1] = filterDims[0];
+      newFilterDims[2] = filterDims[1];
+      newFilterDims[3] = filterDims[2];
+      break;
+    default:
+      assert(0);
+      break;
+  }
+  return newFilterDims;
+}
 
-// std::vector<UINT> transposeFilterStridesAsOihw(
-//     wnn::Conv2dFilterOperandLayout filterLayout,
-//     const std::vector<UINT>& filterDims) {
-//   UINT hStride = 0, wStride = 0, iStride = 0, oStride = 0;
-//   switch (filterLayout) {
-//     case wnn::Conv2dFilterOperandLayout::Hwio:
-//       hStride = filterDims[1] * filterDims[2] * filterDims[3];
-//       wStride = filterDims[2] * filterDims[3];
-//       iStride = filterDims[3];
-//       oStride = 1;
-//       break;
-//     case wnn::Conv2dFilterOperandLayout::Ohwi:
-//       oStride = filterDims[1] * filterDims[2] * filterDims[3];
-//       hStride = filterDims[2] * filterDims[3];
-//       wStride = filterDims[3];
-//       iStride = 1;
-//       break;
-//     case wnn::Conv2dFilterOperandLayout::Ihwo:
-//       iStride = filterDims[1] * filterDims[2] * filterDims[3];
-//       hStride = filterDims[2] * filterDims[3];
-//       wStride = filterDims[3];
-//       oStride = 1;
-//       break;
-//     default:
-//       assert(0);
-//       break;
-//   }
-//   return {oStride, iStride, hStride, wStride};
-// }
+std::vector<UINT> transposeFilterStridesAsOihw(
+    Conv2dFilterOperandLayout filterLayout,
+    const std::vector<UINT>& filterDims) {
+  UINT hStride = 0, wStride = 0, iStride = 0, oStride = 0;
+  switch (filterLayout) {
+    case Conv2dFilterOperandLayout::kHwio:
+      hStride = filterDims[1] * filterDims[2] * filterDims[3];
+      wStride = filterDims[2] * filterDims[3];
+      iStride = filterDims[3];
+      oStride = 1;
+      break;
+    case Conv2dFilterOperandLayout::kOhwi:
+      oStride = filterDims[1] * filterDims[2] * filterDims[3];
+      hStride = filterDims[2] * filterDims[3];
+      wStride = filterDims[3];
+      iStride = 1;
+      break;
+    case Conv2dFilterOperandLayout::kIhwo:
+      iStride = filterDims[1] * filterDims[2] * filterDims[3];
+      hStride = filterDims[2] * filterDims[3];
+      wStride = filterDims[3];
+      oStride = 1;
+      break;
+    default:
+      assert(0);
+      break;
+  }
+  return {oStride, iStride, hStride, wStride};
+}
 
-// template <typename T>
-// std::vector<UINT> ImplicitPadding(const T* options,
-//                                   const std::vector<UINT>& inputDims,
-//                                   const std::vector<UINT>& filterDims) {
-//   return utils::ComputeImplicitPaddingForAutoPad<T, UINT>(
-//       options, {inputDims[2], inputDims[3]},
-//       {filterDims[filterDims.size() - 2], filterDims[filterDims.size() -
-//       1]});
-// }
+template <typename T>
+std::vector<UINT> ImplicitPadding(const T* options,
+                                  const std::vector<UINT>& inputDims,
+                                  const std::vector<UINT>& filterDims) {
+  return utils::ComputeImplicitPaddingForAutoPad<T, UINT>(
+      options, {inputDims[2], inputDims[3]},
+      {filterDims[filterDims.size() - 2], filterDims[filterDims.size() - 1]});
+}
 
 template <typename T>
 std::vector<UINT> ExplicitPadding(const T* options) {
@@ -530,34 +552,35 @@ void GraphDMLNativeImpl::AddEdgesToThisNode(
   mIntermediateNodesDesc.push_back(std::move(nodeDesc));
 }
 
-// MaybeError GraphDMLNativeImpl::TransposeOutputToNhwc(
-//     std::shared_ptr<EdgeInfoBase>& inputEdge,
-//     const std::vector<UINT>& nchwOutputDims) {
-//   auto nhwcOutputStrides = transposeStrides(NchwToNhwc, nchwOutputDims);
-//   auto nhwcOutputDims = transposeDimensions(NchwToNhwc, nchwOutputDims);
-//   std::shared_ptr<DmlTensorDesc> nhwcOutputDmlTensorDesc(new DmlTensorDesc);
-//   if (!CreateDmlTensorDesc(mDmlTensorsDesc, nhwcOutputDmlTensorDesc,
-//                            &inputEdge->outputTensorDESC, nhwcOutputDims,
-//                            nhwcOutputStrides, true)) {
-//     DAWN_INTERNAL_ERROR("Failed to create DML tensor description.");
-//   }
-//   DML_TENSOR_DESC nhwcOutputTensorDesc = {DML_TENSOR_TYPE_BUFFER,
-//                                           &nhwcOutputDmlTensorDesc->bufferDesc};
+void GraphDMLNativeImpl::TransposeOutputToNhwc(
+    std::shared_ptr<EdgeInfoBase>& inputEdge,
+    const std::vector<UINT>& nchwOutputDims) {
+  auto nhwcOutputStrides = transposeStrides(NchwToNhwc, nchwOutputDims);
+  auto nhwcOutputDims = transposeDimensions(NchwToNhwc, nchwOutputDims);
+  std::shared_ptr<DmlTensorDesc> nhwcOutputDmlTensorDesc(new DmlTensorDesc);
+  if (!CreateDmlTensorDesc(mDmlTensorsDesc, nhwcOutputDmlTensorDesc,
+                           &inputEdge->outputTensorDESC, nhwcOutputDims,
+                           nhwcOutputStrides, true)) {
+    DAWN_INTERNAL_ERROR("Failed to create DML tensor description.");
+  }
+  DML_TENSOR_DESC nhwcOutputTensorDesc = {DML_TENSOR_TYPE_BUFFER,
+                                          &nhwcOutputDmlTensorDesc->bufferDesc};
 
-//   inputEdge = updateEdge(inputEdge, nhwcOutputTensorDesc);
-//   return {};
-// }
+  inputEdge = updateEdge(inputEdge, nhwcOutputTensorDesc);
+  return;
+}
 
-GraphDMLNativeImpl::GraphDMLNativeImpl() {
+GraphDMLNativeImpl::GraphDMLNativeImpl()
+    : fusion_operators_(std::make_unique<FusionOperators>()) {
   DXGI_GPU_PREFERENCE gpuPreference =
       DXGI_GPU_PREFERENCE::DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE;
-  // wnn::PowerPreference powerPreference =
+  // PowerPreference powerPreference =
   //     GetContext()->GetContextOptions().powerPreference;
   // switch (powerPreference) {
-  //     case wnn::PowerPreference::High_performance:
+  //     case PowerPreference::High_performance:
   //         gpuPreference =
   //         DXGI_GPU_PREFERENCE::DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE; break;
-  //     case wnn::PowerPreference::Low_power:
+  //     case PowerPreference::Low_power:
   //         gpuPreference =
   //         DXGI_GPU_PREFERENCE::DXGI_GPU_PREFERENCE_MINIMUM_POWER; break;
   //     default:
@@ -605,7 +628,6 @@ void GraphDMLNativeImpl::AddConstant(OperandDescriptorPtr desc,
   std::shared_ptr<EdgeInfoBase> edge(inputEdgeInfo);
 
   mGraphEdgesMap[desc->object_id] = edge;
-  operand_dimensions_map_[desc->object_id] = dmlTensorDesc->dimensions;
   mInputs.push_back(inputEdgeInfo);
   mConstantsBuffer.push_back(std::move(buffer));
   // mConstantSet.insert(constant->PrimaryOutput());
@@ -662,15 +684,8 @@ void GraphDMLNativeImpl::AddInput(const std::string& name,
   std::shared_ptr<EdgeInfoBase> edge(inputEdgeInfo);
 
   mGraphEdgesMap[desc->object_id] = edge;
-  operand_dimensions_map_[desc->object_id] = dmlTensorDesc->dimensions;
   mInputs.push_back(inputEdgeInfo);
   return;
-}
-
-std::vector<UINT> GraphDMLNativeImpl::Dimensions(uint32_t operand_id) {
-  assert(operand_dimensions_map_.find(operand_id) !=
-         operand_dimensions_map_.end());
-  return operand_dimensions_map_[operand_id];
 }
 
 void GraphDMLNativeImpl::AddElementWiseBinary(uint32_t a_id,
@@ -682,11 +697,9 @@ void GraphDMLNativeImpl::AddElementWiseBinary(uint32_t a_id,
 
   auto aEdge = mGraphEdgesMap[a_id];
   auto bEdge = mGraphEdgesMap[b_id];
-  auto aDims = Dimensions(a_id);
-  auto bDims = Dimensions(b_id);
-  operand_dimensions_map_[desc->object_id] =
-      ConvertDimensions(desc->dimensions);
-  auto outputDims = Dimensions(desc->object_id);
+  auto aDims = Dimensions(aEdge);
+  auto bDims = Dimensions(bEdge);
+  auto outputDims = ConvertDimensions(desc->dimensions);
   size_t aRank = aDims.size(), bRank = bDims.size(),
          outputRank = outputDims.size();
   size_t broadcastSkipAxis = 0;
@@ -1197,77 +1210,72 @@ void GraphDMLNativeImpl::AddElementWiseBinary(uint32_t a_id,
 //             updateEdge(inputEdge, outputTensorDesc); return {};
 //         }
 
-//         DML_OPERATOR_DESC* CreateFusedOperator(
-//             FusionOperatorBase* activation,
-//             DML_ACTIVATION_LINEAR_OPERATOR_DESC& dmlActicationOperatorDesc,
-//             DML_OPERATOR_DESC& dmlFusedOperatorDesc) {
-//             if (activation == nullptr) {
-//                 return nullptr;
-//             }
+DML_OPERATOR_DESC* CreateFusedOperator(
+    const FusionOperator* activation,
+    DML_ACTIVATION_LINEAR_OPERATOR_DESC& dmlActicationOperatorDesc,
+    DML_OPERATOR_DESC& dmlFusedOperatorDesc) {
+  if (activation == nullptr) {
+    return nullptr;
+  }
 
-//             dmlActicationOperatorDesc.InputTensor = nullptr;
-//             dmlActicationOperatorDesc.OutputTensor = nullptr;
-//             dmlActicationOperatorDesc.Alpha = 0.0;
-//             dmlActicationOperatorDesc.Beta = 0.0;
-//             switch (activation->GetFusionType()) {
-//                 case FusionType::Relu: {
-//                     dmlFusedOperatorDesc.Type = DML_OPERATOR_ACTIVATION_RELU;
-//                 } break;
-//                 case FusionType::Sigmoid: {
-//                     dmlFusedOperatorDesc.Type =
-//                     DML_OPERATOR_ACTIVATION_SIGMOID;
-//                 } break;
-//                 case FusionType::Tanh: {
-//                     dmlFusedOperatorDesc.Type = DML_OPERATOR_ACTIVATION_TANH;
-//                 } break;
-//                 case FusionType::LeakyRelu: {
-//                     dmlActicationOperatorDesc.Alpha =
-//                         reinterpret_cast<op::FusionLeakyRelu*>(activation)->GetAlpha();
-//                     dmlFusedOperatorDesc.Type =
-//                     DML_OPERATOR_ACTIVATION_LEAKY_RELU;
-//                 } break;
-//                 case FusionType::Clamp:
-//                 case FusionType::HardSwish:
-//                     return nullptr;
-//                 default:
-//                     LOG(ERROR) << "This fusion type is not supported.";
-//                     assert(0);
-//             }
-//             dmlFusedOperatorDesc.Desc = &dmlActicationOperatorDesc;
-//             return &dmlFusedOperatorDesc;
-//         }
+  dmlActicationOperatorDesc.InputTensor = nullptr;
+  dmlActicationOperatorDesc.OutputTensor = nullptr;
+  dmlActicationOperatorDesc.Alpha = 0.0;
+  dmlActicationOperatorDesc.Beta = 0.0;
+  switch (activation->fusion_type) {
+    case FusionType::kRelu: {
+      dmlFusedOperatorDesc.Type = DML_OPERATOR_ACTIVATION_RELU;
+    } break;
+    // case FusionType::kSigmoid: {
+    //   dmlFusedOperatorDesc.Type = DML_OPERATOR_ACTIVATION_SIGMOID;
+    // } break;
+    // case FusionType::kTanh: {
+    //   dmlFusedOperatorDesc.Type = DML_OPERATOR_ACTIVATION_TANH;
+    // } break;
+    // case FusionType::kLeakyRelu: {
+    //   dmlActicationOperatorDesc.Alpha =
+    //       reinterpret_cast<op::FusionLeakyRelu*>(activation)->GetAlpha();
+    //   dmlFusedOperatorDesc.Type = DML_OPERATOR_ACTIVATION_LEAKY_RELU;
+    // } break;
+    case FusionType::kClamp:
+      // case FusionType::kHardSwish:
+      return nullptr;
+    default:
+      LOG(ERROR) << "This fusion type is not supported.";
+      assert(0);
+  }
+  dmlFusedOperatorDesc.Desc = &dmlActicationOperatorDesc;
+  return &dmlFusedOperatorDesc;
+}
 
-//         MaybeError
-//         GraphDMLNativeImpl::EmulateFusedOperator(FusionOperatorBase*
-//         activation,
-//                                                std::shared_ptr<EdgeInfoBase>&
-//                                                inputEdge, const
-//                                                std::vector<UINT>& inputDims)
-//                                                {
-//             // HardSwish and Clamp are not supported for fusion, so we add
-//             them directly to
-//             // emulate. Currently we implement Relu6 operator by Clamp.
-//             if (activation == nullptr) {
-//                 return {};
-//             }
+void GraphDMLNativeImpl::EmulateFusedOperator(
+    const FusionOperator* activation,
+    std::shared_ptr<EdgeInfoBase>& inputEdge,
+    const std::vector<UINT>& inputDims) {
+  // HardSwish and Clamp are not supported for fusion, so we add
+  // them directly to
+  // emulate. Currently we implement Relu6 operator by Clamp.
+  if (activation == nullptr) {
+    return;
+  }
 
-//             auto fusionType = activation->GetFusionType();
-//             if (fusionType == FusionType::Clamp) {
-//                 auto clamp = reinterpret_cast<const
-//                 op::FusionClamp*>(activation); inputEdge = Clamp(clamp,
-//                 inputEdge);
-//             } else if (fusionType == FusionType::HardSwish) {
-//                 if (HardSwish(inputEdge, inputDims).IsError()) {
-//                     DAWN_INTERNAL_ERROR("Failed to create the
-//                     HardSwish.");
-//                 };
-//             }
-//             return {};
-//         }
+  auto fusionType = activation->fusion_type;
+  if (fusionType == FusionType::kClamp) {
+    auto* options = fusion_operators_->GetClampOption(activation->object_id);
+    inputEdge = Clamp(inputEdge, options);
+  }
+  // else if (fusionType == FusionType::kkHardSwish) {
+  //   if (HardSwish(inputEdge, inputDims).IsError()) {
+  //                   DAWN_INTERNAL_ERROR("Failed to create the
+  //                   HardSwish.");
+  //   };
+  // }
+  return;
+}
 
 std::shared_ptr<EdgeInfoBase> GraphDMLNativeImpl::Clamp(
     std::shared_ptr<EdgeInfoBase> inputEdge,
-    ClampOptionsPtr options) {
+    const ClampOptions* options) {
   DML_TENSOR_DESC inputTensorDesc = inputEdge->outputTensorDESC;
 
   // Set OutputTensor = InputTensor with the same strides to optimize
@@ -1297,201 +1305,173 @@ void GraphDMLNativeImpl::AddClamp(uint32_t input_id,
                                   ClampOptionsPtr options,
                                   OperandDescriptorPtr desc) {
   auto inputEdge = mGraphEdgesMap[input_id];
-  mGraphEdgesMap[desc->object_id] = Clamp(inputEdge, std::move(options));
+  mGraphEdgesMap[desc->object_id] = Clamp(inputEdge, options.get());
   return;
 }
 
-//         std::vector<UINT> transposeStridesToNchw(const std::vector<UINT>&
-//         inputDims,
-//                                                  const DML_TENSOR_DESC&
-//                                                  inputTensorDesc) {
-//             const DML_BUFFER_TENSOR_DESC* bufferDesc =
-//                 reinterpret_cast<const
-//                 DML_BUFFER_TENSOR_DESC*>(inputTensorDesc.Desc);
-//             assert(bufferDesc != nullptr && bufferDesc->DimensionCount == 4);
-//             auto strides = bufferDesc->Strides;
-//             if (strides != nullptr) {
-//                 return {strides[0], strides[3], strides[1], strides[2]};
-//             } else {
-//                 return transposeStrides(NhwcToNchw, inputDims);
-//             }
-//         }
+void GraphDMLNativeImpl::AddFusionClamp(ClampOptionsPtr options,
+                                        uint32_t operator_id) {
+  fusion_operators_->AddClampOption(operator_id, std::move(options));
+  return;
+}
 
-//         MaybeError GraphDMLNativeImpl::AddConv2d(const op::Conv2d* conv2d) {
-//             auto inputsOperand = conv2d->Inputs();
-//             assert(inputsOperand.size() == 2 || inputsOperand.size() == 3);
-//             assert(mGraphEdgesMap.find(inputsOperand[0].Get()) !=
-//             mGraphEdgesMap.end());
-//             assert(mGraphEdgesMap.find(inputsOperand[1].Get()) !=
-//             mGraphEdgesMap.end());
+std::vector<UINT> transposeStridesToNchw(
+    const std::vector<UINT>& inputDims,
+    const DML_TENSOR_DESC& inputTensorDesc) {
+  const DML_BUFFER_TENSOR_DESC* bufferDesc =
+      reinterpret_cast<const DML_BUFFER_TENSOR_DESC*>(inputTensorDesc.Desc);
+  assert(bufferDesc != nullptr && bufferDesc->DimensionCount == 4);
+  auto* strides = bufferDesc->Strides;
+  if (strides != nullptr) {
+    return {strides[0], strides[3], strides[1], strides[2]};
+  } else {
+    return transposeStrides(NhwcToNchw, inputDims);
+  }
+}
 
-//             auto inputEdge = mGraphEdgesMap[inputsOperand[0].Get()];
-//             auto filterEdge = mGraphEdgesMap[inputsOperand[1].Get()];
+void GraphDMLNativeImpl::AddConv2d(uint32_t input_id,
+                                   uint32_t filter_id,
+                                   Conv2dOptionsPtr options,
+                                   OperandDescriptorPtr desc) {
+  assert(mGraphEdgesMap.find(input_id) != mGraphEdgesMap.end());
+  assert(mGraphEdgesMap.find(filter_id) != mGraphEdgesMap.end());
 
-//             auto inputDims =
-//             ConvertDimensions(inputsOperand[0].Get()->Shape()); auto
-//             filterDims = ConvertDimensions(inputsOperand[1].Get()->Shape());
-//             auto outputDims =
-//             ConvertDimensions(conv2d->Outputs()[0].Get()->Shape());
-//             std::vector<UINT> newInputDims = inputDims, newFilterDims =
-//             filterDims,
-//                               newOutputDims = outputDims, newInputStrides,
-//                               newFilterStrides;
+  auto inputEdge = mGraphEdgesMap[input_id];
+  auto filterEdge = mGraphEdgesMap[filter_id];
 
-//             const Conv2dOptions* options = conv2d->GetOptions();
+  auto inputDims = Dimensions(inputEdge);
+  auto filterDims = Dimensions(filterEdge);
+  auto outputDims = ConvertDimensions(desc->dimensions);
+  std::vector<UINT> newInputDims = inputDims, newFilterDims = filterDims,
+                    newOutputDims = outputDims, newInputStrides,
+                    newFilterStrides;
 
-//             DML_TENSOR_DESC inputTensorDesc = inputEdge->outputTensorDESC;
-//             if (options->inputLayout == wnn::InputOperandLayout::Nhwc) {
-//                 newInputDims = transposeDimensions(NhwcToNchw, inputDims);
-//                 newOutputDims = transposeDimensions(NhwcToNchw, outputDims);
-//                 newInputStrides = transposeStridesToNchw(inputDims,
-//                 inputTensorDesc);
+  DML_TENSOR_DESC inputTensorDesc = inputEdge->outputTensorDESC;
+  if (options->inputLayout == InputOperandLayout::kNhwc) {
+    newInputDims = transposeDimensions(NhwcToNchw, inputDims);
+    newOutputDims = transposeDimensions(NhwcToNchw, outputDims);
+    newInputStrides = transposeStridesToNchw(inputDims, inputTensorDesc);
 
-//                 std::shared_ptr<DmlTensorDesc> inputDmlTensorDesc(new
-//                 DmlTensorDesc); if (!CreateDmlTensorDesc(mDmlTensorsDesc,
-//                 inputDmlTensorDesc,
-//                                          &inputEdge->outputTensorDESC,
-//                                          newInputDims, newInputStrides)) {
-//                     DAWN_INTERNAL_ERROR("Failed to create DML tensor
-//                     description.");
-//                 }
-//                 inputTensorDesc = {DML_TENSOR_TYPE_BUFFER,
-//                 &inputDmlTensorDesc->bufferDesc};
-//             }
+    std::shared_ptr<DmlTensorDesc> inputDmlTensorDesc(new DmlTensorDesc);
+    if (!CreateDmlTensorDesc(mDmlTensorsDesc, inputDmlTensorDesc,
+                             &inputEdge->outputTensorDESC, newInputDims,
+                             newInputStrides)) {
+      DAWN_INTERNAL_ERROR("Failed to create DML tensor description.");
+    }
+    inputTensorDesc = {DML_TENSOR_TYPE_BUFFER, &inputDmlTensorDesc->bufferDesc};
+  }
 
-//             DML_TENSOR_DESC filterTensorDesc = filterEdge->outputTensorDESC;
-//             if (options->filterLayout !=
-//             wnn::Conv2dFilterOperandLayout::Oihw) {
-//                 newFilterDims =
-//                 transposeFilterDimensionsAsOihw(options->filterLayout,
-//                 filterDims); newFilterStrides =
-//                 transposeFilterStridesAsOihw(options->filterLayout,
-//                 filterDims);
+  DML_TENSOR_DESC filterTensorDesc = filterEdge->outputTensorDESC;
+  if (options->filterLayout != Conv2dFilterOperandLayout::kOihw) {
+    newFilterDims =
+        transposeFilterDimensionsAsOihw(options->filterLayout, filterDims);
+    newFilterStrides =
+        transposeFilterStridesAsOihw(options->filterLayout, filterDims);
 
-//                 std::shared_ptr<DmlTensorDesc> filterDmlTensorDesc(new
-//                 DmlTensorDesc); if (!CreateDmlTensorDesc(mDmlTensorsDesc,
-//                 filterDmlTensorDesc,
-//                                          &filterEdge->outputTensorDESC,
-//                                          newFilterDims, newFilterStrides)) {
-//                     DAWN_INTERNAL_ERROR("Failed to create DML tensor
-//                     description.");
-//                 }
-//                 filterTensorDesc = {DML_TENSOR_TYPE_BUFFER,
-//                 &filterDmlTensorDesc->bufferDesc};
-//             }
+    std::shared_ptr<DmlTensorDesc> filterDmlTensorDesc(new DmlTensorDesc);
+    if (!CreateDmlTensorDesc(mDmlTensorsDesc, filterDmlTensorDesc,
+                             &filterEdge->outputTensorDESC, newFilterDims,
+                             newFilterStrides)) {
+      DAWN_INTERNAL_ERROR("Failed to create DML tensor description.");
+    }
+    filterTensorDesc = {DML_TENSOR_TYPE_BUFFER,
+                        &filterDmlTensorDesc->bufferDesc};
+  }
 
-//             std::vector<std::shared_ptr<EdgeInfoBase>> inputEdges =
-//             {inputEdge, filterEdge};
+  std::vector<std::shared_ptr<EdgeInfoBase>> inputEdges = {inputEdge,
+                                                           filterEdge};
 
-//             const DML_TENSOR_DESC* biasTensorDescPtr = nullptr;
-//             DML_TENSOR_DESC newBiasTensorDesc = {};
-//             if (options->bias != nullptr) {
-//                 assert(mGraphEdgesMap.find(inputsOperand[2].Get()) !=
-//                 mGraphEdgesMap.end()); auto biasEdge =
-//                 mGraphEdgesMap[inputsOperand[2].Get()]; auto biasDims =
-//                 ConvertDimensions(conv2d->Inputs()[2].Get()->Shape()); if
-//                 (biasDims[0] != newFilterDims[0] || biasDims.size() != 1) {
-//                     DAWN_INTERNAL_ERROR(
-//                         "The bias should be 1-D tensor with the shape of
-//                         [output_channels].");
-//                 }
+  const DML_TENSOR_DESC* biasTensorDescPtr = nullptr;
+  DML_TENSOR_DESC newBiasTensorDesc = {};
+  if (options->bias_id != 0) {
+    assert(mGraphEdgesMap.find(options->bias_id) != mGraphEdgesMap.end());
+    auto biasEdge = mGraphEdgesMap[options->bias_id];
+    auto biasDims = Dimensions(biasEdge);
+    if (biasDims[0] != newFilterDims[0] || biasDims.size() != 1) {
+      DAWN_INTERNAL_ERROR(
+          "The bias should be 1-D tensor with the shape of [output_channels].");
+    }
 
-//                 // Reshape bias from 1-D to 4-D for NCHW layout.
-//                 std::vector<UINT> newBiasDims = {1, biasDims[0], 1, 1};
-//                 std::shared_ptr<DmlTensorDesc> biasDmlTensorDesc(new
-//                 DmlTensorDesc); if (!CreateDmlTensorDesc(mDmlTensorsDesc,
-//                 biasDmlTensorDesc,
-//                                          &biasEdge->outputTensorDESC,
-//                                          newBiasDims)) {
-//                     DAWN_INTERNAL_ERROR("Failed to create DML tensor
-//                     description.");
-//                 }
-//                 newBiasTensorDesc = {DML_TENSOR_TYPE_BUFFER,
-//                 &biasDmlTensorDesc->bufferDesc}; biasTensorDescPtr =
-//                 &newBiasTensorDesc; inputEdges.push_back(biasEdge);
-//             }
+    // Reshape bias from 1-D to 4-D for NCHW layout.
+    std::vector<UINT> newBiasDims = {1, biasDims[0], 1, 1};
+    std::shared_ptr<DmlTensorDesc> biasDmlTensorDesc(new DmlTensorDesc);
+    if (!CreateDmlTensorDesc(mDmlTensorsDesc, biasDmlTensorDesc,
+                             &biasEdge->outputTensorDESC, newBiasDims)) {
+      DAWN_INTERNAL_ERROR("Failed to create DML tensor description.");
+    }
+    newBiasTensorDesc = {DML_TENSOR_TYPE_BUFFER,
+                         &biasDmlTensorDesc->bufferDesc};
+    biasTensorDescPtr = &newBiasTensorDesc;
+    inputEdges.push_back(biasEdge);
+  }
 
-//             std::shared_ptr<DmlTensorDesc> outputDmlTensorDesc(new
-//             DmlTensorDesc); if (!CreateDmlTensorDesc(mDmlTensorsDesc,
-//             outputDmlTensorDesc,
-//                                      &inputEdge->outputTensorDESC,
-//                                      newOutputDims, {}, true)) {
-//                 DAWN_INTERNAL_ERROR("Failed to create DML tensor
-//                 description.");
-//             }
-//             DML_TENSOR_DESC outputTensorDesc = {DML_TENSOR_TYPE_BUFFER,
-//                                                 &outputDmlTensorDesc->bufferDesc};
+  std::shared_ptr<DmlTensorDesc> outputDmlTensorDesc(new DmlTensorDesc);
+  if (!CreateDmlTensorDesc(mDmlTensorsDesc, outputDmlTensorDesc,
+                           &inputEdge->outputTensorDESC, newOutputDims, {},
+                           true)) {
+    DAWN_INTERNAL_ERROR("Failed to create DML tensor description.");
+  }
+  DML_TENSOR_DESC outputTensorDesc = {DML_TENSOR_TYPE_BUFFER,
+                                      &outputDmlTensorDesc->bufferDesc};
 
-//             // FIXME(nhu): strides, dilations, padding should be uint32_t
-//             // need to fix the spec.
-//             std::vector<UINT> strides, dilations;
-//             strides.assign(options->strides, options->strides +
-//             options->stridesCount); dilations.assign(options->dilations,
-//             options->dilations + options->dilationsCount);
+  // FIXME(nhu): strides, dilations, padding should be uint32_t
+  // need to fix the spec.
+  std::vector<UINT> strides = ConvertDimensions(options->strides);
+  std::vector<UINT> dilations = ConvertDimensions(options->dilations);
 
-//             std::vector<UINT> padding =
-//                 options->autoPad == wnn::AutoPad::Explicit
-//                     ? ExplicitPadding<Conv2dOptions>(options)
-//                     : ImplicitPadding<Conv2dOptions>(options, newInputDims,
-//                     newFilterDims);
-//             std::vector<UINT> startPadding = {padding[0], padding[2]};
-//             std::vector<UINT> endPadding = {padding[1], padding[3]};
-//             std::vector<UINT> defaultOutPadding = {0, 0};
+  std::vector<UINT> padding =
+      options->autoPad == AutoPad::kExplicit
+          ? ExplicitPadding<Conv2dOptions>(options.get())
+          : ImplicitPadding<Conv2dOptions>(options.get(), newInputDims,
+                                           newFilterDims);
+  std::vector<UINT> startPadding = {padding[0], padding[2]};
+  std::vector<UINT> endPadding = {padding[1], padding[3]};
+  std::vector<UINT> defaultOutPadding = {0, 0};
 
-//             DML_ACTIVATION_LINEAR_OPERATOR_DESC dmlActicationOperatorDesc{};
-//             DML_OPERATOR_DESC dmlFusedOperatorDesc = {};
-//             DML_OPERATOR_DESC* fusedActivation = CreateFusedOperator(
-//                 options->activation, dmlActicationOperatorDesc,
-//                 dmlFusedOperatorDesc);
+  DML_ACTIVATION_LINEAR_OPERATOR_DESC dmlActicationOperatorDesc{};
+  DML_OPERATOR_DESC dmlFusedOperatorDesc = {};
+  DML_OPERATOR_DESC* fusedActivation =
+      CreateFusedOperator(options->activation.get(), dmlActicationOperatorDesc,
+                          dmlFusedOperatorDesc);
 
-//             ComPtr<IDMLOperator> dmlOperator;
-//             DML_CONVOLUTION_OPERATOR_DESC dmlSpecificOperatorDesc{};
-//             dmlSpecificOperatorDesc.InputTensor = &inputTensorDesc;
-//             dmlSpecificOperatorDesc.FilterTensor = &filterTensorDesc;
-//             dmlSpecificOperatorDesc.BiasTensor = biasTensorDescPtr;
-//             dmlSpecificOperatorDesc.OutputTensor = &outputTensorDesc;
+  ComPtr<IDMLOperator> dmlOperator;
+  DML_CONVOLUTION_OPERATOR_DESC dmlSpecificOperatorDesc{};
+  dmlSpecificOperatorDesc.InputTensor = &inputTensorDesc;
+  dmlSpecificOperatorDesc.FilterTensor = &filterTensorDesc;
+  dmlSpecificOperatorDesc.BiasTensor = biasTensorDescPtr;
+  dmlSpecificOperatorDesc.OutputTensor = &outputTensorDesc;
 
-//             dmlSpecificOperatorDesc.Mode =
-//             DML_CONVOLUTION_MODE_CROSS_CORRELATION;
-//             dmlSpecificOperatorDesc.Direction =
-//             DML_CONVOLUTION_DIRECTION_FORWARD;
-//             dmlSpecificOperatorDesc.DimensionCount = inputDims.size() - 2;
-//             dmlSpecificOperatorDesc.Strides = strides.data();
-//             dmlSpecificOperatorDesc.Dilations = dilations.data();
-//             dmlSpecificOperatorDesc.StartPadding = startPadding.data();
-//             dmlSpecificOperatorDesc.EndPadding = endPadding.data();
-//             dmlSpecificOperatorDesc.OutputPadding = defaultOutPadding.data();
-//             dmlSpecificOperatorDesc.GroupCount =
-//             static_cast<UINT>(options->groups);
-//             dmlSpecificOperatorDesc.FusedActivation = fusedActivation;
+  dmlSpecificOperatorDesc.Mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION;
+  dmlSpecificOperatorDesc.Direction = DML_CONVOLUTION_DIRECTION_FORWARD;
+  dmlSpecificOperatorDesc.DimensionCount = inputDims.size() - 2;
+  dmlSpecificOperatorDesc.Strides = strides.data();
+  dmlSpecificOperatorDesc.Dilations = dilations.data();
+  dmlSpecificOperatorDesc.StartPadding = startPadding.data();
+  dmlSpecificOperatorDesc.EndPadding = endPadding.data();
+  dmlSpecificOperatorDesc.OutputPadding = defaultOutPadding.data();
+  dmlSpecificOperatorDesc.GroupCount = static_cast<UINT>(options->groups);
+  dmlSpecificOperatorDesc.FusedActivation = fusedActivation;
 
-//             DML_OPERATOR_DESC dmlOperatorDesc = {};
-//             dmlOperatorDesc.Type = DML_OPERATOR_CONVOLUTION;
-//             dmlOperatorDesc.Desc = &dmlSpecificOperatorDesc;
-//             WEBNN_CHECK(mDevice->CreateOperator(&dmlOperatorDesc,
-//             IID_PPV_ARGS(&dmlOperator)));
-//             mIntermediateNodesMap[mIntermediateNodes.size()] = dmlOperator;
+  DML_OPERATOR_DESC dmlOperatorDesc = {};
+  dmlOperatorDesc.Type = DML_OPERATOR_CONVOLUTION;
+  dmlOperatorDesc.Desc = &dmlSpecificOperatorDesc;
+  WEBNN_CHECK(
+      mDevice->CreateOperator(&dmlOperatorDesc, IID_PPV_ARGS(&dmlOperator)));
+  mIntermediateNodesMap[mIntermediateNodes.size()] = dmlOperator;
 
-//             auto outputEdge = CreateEdgeFromThisNode(outputTensorDesc,
-//             mIntermediateNodes.size()); AddEdgesToThisNode(inputEdges);
+  auto outputEdge =
+      CreateEdgeFromThisNode(outputTensorDesc, mIntermediateNodes.size());
+  AddEdgesToThisNode(inputEdges);
 
-//             // Transpose output from nchw->nhwc.
-//             if (options->inputLayout == wnn::InputOperandLayout::Nhwc) {
-//                 if (TransposeOutputToNhwc(outputEdge,
-//                 newOutputDims).IsError()) {
-//                     DAWN_INTERNAL_ERROR("Failed to transpose output
-//                     from Nchw to Nhwc.");
-//                 };
-//             }
+  // Transpose output from nchw->nhwc.
+  if (options->inputLayout == InputOperandLayout::kNhwc) {
+    TransposeOutputToNhwc(outputEdge, newOutputDims);
+  }
 
-//             if (EmulateFusedOperator(options->activation, outputEdge,
-//             outputDims).IsError()) {
-//                 DAWN_INTERNAL_ERROR("Failed to emulate fused
-//                 operator.");
-//             }
-//             mGraphEdgesMap[conv2d->PrimaryOutput()] = outputEdge;
-//             return {};
-//         }
+  EmulateFusedOperator(options->activation.get(), outputEdge, outputDims);
+  mGraphEdgesMap[desc->object_id] = outputEdge;
+  return;
+}
 
 //         MaybeError GraphDMLNativeImpl::AddPool2d(const op::Pool2d* pool2d) {
 //             assert(pool2d->Inputs().size() == 1);
@@ -1508,7 +1488,7 @@ void GraphDMLNativeImpl::AddClamp(uint32_t input_id,
 //             pool2d->GetOptions();
 
 //             DML_TENSOR_DESC inputTensorDesc = inputEdge->outputTensorDESC;
-//             if (options->layout == wnn::InputOperandLayout::Nhwc) {
+//             if (options->layout == InputOperandLayout::kNhwc) {
 //                 newInputDims = transposeDimensions(NhwcToNchw, inputDims);
 //                 newOutputDims = transposeDimensions(NhwcToNchw, outputDims);
 //                 newInputStrides = transposeStridesToNchw(inputDims,
@@ -1557,7 +1537,7 @@ void GraphDMLNativeImpl::AddClamp(uint32_t input_id,
 //                 windowSizes = {newInputDims[2], newInputDims[3]};
 //             }
 
-//             auto padding = options->autoPad == wnn::AutoPad::Explicit
+//             auto padding = options->autoPad == AutoPad::Explicit
 //                                ? ExplicitPadding<Pool2dOptions>(options)
 //                                : ImplicitPadding<Pool2dOptions>(options,
 //                                newInputDims, windowSizes);
@@ -1652,7 +1632,7 @@ void GraphDMLNativeImpl::AddClamp(uint32_t input_id,
 //             mIntermediateNodes.size()); AddEdgesToThisNode({inputEdge});
 
 //             // Transpose output from nchw->nhwc.
-//             if (options->layout == wnn::InputOperandLayout::Nhwc) {
+//             if (options->layout == InputOperandLayout::kNhwc) {
 //                 if (TransposeOutputToNhwc(outputEdge,
 //                 newOutputDims).IsError()) {
 //                     DAWN_INTERNAL_ERROR("Failed to transpose output
@@ -1753,16 +1733,16 @@ void GraphDMLNativeImpl::AddClamp(uint32_t input_id,
 //             const PadOptions* options = pad->GetOptions();
 //             DML_PADDING_MODE paddingMode;
 //             switch (options->mode) {
-//                 case wnn::PaddingMode::Edge:
+//                 case PaddingMode::Edge:
 //                     paddingMode = DML_PADDING_MODE_EDGE;
 //                     break;
-//                 case wnn::PaddingMode::Reflection:
+//                 case PaddingMode::Reflection:
 //                     paddingMode = DML_PADDING_MODE_REFLECTION;
 //                     break;
-//                 case wnn::PaddingMode::Symmetric:
+//                 case PaddingMode::Symmetric:
 //                     paddingMode = DML_PADDING_MODE_SYMMETRIC;
 //                     break;
-//                 case wnn::PaddingMode::Constant:
+//                 case PaddingMode::Constant:
 //                     paddingMode = DML_PADDING_MODE_CONSTANT;
 //                     break;
 //                 default:
@@ -2112,10 +2092,10 @@ void GraphDMLNativeImpl::AddClamp(uint32_t input_id,
 //             const Resample2dOptions* options = resample2d->GetOptions();
 //             DML_INTERPOLATION_MODE mode;
 //             switch (options->mode) {
-//                 case wnn::InterpolationMode::NearestNeighbor:
+//                 case InterpolationMode::NearestNeighbor:
 //                     mode = DML_INTERPOLATION_MODE_NEAREST_NEIGHBOR;
 //                     break;
-//                 case wnn::InterpolationMode::Linear:
+//                 case InterpolationMode::Linear:
 //                     mode = DML_INTERPOLATION_MODE_LINEAR;
 //                     break;
 //                 default:
@@ -2274,7 +2254,7 @@ void GraphDMLNativeImpl::AddClamp(uint32_t input_id,
 //             instanceNorm->GetOptions();
 
 //             DML_TENSOR_DESC inputTensorDesc = inputEdge->outputTensorDESC;
-//             if (options->layout == wnn::InputOperandLayout::Nhwc) {
+//             if (options->layout == InputOperandLayout::kNhwc) {
 //                 newInputDims = transposeDimensions(NhwcToNchw, inputDims);
 //                 newOutputDims = transposeDimensions(NhwcToNchw, outputDims);
 //                 newInputStrides = transposeStridesToNchw(inputDims,
@@ -2396,7 +2376,7 @@ void GraphDMLNativeImpl::AddClamp(uint32_t input_id,
 //             edges[0], edges[1]});
 
 //             // Transpose output from nchw->nhwc.
-//             if (options->layout == wnn::InputOperandLayout::Nhwc) {
+//             if (options->layout == InputOperandLayout::kNhwc) {
 //                 if (TransposeOutputToNhwc(outputEdge,
 //                 newOutputDims).IsError()) {
 //                     DAWN_INTERNAL_ERROR("Failed to transpose output

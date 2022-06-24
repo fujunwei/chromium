@@ -15,13 +15,13 @@ namespace {
 
 using ml::webnn::mojom::BinaryOperandType;
 using ml::webnn::mojom::ClampOptionsPtr;
+using ml::webnn::mojom::Conv2dOptionsPtr;
 using ml::webnn::mojom::OperandDescriptorPtr;
 
 }  // namespace
 
 namespace webnn {
 
-class FusionOperators;
 class GraphDMLNativeImpl;
 
 class GraphDMLImpl : public ml::webnn::mojom::Graph {
@@ -47,6 +47,10 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
   void AddClamp(uint32_t input_id,
                 ClampOptionsPtr options,
                 OperandDescriptorPtr desc) override;
+  void AddConv2d(uint32_t input_id,
+                 uint32_t filter_id,
+                 Conv2dOptionsPtr options,
+                 OperandDescriptorPtr desc) override;
 
   void AddFusionClamp(ClampOptionsPtr options, uint32_t operator_id) override;
 
@@ -57,7 +61,6 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
       ComputeAsyncCallback callback) override;
 
   std::unique_ptr<GraphDMLNativeImpl> native_graph_dml_;
-  std::unique_ptr<FusionOperators> fusion_operators_;
 };
 
 }  // namespace webnn
