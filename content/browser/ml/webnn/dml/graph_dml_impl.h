@@ -16,6 +16,7 @@ namespace {
 using ml::webnn::mojom::BinaryOperandType;
 using ml::webnn::mojom::ClampOptionsPtr;
 using ml::webnn::mojom::Conv2dOptionsPtr;
+using ml::webnn::mojom::GemmOptionsPtr;
 using ml::webnn::mojom::OperandDescriptorPtr;
 
 }  // namespace
@@ -52,6 +53,10 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
                  Conv2dOptionsPtr options,
                  OperandDescriptorPtr desc) override;
   void AddReshape(uint32_t input_id, OperandDescriptorPtr desc) override;
+  void AddGemm(uint32_t,
+               uint32_t,
+               GemmOptionsPtr,
+               OperandDescriptorPtr) override;
 
   void AddFusionClamp(ClampOptionsPtr options, uint32_t operator_id) override;
 

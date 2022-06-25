@@ -226,12 +226,19 @@ bool WebnnGraph::BuildGraph(
         break;
       }
       case MLOperator::OpKind::kGemm: {
-        // const MLGemmOptions* options =
-        //     static_cast<const MLGemmOptions*>(op->Options());
-        // if (!DefineGemm(subgraph.get(), tensors_map, op, options,
-        //                 exception_state)) {
-        //   return false;
-        // }
+        const MLGemmOptions* ml_options =
+            static_cast<const MLGemmOptions*>(op->Options());
+        auto* input_b = op->Inputs()[1].Get();
+        auto options = ml::webnn::mojom::blink::GemmOptions::New();
+        options->c_id = ml_options->hasC() ? ml_options->c()->GetObjectId() : 0;
+        options->alpha = ml_options->hasAlpha() ? ml_options->alpha() : 1.0;
+        options->beta = ml_options->hasBeta() ? ml_options->beta() : 1.0;
+        options->a_transpose =
+            ml_options->hasATranspose() ? ml_options->aTranspose() : false;
+        options->b_transpose =
+            ml_options->hasBTranspose() ? ml_options->bTranspose() : false;
+        remote_graph_->AddGemm(input->GetObjectId(), input_b->GetObjectId(),
+                               std::move(options), std::move(desc));
         break;
       }
       case MLOperator::OpKind::kAveragePool2d: {

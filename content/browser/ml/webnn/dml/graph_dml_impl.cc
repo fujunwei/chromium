@@ -75,6 +75,14 @@ void GraphDMLImpl::AddReshape(uint32_t input_id, OperandDescriptorPtr desc) {
   native_graph_dml_->AddReshape(input_id, std::move(desc));
 }
 
+void GraphDMLImpl::AddGemm(uint32_t a_id,
+                           uint32_t b_id,
+                           GemmOptionsPtr options,
+                           OperandDescriptorPtr desc) {
+  // TODO: return directly if BuildResult has error message.
+  native_graph_dml_->AddGemm(a_id, b_id, std::move(options), std::move(desc));
+}
+
 void GraphDMLImpl::AddFusionClamp(ClampOptionsPtr options,
                                   uint32_t operator_id) {
   native_graph_dml_->AddFusionClamp(std::move(options), operator_id);

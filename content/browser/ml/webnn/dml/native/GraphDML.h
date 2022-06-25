@@ -38,6 +38,7 @@ using ml::webnn::mojom::ClampOptionsPtr;
 using ml::webnn::mojom::ComputeResult;
 using ml::webnn::mojom::Conv2dOptionsPtr;
 using ml::webnn::mojom::FusionOperator;
+using ml::webnn::mojom::GemmOptionsPtr;
 using ml::webnn::mojom::OperandDescriptorPtr;
 
 class FusionOperators;
@@ -109,7 +110,10 @@ class GraphDMLNativeImpl {
   // virtual MaybeError AddSqueeze(const op::Squeeze* squeeze) override;
   // virtual MaybeError AddTranspose(const op::Transpose* transpose) override;
   // virtual MaybeError AddUnary(const op::Unary* unary) override;
-  // virtual MaybeError AddGemm(const op::Gemm* Gemm) override;
+  void AddGemm(uint32_t a_id,
+               uint32_t b_id,
+               GemmOptionsPtr options,
+               OperandDescriptorPtr desc);
   // virtual MaybeError AddGru(const op::Gru* Gru) override;
   // virtual MaybeError AddConcat(const op::Concat* concat) override;
   void AddClamp(uint32_t, ClampOptionsPtr, OperandDescriptorPtr);

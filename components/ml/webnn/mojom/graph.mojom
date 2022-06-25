@@ -66,6 +66,14 @@ struct Conv2dOptions {
   FusionOperator? activation;
 };
 
+struct GemmOptions {
+  uint32 c_id;
+  float alpha = 1.0;
+  float beta = 1.0;
+  bool a_transpose = false;
+  bool b_transpose = false;
+};
+
 // Represents the `MLClampOptions`.
 struct ClampOptions {
   float minValue;
@@ -102,6 +110,8 @@ interface Graph {
   AddConv2d(uint32 input_id, uint32 filter_id, Conv2dOptions options,
             OperandDescriptor desc);
   AddReshape(uint32 input_id, OperandDescriptor desc);
+  AddGemm(uint32 a_id, uint32 b_id, GemmOptions options, OperandDescriptor desc);
+
   AddFusionClamp(ClampOptions options, uint32 operator_id);
 
   BuildAsync() => (BuildResult result);
