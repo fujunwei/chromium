@@ -101,7 +101,7 @@ interface Graph {
   AddClamp(uint32 input_id, ClampOptions options, OperandDescriptor desc);
   AddConv2d(uint32 input_id, uint32 filter_id, Conv2dOptions options,
             OperandDescriptor desc);
-
+  AddReshape(uint32 input_id, OperandDescriptor desc);
   AddFusionClamp(ClampOptions options, uint32 operator_id);
 
   BuildAsync() => (BuildResult result);

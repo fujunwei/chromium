@@ -51,6 +51,7 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
                  uint32_t filter_id,
                  Conv2dOptionsPtr options,
                  OperandDescriptorPtr desc) override;
+  void AddReshape(uint32_t input_id, OperandDescriptorPtr desc) override;
 
   void AddFusionClamp(ClampOptionsPtr options, uint32_t operator_id) override;
 

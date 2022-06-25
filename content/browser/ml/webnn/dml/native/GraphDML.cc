@@ -1142,32 +1142,25 @@ void GraphDMLNativeImpl::AddElementWiseBinary(uint32_t a_id,
 //             return {};
 //         }
 
-//         MaybeError GraphDMLNativeImpl::AddReshape(const op::Reshape* reshape)
-//         {
-//             assert(reshape->Inputs().size() == 1);
-//             const OperandBase* inputOperand = reshape->Inputs()[0].Get();
-//             assert(mGraphEdgesMap.find(inputOperand) !=
-//             mGraphEdgesMap.end());
+void GraphDMLNativeImpl::AddReshape(uint32_t input_id,
+                                    OperandDescriptorPtr desc) {
+  assert(mGraphEdgesMap.find(input_id) != mGraphEdgesMap.end());
 
-//             auto inputEdge = mGraphEdgesMap[inputOperand];
-//             auto outputDims =
-//             ConvertDimensions(reshape->Outputs()[0].Get()->Shape());
-//             std::shared_ptr<DmlTensorDesc> outputDmlTensorDesc(new
-//             DmlTensorDesc);
-//             // Reshape needn't new strides, because the layout has not been
-//             changed. if (!CreateDmlTensorDesc(mDmlTensorsDesc,
-//             outputDmlTensorDesc,
-//                                      &inputEdge->outputTensorDESC,
-//                                      outputDims)) {
-//                 DAWN_INTERNAL_ERROR("Failed to create DML tensor
-//                 description.");
-//             }
-//             DML_TENSOR_DESC outputTensorDesc = {DML_TENSOR_TYPE_BUFFER,
-//                                                 &outputDmlTensorDesc->bufferDesc};
-//             // Reshape is not a real node in DML, just need to update the
-//             edge created from it. mGraphEdgesMap[reshape->PrimaryOutput()] =
-//             updateEdge(inputEdge, outputTensorDesc); return {};
-//         }
+  auto inputEdge = mGraphEdgesMap[input_id];
+  auto outputDims = ConvertDimensions(desc->dimensions);
+  std::shared_ptr<DmlTensorDesc> outputDmlTensorDesc(new DmlTensorDesc);
+  // Reshape needn't new strides, because the layout has not been changed.
+  if (!CreateDmlTensorDesc(mDmlTensorsDesc, outputDmlTensorDesc,
+                           &inputEdge->outputTensorDESC, outputDims)) {
+    DAWN_INTERNAL_ERROR("Failed to create DML tensor description.");
+  }
+  DML_TENSOR_DESC outputTensorDesc = {DML_TENSOR_TYPE_BUFFER,
+                                      &outputDmlTensorDesc->bufferDesc};
+  // Reshape is not a real node in DML, just need to update the edge created
+  // from it.
+  mGraphEdgesMap[desc->object_id] = updateEdge(inputEdge, outputTensorDesc);
+  return;
+}
 
 //         MaybeError GraphDMLNativeImpl::AddTranspose(const op::Transpose*
 //         transpose) {

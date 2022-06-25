@@ -70,6 +70,11 @@ void GraphDMLImpl::AddConv2d(uint32_t input_id,
                                std::move(desc));
 }
 
+void GraphDMLImpl::AddReshape(uint32_t input_id, OperandDescriptorPtr desc) {
+  // TODO: return directly if BuildResult has error message.
+  native_graph_dml_->AddReshape(input_id, std::move(desc));
+}
+
 void GraphDMLImpl::AddFusionClamp(ClampOptionsPtr options,
                                   uint32_t operator_id) {
   native_graph_dml_->AddFusionClamp(std::move(options), operator_id);

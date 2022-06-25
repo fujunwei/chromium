@@ -250,10 +250,7 @@ bool WebnnGraph::BuildGraph(
         break;
       }
       case MLOperator::OpKind::kReshape: {
-        // if (!DefineReshape(subgraph.get(), tensors_map, op, exception_state))
-        // {
-        //   return false;
-        // }
+        remote_graph_->AddReshape(input->GetObjectId(), std::move(desc));
         break;
       }
       case MLOperator::OpKind::kSoftmax: {

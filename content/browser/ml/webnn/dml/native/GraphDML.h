@@ -102,7 +102,8 @@ class GraphDMLNativeImpl {
   // override; virtual MaybeError AddPool2d(const op::Pool2d* pool2d) override;
   // virtual MaybeError AddReduce(const op::Reduce* reduce) override;
   // virtual MaybeError AddResample2d(const op::Resample2d* resample2d)
-  // override; virtual MaybeError AddReshape(const op::Reshape* reshape)
+  // override;
+  void AddReshape(uint32_t, OperandDescriptorPtr);
   // override; virtual MaybeError AddSlice(const op::Slice* slice) override;
   // virtual MaybeError AddSplit(const op::Split* split) override;
   // virtual MaybeError AddSqueeze(const op::Squeeze* squeeze) override;
