@@ -40,6 +40,9 @@ using ml::webnn::mojom::Conv2dOptionsPtr;
 using ml::webnn::mojom::FusionOperator;
 using ml::webnn::mojom::GemmOptionsPtr;
 using ml::webnn::mojom::OperandDescriptorPtr;
+using ml::webnn::mojom::Pool2dOptions;
+using ml::webnn::mojom::Pool2dOptionsPtr;
+using ml::webnn::mojom::Pool2dType;
 
 class FusionOperators;
 
@@ -100,7 +103,11 @@ class GraphDMLNativeImpl {
   void AddConv2d(uint32_t, uint32_t, Conv2dOptionsPtr, OperandDescriptorPtr);
   // virtual MaybeError AddConvTranspose2d(const op::ConvTranspose2d*
   // convTranspose2d) override; virtual MaybeError AddPad(const op::Pad* pad)
-  // override; virtual MaybeError AddPool2d(const op::Pool2d* pool2d) override;
+  // override;
+  void AddPool2d(uint32_t input_id,
+                 Pool2dOptionsPtr options,
+                 Pool2dType type,
+                 OperandDescriptorPtr desc);
   // virtual MaybeError AddReduce(const op::Reduce* reduce) override;
   // virtual MaybeError AddResample2d(const op::Resample2d* resample2d)
   // override;

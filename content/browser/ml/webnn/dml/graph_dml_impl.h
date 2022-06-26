@@ -18,6 +18,8 @@ using ml::webnn::mojom::ClampOptionsPtr;
 using ml::webnn::mojom::Conv2dOptionsPtr;
 using ml::webnn::mojom::GemmOptionsPtr;
 using ml::webnn::mojom::OperandDescriptorPtr;
+using ml::webnn::mojom::Pool2dOptionsPtr;
+using ml::webnn::mojom::Pool2dType;
 
 }  // namespace
 
@@ -57,7 +59,10 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
                uint32_t,
                GemmOptionsPtr,
                OperandDescriptorPtr) override;
-
+  void AddPool2d(uint32_t input_id,
+                 Pool2dOptionsPtr options,
+                 Pool2dType type,
+                 OperandDescriptorPtr desc) override;
   void AddFusionClamp(ClampOptionsPtr options, uint32_t operator_id) override;
 
   void BuildAsync(BuildAsyncCallback callback) override;

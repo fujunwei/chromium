@@ -34,6 +34,8 @@ using ml::webnn::mojom::blink::Conv2dFilterOperandLayout;
 using ml::webnn::mojom::blink::FusionType;
 using ml::webnn::mojom::blink::InputOperandLayout;
 using ml::webnn::mojom::blink::OperandType;
+using ml::webnn::mojom::blink::Pool2dType;
+using ml::webnn::mojom::blink::RoundingType;
 
 OperandType ConvertBlinkOperandTypeToMojo(V8MLOperandType::Enum type) {
   switch (type) {
@@ -97,6 +99,27 @@ FusionType ConvertBlinkFusionTypeToMojo(MLOperator::OpKind type) {
       // TODO: how to deal with the default.
       assert(0);
       return FusionType::kRelu;
+    }
+  }
+}
+
+RoundingType ConvertBlinkRoundingTypeToMojo(V8MLRoundingType::Enum type) {
+  switch (type) {
+    case V8MLRoundingType::Enum::kFloor:
+      return RoundingType::kFloor;
+    case V8MLRoundingType::Enum::kCeil:
+      return RoundingType::kCeil;
+  }
+}
+
+Pool2dType ConvertBlinkPool2dTypeToMojo(MLOperator::OpKind type) {
+  switch (type) {
+    case MLOperator::OpKind::kAveragePool2d:
+      return Pool2dType::kAveragePool2d;
+    default: {
+      // TODO: how to deal with the default.
+      assert(0);
+      return Pool2dType::kAveragePool2d;
     }
   }
 }
@@ -197,7 +220,7 @@ bool WebnnGraph::BuildGraph(
         options->dilations = ml_options->hasDilations()
                                  ? ml_options->dilations()
                                  : Vector<int32_t>(2, 1);
-        options->autoPad =
+        options->auto_pad =
             ConvertBlinkAutoPadToMojo(ml_options->autoPad().AsEnum());
         options->groups = ml_options->groups();
         options->inputLayout = ConvertBlinkInputOperandLayoutToMojo(
@@ -241,15 +264,9 @@ bool WebnnGraph::BuildGraph(
                                std::move(options), std::move(desc));
         break;
       }
-      case MLOperator::OpKind::kAveragePool2d: {
-        // const MLPool2dOptions* options =
-        //     static_cast<const MLPool2dOptions*>(op->Options());
-        // if (!DefinePool2d(subgraph.get(), tensors_map, op, options,
-        //                   exception_state)) {
-        //   return false;
-        // }
+      case MLOperator::OpKind::kAveragePool2d:
+        AddPool2d(op, std::move(desc));
         break;
-      }
       case MLOperator::OpKind::kRelu: {
         // if (!DefineUnary(subgraph.get(), tensors_map, op, exception_state)) {
         //   return false;
@@ -274,6 +291,35 @@ bool WebnnGraph::BuildGraph(
     remote_graph_->AddOutput(name, output->GetObjectId());
   }
   return true;
+}
+
+void WebnnGraph::AddPool2d(const MLOperator* pool2d,
+                           OperandDescriptorPtr desc) {
+  const MLPool2dOptions* ml_options =
+      static_cast<const MLPool2dOptions*>(pool2d->Options());
+  auto* input = pool2d->Inputs()[0].Get();
+
+  auto options = ml::webnn::mojom::blink::Pool2dOptions::New();
+  options->window_dimensions = ml_options->hasWindowDimensions()
+                                   ? ml_options->windowDimensions()
+                                   : Vector<int32_t>();
+  options->padding =
+      ml_options->hasPadding() ? ml_options->padding() : Vector<int32_t>(4, 0);
+  options->strides =
+      ml_options->hasStrides() ? ml_options->strides() : Vector<int32_t>(2, 1);
+  options->dilations = ml_options->hasDilations() ? ml_options->dilations()
+                                                  : Vector<int32_t>(2, 1);
+  options->auto_pad = ConvertBlinkAutoPadToMojo(ml_options->autoPad().AsEnum());
+  options->layout =
+      ConvertBlinkInputOperandLayoutToMojo(ml_options->layout().AsEnum());
+  options->rounding_type =
+      ConvertBlinkRoundingTypeToMojo(ml_options->roundingType().AsEnum());
+  options->output_sizes = ml_options->hasOutputSizes()
+                              ? ml_options->outputSizes()
+                              : Vector<int32_t>();
+  remote_graph_->AddPool2d(input->GetObjectId(), std::move(options),
+                           ConvertBlinkPool2dTypeToMojo(pool2d->Kind()),
+                           std::move(desc));
 }
 
 void WebnnGraph::OnBuildFinished(ScriptPromiseResolver* resolver,

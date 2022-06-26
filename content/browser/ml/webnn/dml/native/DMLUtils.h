@@ -127,7 +127,7 @@ void CloseExecuteResetWait(ComPtr<ID3D12GraphicsCommandList> commandList,
 }
 
 template <typename T>
-void ComputeImplicitPaddingForAutoPad(AutoPad autoPad,
+void ComputeImplicitPaddingForAutoPad(AutoPad auto_pad,
                                       T dilation,
                                       T inputSize,
                                       T filterSize,
@@ -138,7 +138,7 @@ void ComputeImplicitPaddingForAutoPad(AutoPad autoPad,
   T dilatedFilter = (filterSize - 1) * dilation + 1;
   T neededInput = (outSize - 1) * stride + dilatedFilter;
   T totalPadding = neededInput > inputSize ? neededInput - inputSize : 0;
-  switch (autoPad) {
+  switch (auto_pad) {
     case AutoPad::kSameUpper:
       paddingBegin = totalPadding / 2;
       paddingEnd = (totalPadding + 1) / 2;
@@ -158,16 +158,16 @@ std::vector<T> ComputeImplicitPaddingForAutoPad(const S* options,
                                                 std::vector<T> filterSize) {
   std::vector<T> padding(4);
   ComputeImplicitPaddingForAutoPad<T>(
-      options->autoPad, options->dilations[0], inputSize[0], filterSize[0],
+      options->auto_pad, options->dilations[0], inputSize[0], filterSize[0],
       options->strides[0], padding[0], padding[1]);
   ComputeImplicitPaddingForAutoPad<T>(
-      options->autoPad, options->dilations[1], inputSize[1], filterSize[1],
+      options->auto_pad, options->dilations[1], inputSize[1], filterSize[1],
       options->strides[1], padding[2], padding[3]);
   return padding;
 }
 
 template <typename T>
-void ComputeImplicitPaddingForConvTranspose2dAutoPad(AutoPad autoPad,
+void ComputeImplicitPaddingForConvTranspose2dAutoPad(AutoPad auto_pad,
                                                      T dilation,
                                                      T inputSize,
                                                      T filterSize,
@@ -178,7 +178,7 @@ void ComputeImplicitPaddingForConvTranspose2dAutoPad(AutoPad autoPad,
   T outSize = inputSize * stride;
   T totalPadding = stride * (inputSize - 1) + outputPadding +
                    ((filterSize - 1) * dilation + 1) - outSize;
-  switch (autoPad) {
+  switch (auto_pad) {
     case AutoPad::kSameUpper:
       paddingBegin = totalPadding / 2;
       paddingEnd = totalPadding - totalPadding / 2;
@@ -199,13 +199,13 @@ void ComputeImplicitPaddingForConvTranspose2dAutoPad(AutoPad autoPad,
 //     std::vector<T> filterSize) {
 //     std::vector<T> padding(4);
 //     utils::ComputeImplicitPaddingForConvTranspose2dAutoPad<T>(
-//         options->autoPad, options->dilations[0], inputSize[0], filterSize[0],
-//         options->strides[0], options->outputPadding[0], padding[0],
-//         padding[1]);
+//         options->auto_pad, options->dilations[0], inputSize[0],
+//         filterSize[0], options->strides[0], options->outputPadding[0],
+//         padding[0], padding[1]);
 //     utils::ComputeImplicitPaddingForConvTranspose2dAutoPad<T>(
-//         options->autoPad, options->dilations[1], inputSize[1], filterSize[1],
-//         options->strides[1], options->outputPadding[1], padding[2],
-//         padding[3]);
+//         options->auto_pad, options->dilations[1], inputSize[1],
+//         filterSize[1], options->strides[1], options->outputPadding[1],
+//         padding[2], padding[3]);
 //     return padding;
 // }
 

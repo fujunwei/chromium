@@ -18,6 +18,8 @@ namespace blink {
 class ExecutionContext;
 class ScriptPromiseResolver;
 
+using ml::webnn::mojom::blink::OperandDescriptorPtr;
+
 class WebnnGraph : public MLGraph {
  public:
   WebnnGraph(ScriptState* script_state,
@@ -45,6 +47,7 @@ class WebnnGraph : public MLGraph {
                                  ExceptionState& exception_state) override;
 
  private:
+  void AddPool2d(const MLOperator* pool2d, OperandDescriptorPtr desc);
   bool BuildGraph(const MLNamedOperands& named_outputs,
                   const HeapVector<Member<const MLOperand>>& inputs,
                   const HeapVector<Member<const MLOperand>>& constants,

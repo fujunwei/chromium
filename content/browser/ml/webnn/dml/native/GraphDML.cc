@@ -1413,7 +1413,7 @@ void GraphDMLNativeImpl::AddConv2d(uint32_t input_id,
   std::vector<UINT> dilations = ConvertDimensions(options->dilations);
 
   std::vector<UINT> padding =
-      options->autoPad == AutoPad::kExplicit
+      options->auto_pad == AutoPad::kExplicit
           ? ExplicitPadding<Conv2dOptions>(options.get())
           : ImplicitPadding<Conv2dOptions>(options.get(), newInputDims,
                                            newFilterDims);
@@ -1466,176 +1466,151 @@ void GraphDMLNativeImpl::AddConv2d(uint32_t input_id,
   return;
 }
 
-//         MaybeError GraphDMLNativeImpl::AddPool2d(const op::Pool2d* pool2d) {
-//             assert(pool2d->Inputs().size() == 1);
-//             const OperandBase* inputOperand = pool2d->Inputs()[0].Get();
-//             assert(mGraphEdgesMap.find(inputOperand) !=
-//             mGraphEdgesMap.end());
+void GraphDMLNativeImpl::AddPool2d(uint32_t input_id,
+                                   Pool2dOptionsPtr options,
+                                   Pool2dType type,
+                                   OperandDescriptorPtr desc) {
+  assert(mGraphEdgesMap.find(input_id) != mGraphEdgesMap.end());
 
-//             auto inputEdge = mGraphEdgesMap[inputOperand];
-//             auto inputDims = ConvertDimensions(inputOperand->Shape());
-//             auto outputDims =
-//             ConvertDimensions(pool2d->Outputs()[0].Get()->Shape());
-//             std::vector<UINT> newInputDims = inputDims, newOutputDims =
-//             outputDims, newInputStrides; const Pool2dOptions* options =
-//             pool2d->GetOptions();
+  auto inputEdge = mGraphEdgesMap[input_id];
+  auto inputDims = Dimensions(inputEdge);
+  auto outputDims = ConvertDimensions(desc->dimensions);
+  std::vector<UINT> newInputDims = inputDims, newOutputDims = outputDims,
+                    newInputStrides;
 
-//             DML_TENSOR_DESC inputTensorDesc = inputEdge->outputTensorDESC;
-//             if (options->layout == InputOperandLayout::kNhwc) {
-//                 newInputDims = transposeDimensions(NhwcToNchw, inputDims);
-//                 newOutputDims = transposeDimensions(NhwcToNchw, outputDims);
-//                 newInputStrides = transposeStridesToNchw(inputDims,
-//                 inputTensorDesc);
+  DML_TENSOR_DESC inputTensorDesc = inputEdge->outputTensorDESC;
+  if (options->layout == InputOperandLayout::kNhwc) {
+    newInputDims = transposeDimensions(NhwcToNchw, inputDims);
+    newOutputDims = transposeDimensions(NhwcToNchw, outputDims);
+    newInputStrides = transposeStridesToNchw(inputDims, inputTensorDesc);
 
-//                 std::shared_ptr<DmlTensorDesc> inputDmlTensorDesc(new
-//                 DmlTensorDesc); if (!CreateDmlTensorDesc(mDmlTensorsDesc,
-//                 inputDmlTensorDesc,
-//                                          &inputEdge->outputTensorDESC,
-//                                          newInputDims, newInputStrides)) {
-//                     DAWN_INTERNAL_ERROR("Failed to create DML tensor
-//                     description.");
-//                 }
-//                 inputTensorDesc = {DML_TENSOR_TYPE_BUFFER,
-//                 &inputDmlTensorDesc->bufferDesc};
-//             }
+    std::shared_ptr<DmlTensorDesc> inputDmlTensorDesc(new DmlTensorDesc);
+    if (!CreateDmlTensorDesc(mDmlTensorsDesc, inputDmlTensorDesc,
+                             &inputEdge->outputTensorDESC, newInputDims,
+                             newInputStrides)) {
+      DAWN_INTERNAL_ERROR("Failed to create DML tensor description.");
+    }
+    inputTensorDesc = {DML_TENSOR_TYPE_BUFFER, &inputDmlTensorDesc->bufferDesc};
+  }
 
-//             std::shared_ptr<DmlTensorDesc> outputDmlTensorDesc(new
-//             DmlTensorDesc); if (!CreateDmlTensorDesc(mDmlTensorsDesc,
-//             outputDmlTensorDesc,
-//                                      &inputEdge->outputTensorDESC,
-//                                      newOutputDims, {}, true)) {
-//                 DAWN_INTERNAL_ERROR("Failed to create DML tensor
-//                 description.");
-//             }
-//             DML_TENSOR_DESC outputTensorDesc = {DML_TENSOR_TYPE_BUFFER,
-//                                                 &outputDmlTensorDesc->bufferDesc};
+  std::shared_ptr<DmlTensorDesc> outputDmlTensorDesc(new DmlTensorDesc);
+  if (!CreateDmlTensorDesc(mDmlTensorsDesc, outputDmlTensorDesc,
+                           &inputEdge->outputTensorDESC, newOutputDims, {},
+                           true)) {
+    DAWN_INTERNAL_ERROR("Failed to create DML tensor description.");
+  }
+  DML_TENSOR_DESC outputTensorDesc = {DML_TENSOR_TYPE_BUFFER,
+                                      &outputDmlTensorDesc->bufferDesc};
 
-//             std::vector<UINT> strides, dilations;
-//             strides.assign(reinterpret_cast<const UINT*>(options->strides),
-//                            reinterpret_cast<const UINT*>(options->strides) +
-//                            options->stridesCount);
-//             dilations.assign(
-//                 reinterpret_cast<const UINT*>(options->dilations),
-//                 reinterpret_cast<const UINT*>(options->dilations) +
-//                 options->stridesCount);
+  std::vector<UINT> strides = ConvertDimensions(options->strides);
+  std::vector<UINT> dilations = ConvertDimensions(options->dilations);
 
-//             std::vector<UINT> windowSizes;
-//             if (options->windowDimensions != nullptr) {
-//                 const UINT* windowDimensions =
-//                     reinterpret_cast<const UINT*>(options->windowDimensions);
-//                 windowSizes.assign(windowDimensions,
-//                                    windowDimensions +
-//                                    options->windowDimensionsCount);
-//             } else {
-//                 windowSizes = {newInputDims[2], newInputDims[3]};
-//             }
+  std::vector<UINT> windowSizes;
+  if (!options->window_dimensions.empty()) {
+    windowSizes = ConvertDimensions(options->window_dimensions);
+    // const UINT* windowDimensions =
+    //     reinterpret_cast<const UINT*>(options->window_dimensions);
+    // windowSizes.assign(windowDimensions,
+    //                    windowDimensions + options->window_dimensionsCount);
+  } else {
+    windowSizes = {newInputDims[2], newInputDims[3]};
+  }
 
-//             auto padding = options->autoPad == AutoPad::Explicit
-//                                ? ExplicitPadding<Pool2dOptions>(options)
-//                                : ImplicitPadding<Pool2dOptions>(options,
-//                                newInputDims, windowSizes);
-//             std::vector<UINT> startPadding = {padding[0], padding[2]};
-//             std::vector<UINT> endPadding = {padding[1], padding[3]};
+  auto padding = options->auto_pad == AutoPad::kExplicit
+                     ? ExplicitPadding<Pool2dOptions>(options.get())
+                     : ImplicitPadding<Pool2dOptions>(
+                           options.get(), newInputDims, windowSizes);
+  std::vector<UINT> startPadding = {padding[0], padding[2]};
+  std::vector<UINT> endPadding = {padding[1], padding[3]};
 
-//             ComPtr<IDMLOperator> dmlOperator;
-//             if (pool2d->GetType() == op::Pool2dType::kAveragePool2d) {
-//                 if (dilations[0] != 1 || dilations[1] != 1) {
-//                     DAWN_INTERNAL_ERROR(
-//                         "The dilations of average pool2d are not
-//                         supported.");
-//                 }
-//                 DML_AVERAGE_POOLING_OPERATOR_DESC desc = {};
-//                 desc.InputTensor = &inputTensorDesc;
-//                 desc.OutputTensor = &outputTensorDesc;
-//                 desc.DimensionCount = static_cast<UINT>(windowSizes.size());
-//                 desc.Strides = strides.data();
-//                 desc.WindowSize = windowSizes.data();
-//                 desc.StartPadding = startPadding.data();
-//                 desc.EndPadding = endPadding.data();
-//                 desc.IncludePadding = false;
-//                 DML_OPERATOR_DESC dmlOperatorDesc = {};
-//                 dmlOperatorDesc.Type = DML_OPERATOR_AVERAGE_POOLING;
-//                 dmlOperatorDesc.Desc = &desc;
-//                 WEBNN_CHECK(mDevice->CreateOperator(&dmlOperatorDesc,
-//                 IID_PPV_ARGS(&dmlOperator)));
-//             } else if (pool2d->GetType() == op::Pool2dType::kL2Pool2d) {
-//                 if (dilations[0] != 1 || dilations[1] != 1) {
-//                     DAWN_INTERNAL_ERROR("The dilations of L2 pool2d
-//                     are not supported.");
-//                 }
-//                 DML_LP_POOLING_OPERATOR_DESC desc = {};
-//                 desc.InputTensor = &inputTensorDesc;
-//                 desc.OutputTensor = &outputTensorDesc;
-//                 desc.DimensionCount = static_cast<UINT>(windowSizes.size());
-//                 desc.Strides = strides.data();
-//                 desc.WindowSize = windowSizes.data();
-//                 desc.StartPadding = startPadding.data();
-//                 desc.EndPadding = endPadding.data();
-//                 desc.P = 2;
-//                 DML_OPERATOR_DESC dmlOperatorDesc = {};
-//                 dmlOperatorDesc.Type = DML_OPERATOR_LP_POOLING;
-//                 dmlOperatorDesc.Desc = &desc;
-//                 WEBNN_CHECK(mDevice->CreateOperator(&dmlOperatorDesc,
-//                 IID_PPV_ARGS(&dmlOperator)));
-//             } else if (pool2d->GetType() == op::Pool2dType::kMaxPool2d) {
-//                 if (dilations[0] != 1 || dilations[1] != 1) {
-//                     for (size_t i = 0; i < windowSizes.size(); ++i) {
-//                         uint32_t paddedInputSize =
-//                             newInputDims[2 + i] + startPadding[i] +
-//                             endPadding[i];
-//                         uint32_t dilatedWindowSize = 1 + (windowSizes[i] - 1)
-//                         * dilations[i]; newOutputDims[2 + i] =
-//                             (dilatedWindowSize >= paddedInputSize)
-//                                 ? 1
-//                                 : (paddedInputSize - dilatedWindowSize) /
-//                                 strides[i] + 1;
-//                     }
-//                     outputDims = transposeDimensions(NchwToNhwc,
-//                     newOutputDims);
-//                     // Update output tensor.
-//                     if (!CreateDmlTensorDesc(mDmlTensorsDesc,
-//                     outputDmlTensorDesc, newOutputDims)) {
-//                         DAWN_INTERNAL_ERROR("Failed to create DML
-//                         tensor description.");
-//                     }
-//                 }
+  ComPtr<IDMLOperator> dmlOperator;
+  if (type == Pool2dType::kAveragePool2d) {
+    if (dilations[0] != 1 || dilations[1] != 1) {
+      DAWN_INTERNAL_ERROR("The dilations of average pool2d are not supported.");
+    }
+    DML_AVERAGE_POOLING_OPERATOR_DESC desc = {};
+    desc.InputTensor = &inputTensorDesc;
+    desc.OutputTensor = &outputTensorDesc;
+    desc.DimensionCount = static_cast<UINT>(windowSizes.size());
+    desc.Strides = strides.data();
+    desc.WindowSize = windowSizes.data();
+    desc.StartPadding = startPadding.data();
+    desc.EndPadding = endPadding.data();
+    desc.IncludePadding = false;
+    DML_OPERATOR_DESC dmlOperatorDesc = {};
+    dmlOperatorDesc.Type = DML_OPERATOR_AVERAGE_POOLING;
+    dmlOperatorDesc.Desc = &desc;
+    WEBNN_CHECK(
+        mDevice->CreateOperator(&dmlOperatorDesc, IID_PPV_ARGS(&dmlOperator)));
+  } else if (type == Pool2dType::kL2Pool2d) {
+    if (dilations[0] != 1 || dilations[1] != 1) {
+      DAWN_INTERNAL_ERROR("The dilations of L2 pool2d are not supported.");
+    }
+    DML_LP_POOLING_OPERATOR_DESC desc = {};
+    desc.InputTensor = &inputTensorDesc;
+    desc.OutputTensor = &outputTensorDesc;
+    desc.DimensionCount = static_cast<UINT>(windowSizes.size());
+    desc.Strides = strides.data();
+    desc.WindowSize = windowSizes.data();
+    desc.StartPadding = startPadding.data();
+    desc.EndPadding = endPadding.data();
+    desc.P = 2;
+    DML_OPERATOR_DESC dmlOperatorDesc = {};
+    dmlOperatorDesc.Type = DML_OPERATOR_LP_POOLING;
+    dmlOperatorDesc.Desc = &desc;
+    WEBNN_CHECK(
+        mDevice->CreateOperator(&dmlOperatorDesc, IID_PPV_ARGS(&dmlOperator)));
+  } else if (type == Pool2dType::kMaxPool2d) {
+    if (dilations[0] != 1 || dilations[1] != 1) {
+      for (size_t i = 0; i < windowSizes.size(); ++i) {
+        uint32_t paddedInputSize =
+            newInputDims[2 + i] + startPadding[i] + endPadding[i];
+        uint32_t dilatedWindowSize = 1 + (windowSizes[i] - 1) * dilations[i];
+        newOutputDims[2 + i] =
+            (dilatedWindowSize >= paddedInputSize)
+                ? 1
+                : (paddedInputSize - dilatedWindowSize) / strides[i] + 1;
+      }
+      outputDims = transposeDimensions(NchwToNhwc, newOutputDims);
+      // Update output tensor.
+      if (!CreateDmlTensorDesc(mDmlTensorsDesc, outputDmlTensorDesc,
+                               newOutputDims)) {
+        DAWN_INTERNAL_ERROR("Failed to create DML tensor description.");
+      }
+    }
 
-//                 DML_MAX_POOLING2_OPERATOR_DESC desc = {};
-//                 desc.InputTensor = &inputTensorDesc;
-//                 desc.OutputTensor = &outputTensorDesc;
-//                 desc.OutputIndicesTensor = nullptr;
-//                 desc.DimensionCount = static_cast<UINT>(windowSizes.size());
-//                 desc.Strides = strides.data();
-//                 desc.WindowSize = windowSizes.data();
-//                 desc.StartPadding = startPadding.data();
-//                 desc.EndPadding = endPadding.data();
-//                 desc.Dilations = dilations.data();
-//                 DML_OPERATOR_DESC dmlOperatorDesc = {};
-//                 dmlOperatorDesc.Type = DML_OPERATOR_MAX_POOLING2;
-//                 dmlOperatorDesc.Desc = &desc;
-//                 WEBNN_CHECK(mDevice->CreateOperator(&dmlOperatorDesc,
-//                 IID_PPV_ARGS(&dmlOperator)));
-//             } else {
-//                 DAWN_INTERNAL_ERROR("This pool2d type is not
-//                 supported.");
-//             }
-//             mIntermediateNodesMap[mIntermediateNodes.size()] = dmlOperator;
+    DML_MAX_POOLING2_OPERATOR_DESC desc = {};
+    desc.InputTensor = &inputTensorDesc;
+    desc.OutputTensor = &outputTensorDesc;
+    desc.OutputIndicesTensor = nullptr;
+    desc.DimensionCount = static_cast<UINT>(windowSizes.size());
+    desc.Strides = strides.data();
+    desc.WindowSize = windowSizes.data();
+    desc.StartPadding = startPadding.data();
+    desc.EndPadding = endPadding.data();
+    desc.Dilations = dilations.data();
+    DML_OPERATOR_DESC dmlOperatorDesc = {};
+    dmlOperatorDesc.Type = DML_OPERATOR_MAX_POOLING2;
+    dmlOperatorDesc.Desc = &desc;
+    WEBNN_CHECK(
+        mDevice->CreateOperator(&dmlOperatorDesc, IID_PPV_ARGS(&dmlOperator)));
+  } else {
+    DAWN_INTERNAL_ERROR("This pool2d type is not supported.");
+  }
+  mIntermediateNodesMap[mIntermediateNodes.size()] = dmlOperator;
 
-//             auto outputEdge = CreateEdgeFromThisNode(outputTensorDesc,
-//             mIntermediateNodes.size()); AddEdgesToThisNode({inputEdge});
+  auto outputEdge =
+      CreateEdgeFromThisNode(outputTensorDesc, mIntermediateNodes.size());
+  AddEdgesToThisNode({inputEdge});
 
-//             // Transpose output from nchw->nhwc.
-//             if (options->layout == InputOperandLayout::kNhwc) {
-//                 if (TransposeOutputToNhwc(outputEdge,
-//                 newOutputDims).IsError()) {
-//                     DAWN_INTERNAL_ERROR("Failed to transpose output
-//                     from Nchw to Nhwc.");
-//                 };
-//             }
+  // Transpose output from nchw->nhwc.
+  if (options->layout == InputOperandLayout::kNhwc) {
+    TransposeOutputToNhwc(outputEdge, newOutputDims);
+  }
 
-//             mGraphEdgesMap[pool2d->PrimaryOutput()] = outputEdge;
-//             return {};
-//         }
+  mGraphEdgesMap[desc->object_id] = outputEdge;
+  return;
+}
 
 //         MaybeError GraphDMLNativeImpl::AddPad(const op::Pad* pad) {
 //             auto inputsOperand = pad->Inputs();

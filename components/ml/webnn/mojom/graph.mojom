@@ -58,7 +58,7 @@ struct Conv2dOptions {
   array<int32> padding;
   array<int32> strides;
   array<int32> dilations;
-  AutoPad autoPad = AutoPad.kExplicit;
+  AutoPad auto_pad = AutoPad.kExplicit;
   int32 groups = 1;
   InputOperandLayout inputLayout = InputOperandLayout.kNchw;
   Conv2dFilterOperandLayout filterLayout = Conv2dFilterOperandLayout.kOihw;
@@ -66,12 +66,28 @@ struct Conv2dOptions {
   FusionOperator? activation;
 };
 
+// Represents the `MLGemmOptions`.
 struct GemmOptions {
   uint32 c_id;
   float alpha = 1.0;
   float beta = 1.0;
   bool a_transpose = false;
   bool b_transpose = false;
+};
+
+enum Pool2dType { kAveragePool2d, kMaxPool2d, kL2Pool2d };
+enum RoundingType { kFloor, kCeil };
+
+// Represents the `MLPool2dOptions`.
+struct Pool2dOptions {
+  array<int32> window_dimensions;
+  array<int32> padding;
+  array<int32> strides;
+  array<int32> dilations;
+  AutoPad auto_pad = AutoPad.kExplicit;
+  InputOperandLayout layout = InputOperandLayout.kNchw;
+  RoundingType rounding_type = RoundingType.kFloor;
+  array<int32> output_sizes;
 };
 
 // Represents the `MLClampOptions`.
@@ -111,6 +127,8 @@ interface Graph {
             OperandDescriptor desc);
   AddReshape(uint32 input_id, OperandDescriptor desc);
   AddGemm(uint32 a_id, uint32 b_id, GemmOptions options, OperandDescriptor desc);
+  AddPool2d(uint32 input_id, Pool2dOptions options, Pool2dType type,
+      OperandDescriptor desc);
 
   AddFusionClamp(ClampOptions options, uint32 operator_id);
 
