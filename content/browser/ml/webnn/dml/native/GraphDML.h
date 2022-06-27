@@ -96,38 +96,23 @@ class GraphDMLNativeImpl {
   void AddConstant(OperandDescriptorPtr, const std::vector<uint8_t>&);
   void AddInput(const std::string&, OperandDescriptorPtr);
   void AddOutput(const std::string&, uint32_t);
-  // virtual MaybeError AddBatchNorm(const op::BatchNorm* batchNorm) override;
   void AddElementWiseBinary(uint32_t,
                             uint32_t,
                             BinaryOperandType,
                             OperandDescriptorPtr);
   void AddConv2d(uint32_t, uint32_t, Conv2dOptionsPtr, OperandDescriptorPtr);
-  // virtual MaybeError AddConvTranspose2d(const op::ConvTranspose2d*
-  // convTranspose2d) override; virtual MaybeError AddPad(const op::Pad* pad)
-  // override;
   void AddPool2d(uint32_t input_id,
                  Pool2dOptionsPtr options,
                  Pool2dType type,
                  OperandDescriptorPtr desc);
-  // virtual MaybeError AddReduce(const op::Reduce* reduce) override;
-  // virtual MaybeError AddResample2d(const op::Resample2d* resample2d)
-  // override;
   void AddReshape(uint32_t, OperandDescriptorPtr);
-  // override; virtual MaybeError AddSlice(const op::Slice* slice) override;
-  // virtual MaybeError AddSplit(const op::Split* split) override;
-  // virtual MaybeError AddSqueeze(const op::Squeeze* squeeze) override;
-  // virtual MaybeError AddTranspose(const op::Transpose* transpose) override;
   void AddUnary(uint32_t, UnaryOperandType, OperandDescriptorPtr);
   void AddGemm(uint32_t a_id,
                uint32_t b_id,
                GemmOptionsPtr options,
                OperandDescriptorPtr desc);
-  // virtual MaybeError AddGru(const op::Gru* Gru) override;
-  // virtual MaybeError AddConcat(const op::Concat* concat) override;
   void AddClamp(uint32_t, ClampOptionsPtr, OperandDescriptorPtr);
   void AddFusionClamp(ClampOptionsPtr options, uint32_t operator_id);
-  // virtual MaybeError AddInstanceNorm(const op::InstanceNorm* instanceNorm)
-  // override;
   BuildResult CompileImpl();
   ComputeResult ComputeImpl(
       const base::flat_map<std::string, std::vector<uint8_t>>& named_inputs,
@@ -140,18 +125,8 @@ class GraphDMLNativeImpl {
       uint64_t uploadResourceSize,
       std::vector<DML_BUFFER_BINDING>& inputBufferBinding,
       base::flat_map<std::string, std::vector<uint8_t>> namedInputs);
-  //   MaybeError createConstantInput(
-  //       DML_TENSOR_DESC& inputTensorDESC,
-  //       void const* value,
-  //       size_t size,
-  //       const std::vector<UINT>& dmlTensorDims,
-  //       const std::vector<UINT>& strides = {},
-  //       DML_TENSOR_DATA_TYPE dataType = DML_TENSOR_DATA_TYPE_FLOAT32,
-  //       DML_TENSOR_FLAGS tensorFlag = DML_TENSOR_FLAG_OWNED_BY_DML);
   std::shared_ptr<EdgeInfoBase> Clamp(std::shared_ptr<EdgeInfoBase> inputEdge,
                                       const ClampOptions* options);
-  //   MaybeError HardSwish(std::shared_ptr<EdgeInfoBase>& inputEdge,
-  //                        const std::vector<UINT>& inputDims);
   void EmulateFusedOperator(const FusionOperator* activation,
                             std::shared_ptr<EdgeInfoBase>& inputEdge,
                             const std::vector<UINT>& inputDims);
@@ -217,7 +192,6 @@ class GraphDMLNativeImpl {
   std::vector<std::unique_ptr<DML_OUTPUT_GRAPH_EDGE_DESC>> mOutputEdgesDesc;
   std::vector<std::unique_ptr<DML_INTERMEDIATE_GRAPH_EDGE_DESC>>
       mIntermediateEdgesDesc;
-  // std::unordered_set<const OperandBase*> mConstantSet;
   std::vector<std::unique_ptr<char>> mConstantsBuffer;
 
   std::string error_messages_;
