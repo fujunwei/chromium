@@ -79,7 +79,7 @@ dictionary MLClampOptions {
                                             optional MLPool2dOptions options = {});
 
   [RaisesException] MLOperand relu(MLOperand input);
-  [RaisesException] MLOperand relu();
+  [RaisesException] MLOperator relu();
 
   [RaisesException] MLOperand reshape(MLOperand input, sequence<long> newShape);
 

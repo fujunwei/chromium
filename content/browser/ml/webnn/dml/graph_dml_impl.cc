@@ -92,6 +92,13 @@ void GraphDMLImpl::AddPool2d(uint32_t input_id,
                                std::move(desc));
 }
 
+void GraphDMLImpl::AddUnary(uint32_t input_id,
+                            UnaryOperandType type,
+                            OperandDescriptorPtr desc) {
+  // TODO: return directly if BuildResult has error message.
+  native_graph_dml_->AddUnary(input_id, type, std::move(desc));
+}
+
 void GraphDMLImpl::AddFusionClamp(ClampOptionsPtr options,
                                   uint32_t operator_id) {
   native_graph_dml_->AddFusionClamp(std::move(options), operator_id);

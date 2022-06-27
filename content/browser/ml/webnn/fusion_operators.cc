@@ -19,6 +19,7 @@ void FusionOperators::AddClampOption(uint32_t operator_id,
 
 const ClampOptions* FusionOperators::GetClampOption(uint32_t operator_id) {
   if (clamp_options_.find(operator_id) == clamp_options_.end()) {
+    assert(0);
     return nullptr;
   }
   return clamp_options_[operator_id].get();

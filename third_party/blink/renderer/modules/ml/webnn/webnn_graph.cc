@@ -36,6 +36,7 @@ using ml::webnn::mojom::blink::InputOperandLayout;
 using ml::webnn::mojom::blink::OperandType;
 using ml::webnn::mojom::blink::Pool2dType;
 using ml::webnn::mojom::blink::RoundingType;
+using ml::webnn::mojom::blink::UnaryOperandType;
 
 OperandType ConvertBlinkOperandTypeToMojo(V8MLOperandType::Enum type) {
   switch (type) {
@@ -89,20 +90,6 @@ AutoPad ConvertBlinkAutoPadToMojo(V8MLAutoPad::Enum type) {
   }
 }
 
-FusionType ConvertBlinkFusionTypeToMojo(MLOperator::OpKind type) {
-  switch (type) {
-    case MLOperator::OpKind::kClamp:
-      return FusionType::kClamp;
-    case MLOperator::OpKind::kRelu:
-      return FusionType::kRelu;
-    default: {
-      // TODO: how to deal with the default.
-      assert(0);
-      return FusionType::kRelu;
-    }
-  }
-}
-
 RoundingType ConvertBlinkRoundingTypeToMojo(V8MLRoundingType::Enum type) {
   switch (type) {
     case V8MLRoundingType::Enum::kFloor:
@@ -120,6 +107,20 @@ Pool2dType ConvertBlinkPool2dTypeToMojo(MLOperator::OpKind type) {
       // TODO: how to deal with the default.
       assert(0);
       return Pool2dType::kAveragePool2d;
+    }
+  }
+}
+
+UnaryOperandType ConvertBlinkUnaryOperandTypeToMojo(MLOperator::OpKind type) {
+  switch (type) {
+    case MLOperator::OpKind::kRelu:
+      return UnaryOperandType::kRelu;
+    case MLOperator::OpKind::kSoftmax:
+      return UnaryOperandType::kSoftmax;
+    default: {
+      // TODO: how to deal with the default.
+      assert(0);
+      return UnaryOperandType::kRelu;
     }
   }
 }
@@ -230,12 +231,9 @@ bool WebnnGraph::BuildGraph(
         options->bias_id =
             ml_options->hasBias() ? ml_options->bias()->GetObjectId() : 0;
         if (ml_options->hasActivation()) {
-          options->activation = ml::webnn::mojom::blink::FusionOperator::New();
-          options->activation->object_id =
-              ml_options->activation()->GetObjectId();
-          options->activation->fusion_type =
-              ConvertBlinkFusionTypeToMojo(ml_options->activation()->Kind());
+          options->activation = AddFusionOperator(ml_options->activation());
         }
+
         auto* filter = op->Inputs()[1].Get();
         remote_graph_->AddConv2d(input->GetObjectId(), filter->GetObjectId(),
                                  std::move(options), std::move(desc));
@@ -267,22 +265,13 @@ bool WebnnGraph::BuildGraph(
       case MLOperator::OpKind::kAveragePool2d:
         AddPool2d(op, std::move(desc));
         break;
-      case MLOperator::OpKind::kRelu: {
-        // if (!DefineUnary(subgraph.get(), tensors_map, op, exception_state)) {
-        //   return false;
-        // }
-        break;
-      }
-      case MLOperator::OpKind::kReshape: {
+      case MLOperator::OpKind::kReshape:
         remote_graph_->AddReshape(input->GetObjectId(), std::move(desc));
         break;
-      }
-      case MLOperator::OpKind::kSoftmax: {
-        // if (!DefineUnary(subgraph.get(), tensors_map, op, exception_state)) {
-        //   return false;
-        // }
+      case MLOperator::OpKind::kRelu:
+      case MLOperator::OpKind::kSoftmax:
+        AddUnary(op, std::move(desc));
         break;
-      }
       default:
         return false;
     }
@@ -320,6 +309,48 @@ void WebnnGraph::AddPool2d(const MLOperator* pool2d,
   remote_graph_->AddPool2d(input->GetObjectId(), std::move(options),
                            ConvertBlinkPool2dTypeToMojo(pool2d->Kind()),
                            std::move(desc));
+}
+
+void WebnnGraph::AddUnary(const MLOperator* unary, OperandDescriptorPtr desc) {
+  auto* input = unary->Inputs()[0].Get();
+  remote_graph_->AddUnary(input->GetObjectId(),
+                          ConvertBlinkUnaryOperandTypeToMojo(unary->Kind()),
+                          std::move(desc));
+}
+
+FusionOperatorPtr WebnnGraph::AddFusionOperator(const MLOperator* activation) {
+  auto fusion_operation = ml::webnn::mojom::blink::FusionOperator::New();
+  switch (activation->Kind()) {
+    case MLOperator::OpKind::kClamp: {
+      const MLClampOptions* ml_options =
+          static_cast<const MLClampOptions*>(activation->Options());
+      const float min = ml_options->hasMinValue()
+                            ? ml_options->minValue()
+                            : -std::numeric_limits<float>::infinity();
+      const float max = ml_options->hasMaxValue()
+                            ? ml_options->maxValue()
+                            : +std::numeric_limits<float>::infinity();
+      auto options = ml::webnn::mojom::blink::ClampOptions::New();
+      options->minValue = min;
+      options->maxValue = max;
+      remote_graph_->AddFusionClamp(std::move(options),
+                                    activation->GetObjectId());
+
+      fusion_operation->fusion_type = FusionType::kClamp;
+      break;
+    }
+    case MLOperator::OpKind::kRelu: {
+      fusion_operation->fusion_type = FusionType::kRelu;
+      break;
+    }
+    default: {
+      // TODO: how to deal with the default.
+      assert(0);
+      break;
+    }
+  }
+  fusion_operation->object_id = activation->GetObjectId();
+  return fusion_operation;
 }
 
 void WebnnGraph::OnBuildFinished(ScriptPromiseResolver* resolver,

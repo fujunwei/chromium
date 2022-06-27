@@ -43,6 +43,7 @@ using ml::webnn::mojom::OperandDescriptorPtr;
 using ml::webnn::mojom::Pool2dOptions;
 using ml::webnn::mojom::Pool2dOptionsPtr;
 using ml::webnn::mojom::Pool2dType;
+using ml::webnn::mojom::UnaryOperandType;
 
 class FusionOperators;
 
@@ -116,7 +117,7 @@ class GraphDMLNativeImpl {
   // virtual MaybeError AddSplit(const op::Split* split) override;
   // virtual MaybeError AddSqueeze(const op::Squeeze* squeeze) override;
   // virtual MaybeError AddTranspose(const op::Transpose* transpose) override;
-  // virtual MaybeError AddUnary(const op::Unary* unary) override;
+  void AddUnary(uint32_t, UnaryOperandType, OperandDescriptorPtr);
   void AddGemm(uint32_t a_id,
                uint32_t b_id,
                GemmOptionsPtr options,

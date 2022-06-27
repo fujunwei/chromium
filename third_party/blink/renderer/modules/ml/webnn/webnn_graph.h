@@ -18,6 +18,7 @@ namespace blink {
 class ExecutionContext;
 class ScriptPromiseResolver;
 
+using ml::webnn::mojom::blink::FusionOperatorPtr;
 using ml::webnn::mojom::blink::OperandDescriptorPtr;
 
 class WebnnGraph : public MLGraph {
@@ -48,6 +49,9 @@ class WebnnGraph : public MLGraph {
 
  private:
   void AddPool2d(const MLOperator* pool2d, OperandDescriptorPtr desc);
+  void AddUnary(const MLOperator* unary, OperandDescriptorPtr desc);
+  FusionOperatorPtr AddFusionOperator(const MLOperator* activation);
+
   bool BuildGraph(const MLNamedOperands& named_outputs,
                   const HeapVector<Member<const MLOperand>>& inputs,
                   const HeapVector<Member<const MLOperand>>& constants,

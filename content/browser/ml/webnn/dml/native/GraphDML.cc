@@ -952,135 +952,115 @@ void GraphDMLNativeImpl::AddElementWiseBinary(uint32_t a_id,
 //     }
 // }
 
-//         MaybeError GraphDMLNativeImpl::AddUnary(const op::Unary* unary) {
-//             assert(unary->Inputs().size() == 1);
-//             const OperandBase* inputOperand = unary->Inputs()[0].Get();
-//             assert(mGraphEdgesMap.find(inputOperand) !=
-//             mGraphEdgesMap.end());
+void GraphDMLNativeImpl::AddUnary(uint32_t input_id,
+                                  UnaryOperandType type,
+                                  OperandDescriptorPtr desc) {
+  assert(mGraphEdgesMap.find(input_id) != mGraphEdgesMap.end());
 
-//             auto inputEdge = mGraphEdgesMap[inputOperand];
-//             auto inputDims = ConvertDimensions(inputOperand->Shape());
-//             std::vector<std::shared_ptr<EdgeInfoBase>> inputEdges =
-//             {inputEdge}; DML_TENSOR_DESC inputTensorDesc =
-//             inputEdge->outputTensorDESC; ComPtr<IDMLOperator> dmlOperator;
-//             switch (unary->GetType()) {
-//                 case op::UnaryOpType::kAbs: {
-//                     CREATE_UNARY_OPERATOR(ELEMENT_WISE_ABS, inputTensorDesc,
-//                     dmlOperator);
-//                 } break;
-//                 case op::UnaryOpType::kCeil: {
-//                     CREATE_UNARY_OPERATOR(ELEMENT_WISE_CEIL, inputTensorDesc,
-//                     dmlOperator);
-//                 } break;
-//                 case op::UnaryOpType::kCos: {
-//                     CREATE_UNARY_OPERATOR(ELEMENT_WISE_COS, inputTensorDesc,
-//                     dmlOperator);
-//                 } break;
-//                 case op::UnaryOpType::kExp: {
-//                     CREATE_UNARY_OPERATOR(ELEMENT_WISE_EXP, inputTensorDesc,
-//                     dmlOperator);
-//                 } break;
-//                 case op::UnaryOpType::kFloor: {
-//                     CREATE_UNARY_OPERATOR(ELEMENT_WISE_FLOOR,
-//                     inputTensorDesc, dmlOperator);
-//                 } break;
-//                 case op::UnaryOpType::kHardSwish: {
-//                     if (HardSwish(inputEdge, inputDims).IsError()) {
-//                         DAWN_INTERNAL_ERROR("Failed to create the
-//                         HardSwish.");
-//                     };
-//                     mGraphEdgesMap[unary->PrimaryOutput()] = inputEdge;
-//                     return {};
-//                 }
-//                 case op::UnaryOpType::kLog: {
-//                     CREATE_UNARY_OPERATOR(ELEMENT_WISE_LOG, inputTensorDesc,
-//                     dmlOperator);
-//                 } break;
-//                 case op::UnaryOpType::kLeakyRelu: {
-//                     DML_ACTIVATION_LEAKY_RELU_OPERATOR_DESC
-//                     dmlSpecificOperatorDesc{};
-//                     dmlSpecificOperatorDesc.InputTensor = &inputTensorDesc;
-//                     dmlSpecificOperatorDesc.OutputTensor = &inputTensorDesc;
-//                     dmlSpecificOperatorDesc.Alpha =
-//                         reinterpret_cast<const
-//                         op::LeakyRelu*>(unary)->GetAlpha();
-//                     CREATE_OPERATOR(ACTIVATION_LEAKY_RELU,
-//                     dmlSpecificOperatorDesc)
-//                 } break;
-//                 // DML doesn't support element-wise negative, emulated it
-//                 from multiplying input by
-//                 // -1.
-//                 case op::UnaryOpType::kNeg: {
-//                     uint32_t length = SizeOfShape(inputDims);
-//                     DML_TENSOR_DESC constantInputTensorDesc;
-//                     if (inputOperand->Type() == OperandType::Float32) {
-//                         std::vector<float> constant(length, -1);
-//                         if (createConstantInput(constantInputTensorDesc,
-//                         constant.data(),
-//                                                 length * sizeof(float),
-//                                                 inputDims, {},
-//                                                 DML_TENSOR_DATA_TYPE_FLOAT32)
-//                                 .IsError()) {
-//                             DAWN_INTERNAL_ERROR("Failed to create a
-//                             constant input tensor.");
-//                         };
-//                     } else if (inputOperand->Type() ==
-//                     OperandType::Int32) {
-//                         std::vector<int32_t> constant(length, -1);
-//                         if (createConstantInput(constantInputTensorDesc,
-//                         constant.data(),
-//                                                 length * sizeof(int32_t),
-//                                                 inputDims, {},
-//                                                 DML_TENSOR_DATA_TYPE_INT32)
-//                                 .IsError()) {
-//                             DAWN_INTERNAL_ERROR("Failed to create a
-//                             constant input tensor.");
-//                         };
-//                     } else {
-//                         return DAWN_UNIMPLEMENTED_ERROR("This data type is
-//                         not supported for neg.");
-//                     }
+  auto inputEdge = mGraphEdgesMap[input_id];
+  auto inputDims = Dimensions(inputEdge);
+  std::vector<std::shared_ptr<EdgeInfoBase>> inputEdges = {inputEdge};
+  DML_TENSOR_DESC inputTensorDesc = inputEdge->outputTensorDESC;
+  ComPtr<IDMLOperator> dmlOperator;
+  switch (type) {
+    // case UnaryOperandType::kAbs: {
+    //   CREATE_UNARY_OPERATOR(ELEMENT_WISE_ABS, inputTensorDesc, dmlOperator);
+    // } break;
+    // case UnaryOperandType::kCeil: {
+    //   CREATE_UNARY_OPERATOR(ELEMENT_WISE_CEIL, inputTensorDesc, dmlOperator);
+    // } break;
+    // case UnaryOperandType::kCos: {
+    //   CREATE_UNARY_OPERATOR(ELEMENT_WISE_COS, inputTensorDesc, dmlOperator);
+    // } break;
+    // case UnaryOperandType::kExp: {
+    //   CREATE_UNARY_OPERATOR(ELEMENT_WISE_EXP, inputTensorDesc, dmlOperator);
+    // } break;
+    // case UnaryOperandType::kFloor: {
+    //   CREATE_UNARY_OPERATOR(ELEMENT_WISE_FLOOR, inputTensorDesc,
+    //   dmlOperator);
+    // } break;
+    // case UnaryOperandType::kHardSwish: {
+    //   if (HardSwish(inputEdge, inputDims).IsError()) {
+    //                     DAWN_INTERNAL_ERROR("Failed to create the
+    //                     HardSwish.");
+    //   };
+    //   mGraphEdgesMap[unary->PrimaryOutput()] = inputEdge;
+    //   return {};
+    // }
+    // case UnaryOperandType::kLog: {
+    //   CREATE_UNARY_OPERATOR(ELEMENT_WISE_LOG, inputTensorDesc, dmlOperator);
+    // } break;
+    // case UnaryOperandType::kLeakyRelu: {
+    //   DML_ACTIVATION_LEAKY_RELU_OPERATOR_DESC
+    //   dmlSpecificOperatorDesc{};
+    //   dmlSpecificOperatorDesc.InputTensor = &inputTensorDesc;
+    //   dmlSpecificOperatorDesc.OutputTensor = &inputTensorDesc;
+    //   dmlSpecificOperatorDesc.Alpha =
+    //       reinterpret_cast<const op::LeakyRelu*>(unary)->GetAlpha();
+    //   CREATE_OPERATOR(ACTIVATION_LEAKY_RELU, dmlSpecificOperatorDesc)
+    // } break;
+    // DML doesn't support element-wise negative, emulated it from multiplying
+    // input by -1.
+    // case UnaryOperandType::kNeg: {
+    //   uint32_t length = SizeOfShape(inputDims);
+    //   DML_TENSOR_DESC constantInputTensorDesc;
+    //   if (inputOperand->Type() == OperandType::Float32) {
+    //     std::vector<float> constant(length, -1);
+    //     if (createConstantInput(constantInputTensorDesc, constant.data(),
+    //                             length * sizeof(float), inputDims, {},
+    //                             DML_TENSOR_DATA_TYPE_FLOAT32)
+    //             .IsError()) {
+    //                         DAWN_INTERNAL_ERROR("Failed to create a
+    //                         constant input tensor.");
+    //     };
+    //   } else if (inputOperand->Type() == OperandType::Int32) {
+    //     std::vector<int32_t> constant(length, -1);
+    //     if (createConstantInput(constantInputTensorDesc, constant.data(),
+    //                             length * sizeof(int32_t), inputDims, {},
+    //                             DML_TENSOR_DATA_TYPE_INT32)
+    //             .IsError()) {
+    //                         DAWN_INTERNAL_ERROR("Failed to create a
+    //                         constant input tensor.");
+    //     };
+    //   } else {
+    //                     return DAWN_UNIMPLEMENTED_ERROR("This data type is
+    //                     not supported for neg.");
+    //   }
 
-//                     CREATE_BINARY_OPERATOR(MULTIPLY, inputTensorDesc,
-//                     constantInputTensorDesc,
-//                                            inputTensorDesc, dmlOperator);
-//                     inputEdges.push_back(mInputs.back());
-//                 } break;
-//                 case op::UnaryOpType::kRelu: {
-//                     CREATE_UNARY_OPERATOR(ACTIVATION_RELU, inputTensorDesc,
-//                     dmlOperator);
-//                 } break;
-//                 case op::UnaryOpType::kSigmoid: {
-//                     CREATE_UNARY_OPERATOR(ACTIVATION_SIGMOID,
-//                     inputTensorDesc, dmlOperator);
-//                 } break;
-//                 case op::UnaryOpType::kSin: {
-//                     CREATE_UNARY_OPERATOR(ELEMENT_WISE_SIN, inputTensorDesc,
-//                     dmlOperator);
-//                 } break;
-//                 case op::UnaryOpType::kSoftmax: {
-//                     CREATE_UNARY_OPERATOR(ACTIVATION_SOFTMAX,
-//                     inputTensorDesc, dmlOperator);
-//                 } break;
-//                 case op::UnaryOpType::kTan: {
-//                     CREATE_UNARY_OPERATOR(ELEMENT_WISE_TAN, inputTensorDesc,
-//                     dmlOperator);
-//                 } break;
-//                 case op::UnaryOpType::kTanh: {
-//                     CREATE_UNARY_OPERATOR(ACTIVATION_TANH, inputTensorDesc,
-//                     dmlOperator);
-//                 } break;
-//                 default:
-//                     return DAWN_UNIMPLEMENTED_ERROR("This Unary op is not
-//                     implemented.");
-//             }
-//             mIntermediateNodesMap[mIntermediateNodes.size()] = dmlOperator;
-//             mGraphEdgesMap[unary->PrimaryOutput()] =
-//                 CreateEdgeFromThisNode(inputTensorDesc,
-//                 mIntermediateNodes.size());
-//             AddEdgesToThisNode(inputEdges);
-//             return {};
-//         }
+    //   CREATE_BINARY_OPERATOR(MULTIPLY, inputTensorDesc,
+    //   constantInputTensorDesc,
+    //                          inputTensorDesc, dmlOperator);
+    //   inputEdges.push_back(mInputs.back());
+    // } break;
+    case UnaryOperandType::kRelu: {
+      CREATE_UNARY_OPERATOR(ACTIVATION_RELU, inputTensorDesc, dmlOperator);
+    } break;
+    case UnaryOperandType::kSigmoid: {
+      CREATE_UNARY_OPERATOR(ACTIVATION_SIGMOID, inputTensorDesc, dmlOperator);
+    } break;
+    // case UnaryOperandType::kSin: {
+    //   CREATE_UNARY_OPERATOR(ELEMENT_WISE_SIN, inputTensorDesc, dmlOperator);
+    // } break;
+    case UnaryOperandType::kSoftmax: {
+      CREATE_UNARY_OPERATOR(ACTIVATION_SOFTMAX, inputTensorDesc, dmlOperator);
+    } break;
+      // case UnaryOperandType::kTan: {
+      //   CREATE_UNARY_OPERATOR(ELEMENT_WISE_TAN, inputTensorDesc,
+      //   dmlOperator);
+      // } break;
+      // case UnaryOperandType::kTanh: {
+      //   CREATE_UNARY_OPERATOR(ACTIVATION_TANH, inputTensorDesc, dmlOperator);
+      // } break;
+      // default:
+      //                 return DAWN_UNIMPLEMENTED_ERROR("This Unary op is not
+      //                 implemented.");
+  }
+  mIntermediateNodesMap[mIntermediateNodes.size()] = dmlOperator;
+  mGraphEdgesMap[desc->object_id] =
+      CreateEdgeFromThisNode(inputTensorDesc, mIntermediateNodes.size());
+  AddEdgesToThisNode(inputEdges);
+  return;
+}
 
 //         MaybeError GraphDMLNativeImpl::AddSplit(const op::Split* split) {
 //             assert(split->Inputs().size() == 1);

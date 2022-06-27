@@ -28,6 +28,12 @@ enum BinaryOperandType {
   kPower,
 };
 
+enum UnaryOperandType {
+  kRelu = 0,
+  kSoftmax,
+  kSigmoid,
+};
+
 // Represents the `MLOperandDescriptor`.
 struct OperandDescriptor {
   // The type of the operand.
@@ -129,6 +135,7 @@ interface Graph {
   AddGemm(uint32 a_id, uint32 b_id, GemmOptions options, OperandDescriptor desc);
   AddPool2d(uint32 input_id, Pool2dOptions options, Pool2dType type,
       OperandDescriptor desc);
+  AddUnary(uint32 input_id, UnaryOperandType type, OperandDescriptor desc);
 
   AddFusionClamp(ClampOptions options, uint32 operator_id);
 
