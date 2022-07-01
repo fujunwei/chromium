@@ -72,6 +72,14 @@ class WebnnGraph : public MLGraph {
   HeapVector<Member<const MLOperand>> constants_;
   HeapVector<Member<const MLOperator>> sorted_operators_;
   MLNamedArrayOutputs named_array_outputs_;
+
+  struct MemoryInfo {
+    size_t byte_offset;
+    size_t byte_length;
+    mojo::ScopedSharedBufferMapping mapping;
+  };
+  HashMap<String, MemoryInfo> inputs_info_;
+  mojo::ScopedSharedBufferHandle input_buffer_;
 };
 
 }  // namespace blink

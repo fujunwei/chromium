@@ -37,6 +37,7 @@ using ml::webnn::mojom::FusionOperator;
 using ml::webnn::mojom::FusionOperatorPtr;
 using ml::webnn::mojom::FusionType;
 using ml::webnn::mojom::InputOperandLayout;
+using ml::webnn::mojom::MemoryInfoPtr;
 using ml::webnn::mojom::OperandType;
 
 }  // namespace
@@ -44,12 +45,12 @@ using ml::webnn::mojom::OperandType;
 DmlTensorDesc::DmlTensorDesc() = default;
 DmlTensorDesc::~DmlTensorDesc() = default;
 
-#define DAWN_INTERNAL_ERROR(MESSAGE)             \
-  do {                                           \
-    error_messages_ = MESSAGE;                   \
-    assert(0);                                   \
-    build_result_ = BuildResult::kUnknownError;  \
-    return;                                      \
+#define DAWN_INTERNAL_ERROR(MESSAGE)            \
+  do {                                          \
+    error_messages_ = MESSAGE;                  \
+    assert(0);                                  \
+    build_result_ = BuildResult::kUnknownError; \
+    return;                                     \
   } while (0)
 
 #define CREATE_OPERATOR(type, dmlSpecificOperatorDesc) \
@@ -1431,7 +1432,7 @@ BuildResult GraphDMLNativeImpl::Finish() {
 void GraphDMLNativeImpl::FillUploadResourceAndInputBindings(
     uint64_t uploadResourceSize,
     std::vector<DML_BUFFER_BINDING>& inputBufferBinding,
-    base::flat_map<std::string, std::vector<uint8_t>> namedInputs) {
+    NamedInputsPtr namedInputs) {
   D3D12_RANGE uploadBufferRange{0, uploadResourceSize};
   int8_t* uploadBuffer;
   WEBNN_CHECK(mUploadResource->Map(0, &uploadBufferRange,
@@ -1439,7 +1440,7 @@ void GraphDMLNativeImpl::FillUploadResourceAndInputBindings(
   uint64_t offset = 0;
   for (size_t i = 0; i < mInputs.size(); ++i) {
     auto input = mInputs[i];
-    if (namedInputs.empty()) {
+    if (namedInputs.get() == nullptr) {
       if (input->isConstantInput) {
         offset = utils::RoundUpToMultiple(
             offset, (uint64_t)DML_MINIMUM_BUFFER_TENSOR_ALIGNMENT);
@@ -1454,15 +1455,17 @@ void GraphDMLNativeImpl::FillUploadResourceAndInputBindings(
       if (!input->isConstantInput) {
         offset = utils::RoundUpToMultiple(
             offset, (uint64_t)DML_MINIMUM_BUFFER_TENSOR_ALIGNMENT);
-        auto arrayBufferView = namedInputs[input->name];
+        MemoryInfoPtr memory_info = std::move(namedInputs->inputs[input->name]);
+        mojo::ScopedSharedBufferHandle output_buffer =
+            std::move(namedInputs->memory);
+        mojo::ScopedSharedBufferMapping mapping = output_buffer->MapAtOffset(
+            memory_info->byte_length, memory_info->byte_offset);
         inputBufferBinding[i].Buffer = mInputResource.Get();
         inputBufferBinding[i].Offset = offset;
-        inputBufferBinding[i].SizeInBytes = arrayBufferView.size();
-        memcpy(uploadBuffer + offset,
-               static_cast<uint8_t*>(arrayBufferView.data()) +
-                   0 /*arrayBufferView.byteOffset*/,
-               arrayBufferView.size());
-        offset = offset + arrayBufferView.size();
+        inputBufferBinding[i].SizeInBytes = memory_info->byte_length;
+        memcpy(uploadBuffer + offset, static_cast<uint8_t*>(mapping.get()),
+               memory_info->byte_length);
+        offset = offset + memory_info->byte_length;
       }
     }
   }
@@ -1667,7 +1670,7 @@ BuildResult GraphDMLNativeImpl::CompileImpl() {
 }
 
 ComputeResult GraphDMLNativeImpl::ComputeImpl(
-    const base::flat_map<std::string, std::vector<uint8_t>>& named_inputs,
+    NamedInputsPtr named_inputs,
     const std::vector<std::string>& output_names,
     std::vector<std::vector<uint8_t>>& output_buffers) {
   // Bind and execute the operator on the GPU.
@@ -1693,7 +1696,7 @@ ComputeResult GraphDMLNativeImpl::ComputeImpl(
   for (auto& input : mInputs) {
     // All the inputs must be set.
     if (!input->isConstantInput &&
-        named_inputs.find(input->name) == named_inputs.end()) {
+        named_inputs->inputs.find(input->name) == named_inputs->inputs.end()) {
       return ComputeResult::kIncorrectNumberOfInputs;
     }
   }

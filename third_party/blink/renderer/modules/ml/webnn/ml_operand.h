@@ -42,6 +42,7 @@ class MLOperand final : public WebnnObject {
   V8MLOperandType::Enum Type() const;
   void SetDimensions(const Vector<int32_t>& dimensions);
   const Vector<int32_t>& Dimensions() const;
+  size_t GetByteLength() const;
   void SetArrayBufferView(const DOMArrayBufferView* array_buffer_view);
   const DOMArrayBufferView* ArrayBufferView() const;
 

@@ -102,6 +102,21 @@ struct ClampOptions {
   float maxValue;
 };
 
+struct MemoryInfo {
+  uint64 byte_offset;
+  uint64 byte_length;
+};
+
+struct NamedInputs {
+  map<string, MemoryInfo> inputs;
+  handle<shared_buffer> memory;
+};
+
+struct NamedOutputs {
+  map<string, MemoryInfo> outputs;
+  handle<shared_buffer> memory;
+};
+
 // Used by `Build()` of interface Graph.
 enum BuildResult {
   kOk,
@@ -140,7 +155,7 @@ interface Graph {
   AddFusionClamp(ClampOptions options, uint32 operator_id);
 
   BuildAsync() => (BuildResult result);
-  ComputeAsync(map<string, array<uint8>> named_inputs,
+  ComputeAsync(NamedInputs named_inputs,
       array<string> output_names) => (ComputeResult result,
                                     array<array<uint8>>? output_buffers);
 };

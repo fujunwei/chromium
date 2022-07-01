@@ -17,6 +17,7 @@ using ml::webnn::mojom::BinaryOperandType;
 using ml::webnn::mojom::ClampOptionsPtr;
 using ml::webnn::mojom::Conv2dOptionsPtr;
 using ml::webnn::mojom::GemmOptionsPtr;
+using ml::webnn::mojom::NamedInputsPtr;
 using ml::webnn::mojom::OperandDescriptorPtr;
 using ml::webnn::mojom::Pool2dOptionsPtr;
 using ml::webnn::mojom::Pool2dType;
@@ -70,10 +71,9 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
   void AddFusionClamp(ClampOptionsPtr options, uint32_t operator_id) override;
 
   void BuildAsync(BuildAsyncCallback callback) override;
-  void ComputeAsync(
-      const base::flat_map<std::string, std::vector<uint8_t>>& named_inputs,
-      const std::vector<std::string>& output_names,
-      ComputeAsyncCallback callback) override;
+  void ComputeAsync(NamedInputsPtr named_inputs,
+                    const std::vector<std::string>& output_names,
+                    ComputeAsyncCallback callback) override;
 
   std::unique_ptr<GraphDMLNativeImpl> native_graph_dml_;
 };

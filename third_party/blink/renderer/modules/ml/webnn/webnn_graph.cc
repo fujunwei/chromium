@@ -167,13 +167,22 @@ bool WebnnGraph::BuildGraph(
     const HeapVector<Member<const MLOperand>>& inputs,
     const HeapVector<Member<const MLOperand>>& constants,
     const HeapVector<Member<const MLOperator>>& sorted_operators) {
+  wtf_size_t shared_buffer_length = 0;
   for (const auto& input : inputs) {
     auto desc = ml::webnn::mojom::blink::OperandDescriptor::New();
     desc->data_type = ConvertBlinkOperandTypeToMojo(input->Type());
     desc->dimensions = input->Dimensions();
     desc->object_id = input->GetObjectId();
     remote_graph_->AddInput(input->Name(), std::move(desc));
+    size_t length = input->GetByteLength();
+    MemoryInfo memory_info = {};
+    memory_info.byte_offset = shared_buffer_length;
+    memory_info.byte_length = length;
+
+    inputs_info_.insert(input->Name(), std::move(memory_info));
+    shared_buffer_length += length;
   }
+  input_buffer_ = mojo::SharedBufferHandle::Create(shared_buffer_length);
   for (const auto& constant : constants) {
     auto desc = ml::webnn::mojom::blink::OperandDescriptor::New();
     desc->data_type = ConvertBlinkOperandTypeToMojo(constant->Type());
@@ -377,8 +386,21 @@ ScriptPromise WebnnGraph::ComputeAsyncImpl(ScriptState* script_state,
                                            const MLNamedArrayInputs& inputs,
                                            const MLNamedArrayOutputs& outputs,
                                            ExceptionState& exception_state) {
+  if (inputs.size() != inputs_info_.size()) {
+    exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
+                                      "The number of inputs is invalid");
+    return ScriptPromise();
+  }
+  auto named_inputs = ml::webnn::mojom::blink::NamedInputs::New();
   HashMap<String, Vector<uint8_t>> input_mojo;
   for (const auto& input : inputs) {
+    auto iter = inputs_info_.find(input.first);
+    if (iter == inputs_info_.end()) {
+      exception_state.ThrowDOMException(
+          DOMExceptionCode::kDataError,
+          "There is unknown input: " + input.first);
+      return ScriptPromise();
+    }
     DOMArrayBufferView* array_buffer_view = nullptr;
     if (input.second->IsArrayBufferViewAllowShared()) {
       array_buffer_view = input.second->GetAsArrayBufferViewAllowShared().Get();
@@ -387,13 +409,29 @@ ScriptPromise WebnnGraph::ComputeAsyncImpl(ScriptState* script_state,
       array_buffer_view = ml_tensor->data().Get();
     }
     DCHECK(array_buffer_view != nullptr);
+    if (array_buffer_view->byteLength() != iter->value.byte_length) {
+      exception_state.ThrowDOMException(
+          DOMExceptionCode::kDataError,
+          "The input (" + input.first + ") buffer length is invalid.");
+      return ScriptPromise();
+    }
     wtf_size_t size =
         base::checked_cast<wtf_size_t>(array_buffer_view->byteLength());
-    Vector<uint8_t> tensor(size);
-    memcpy(tensor.data(), array_buffer_view->BaseAddressMaybeShared(), size);
+    if (iter->value.mapping.get() == nullptr) {
+      iter->value.mapping = input_buffer_->MapAtOffset(iter->value.byte_length,
+                                                       iter->value.byte_offset);
+    }
+    memcpy(iter->value.mapping.get(),
+           array_buffer_view->BaseAddressMaybeShared(), size);
 
-    input_mojo.insert(input.first, std::move(tensor));
+    auto memory_info = ml::webnn::mojom::blink::MemoryInfo::New();
+    memory_info->byte_offset = iter->value.byte_offset;
+    memory_info->byte_length = iter->value.byte_length;
+    named_inputs->inputs.insert(input.first, std::move(memory_info));
   }
+  named_inputs->memory =
+      input_buffer_->Clone(mojo::SharedBufferHandle::AccessMode::READ_ONLY);
+
   Vector<String> output_names;
   for (const auto& output : outputs) {
     output_names.push_back(output.first);
@@ -401,7 +439,7 @@ ScriptPromise WebnnGraph::ComputeAsyncImpl(ScriptState* script_state,
   ScriptPromiseResolver* resolver =
       MakeGarbageCollected<ScriptPromiseResolver>(script_state);
   remote_graph_->ComputeAsync(
-      std::move(input_mojo), std::move(output_names),
+      std::move(named_inputs), std::move(output_names),
       WTF::Bind(&WebnnGraph::OnGraphComputed, WrapPersistent(this),
                 WrapPersistent(resolver)));
   named_array_outputs_ = std::move(outputs);

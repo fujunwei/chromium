@@ -80,31 +80,6 @@ String XnnStatusToString(xnn_status status) {
   }
 }
 
-size_t GetBytesPerElement(V8MLOperandType::Enum datatype) {
-  switch (datatype) {
-    case V8MLOperandType::Enum::kFloat32:
-      return 4;
-    case V8MLOperandType::Enum::kFloat16:
-      return 2;
-    case V8MLOperandType::Enum::kInt32:
-      return 4;
-    case V8MLOperandType::Enum::kUint32:
-      return 4;
-    case V8MLOperandType::Enum::kInt8:
-      return 1;
-    case V8MLOperandType::Enum::kUint8:
-      return 1;
-  }
-}
-
-size_t GetByteLength(const MLOperand* operand) {
-  size_t elements = 1;
-  for (auto& d : operand->Dimensions()) {
-    elements = elements * d;
-  }
-  return elements * GetBytesPerElement(operand->Type());
-}
-
 }  // namespace
 
 MLGraphXnnpack::MLGraphXnnpack(MLContext* context)

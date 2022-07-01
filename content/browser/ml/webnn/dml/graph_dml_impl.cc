@@ -108,13 +108,12 @@ void GraphDMLImpl::BuildAsync(BuildAsyncCallback callback) {
   std::move(callback).Run(native_graph_dml_->CompileImpl());
 }
 
-void GraphDMLImpl::ComputeAsync(
-    const base::flat_map<std::string, std::vector<uint8_t>>& named_inputs,
-    const std::vector<std::string>& output_names,
-    ComputeAsyncCallback callback) {
+void GraphDMLImpl::ComputeAsync(NamedInputsPtr named_inputs,
+                                const std::vector<std::string>& output_names,
+                                ComputeAsyncCallback callback) {
   std::vector<std::vector<uint8_t>> output_buffers;
   ComputeResult result = native_graph_dml_->ComputeImpl(
-      named_inputs, output_names, output_buffers);
+      std::move(named_inputs), output_names, output_buffers);
   std::move(callback).Run(result, output_buffers);
 }
 

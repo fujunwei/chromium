@@ -9,6 +9,26 @@
 
 namespace blink {
 
+namespace {
+
+size_t GetBytesPerElement(V8MLOperandType::Enum datatype) {
+  switch (datatype) {
+    case V8MLOperandType::Enum::kFloat32:
+      return 4;
+    case V8MLOperandType::Enum::kFloat16:
+      return 2;
+    case V8MLOperandType::Enum::kInt32:
+      return 4;
+    case V8MLOperandType::Enum::kUint32:
+      return 4;
+    case V8MLOperandType::Enum::kInt8:
+      return 1;
+    case V8MLOperandType::Enum::kUint8:
+      return 1;
+  }
+}
+
+}  // namespace
 MLOperand::MLOperand(MLGraphBuilder* builder, KindEnum kind)
     : WebnnObject(builder->GetContext()),
       builder_(builder),
@@ -55,6 +75,14 @@ void MLOperand::SetDimensions(const Vector<int32_t>& dimensions) {
 
 const Vector<int32_t>& MLOperand::Dimensions() const {
   return dimensions_;
+}
+
+size_t MLOperand::GetByteLength() const {
+  size_t elements = 1;
+  for (auto& d : Dimensions()) {
+    elements = elements * d;
+  }
+  return elements * GetBytesPerElement(Type());
 }
 
 void MLOperand::SetArrayBufferView(

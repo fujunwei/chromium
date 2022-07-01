@@ -39,6 +39,7 @@ using ml::webnn::mojom::ComputeResult;
 using ml::webnn::mojom::Conv2dOptionsPtr;
 using ml::webnn::mojom::FusionOperator;
 using ml::webnn::mojom::GemmOptionsPtr;
+using ml::webnn::mojom::NamedInputsPtr;
 using ml::webnn::mojom::OperandDescriptorPtr;
 using ml::webnn::mojom::Pool2dOptions;
 using ml::webnn::mojom::Pool2dOptionsPtr;
@@ -114,17 +115,16 @@ class GraphDMLNativeImpl {
   void AddClamp(uint32_t, ClampOptionsPtr, OperandDescriptorPtr);
   void AddFusionClamp(ClampOptionsPtr options, uint32_t operator_id);
   BuildResult CompileImpl();
-  ComputeResult ComputeImpl(
-      const base::flat_map<std::string, std::vector<uint8_t>>& named_inputs,
-      const std::vector<std::string>& output_names,
-      std::vector<std::vector<uint8_t>>& output_buffers);
+  ComputeResult ComputeImpl(NamedInputsPtr named_inputs,
+                            const std::vector<std::string>& output_names,
+                            std::vector<std::vector<uint8_t>>& output_buffers);
 
   void AddEdgesToThisNode(
       std::vector<std::shared_ptr<EdgeInfoBase>> inputNodes);
   void FillUploadResourceAndInputBindings(
       uint64_t uploadResourceSize,
       std::vector<DML_BUFFER_BINDING>& inputBufferBinding,
-      base::flat_map<std::string, std::vector<uint8_t>> namedInputs);
+      NamedInputsPtr namedInputs);
   std::shared_ptr<EdgeInfoBase> Clamp(std::shared_ptr<EdgeInfoBase> inputEdge,
                                       const ClampOptions* options);
   void EmulateFusedOperator(const FusionOperator* activation,
