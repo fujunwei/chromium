@@ -1,0 +1,15 @@
+// Copyright 2022 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+module ml.webnn.mojom;
+
+import "components/ml/webnn/mojom/graph.mojom";
+
+// Represents the `MLContext` object in the WebIDL definition. The user can use
+// its `Compute` interface to do inferences.
+[Stable]
+interface Context {
+  CreateGraph@0(uint32 context_id, uint32 graph_id)
+      => (pending_remote<Graph>? remote);
+};

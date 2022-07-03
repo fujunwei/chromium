@@ -1,0 +1,199 @@
+// Copyright 2022 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+module ml.webnn.mojom;
+
+// Represents the `MLOperandType`.
+[Stable, Extensible]
+enum OperandType {
+  kFloat32,
+  kFloat16,
+  kInt32,
+  kUint32,
+  kInt8,
+  kUint8,
+};
+
+// Represents the `MLOperandDescriptor`.
+[Stable]
+struct OperandDescriptor {
+  // The type of the operand.
+  OperandType data_type@0;
+  // The dimensions of the operand.
+  array<int32> dimensions@1;
+  // The object id of the operand.
+  uint32 object_id@2;
+};
+
+// Represents the activation function types, the `kUnknown` is used to throw
+// exception for unsupported type in blink.
+[Stable, Extensible]
+enum FusionType { kUnknown = 0, kClamp, kRelu };
+
+[Stable]
+struct FusionOperator {
+  uint32 object_id@0;
+  FusionType fusion_type@1;
+};
+
+// Represents the `MLInputOperandLayout`.
+[Stable, Extensible]
+enum InputOperandLayout { kNchw, kNhwc };
+
+// Represents the `MLConv2dFilterOperandLayout`.
+[Stable, Extensible]
+enum Conv2dFilterOperandLayout { kOihw, kHwio, kOhwi, kIhwo };
+
+// Represents the `MLAutoPad`.
+[Stable, Extensible]
+enum AutoPad { kExplicit, kSameUpper, kSameLower };
+
+// Represents the `MLConv2dOptions`.
+[Stable]
+struct Conv2dOptions {
+  array<int32> padding@0;
+  array<int32> strides@1;
+  array<int32> dilations@2;
+  AutoPad auto_pad@3 = AutoPad.kExplicit;
+  int32 groups@4 = 1;
+  InputOperandLayout inputLayout@5 = InputOperandLayout.kNchw;
+  Conv2dFilterOperandLayout filterLayout@6 = Conv2dFilterOperandLayout.kOihw;
+  uint32 bias_id@7;
+  FusionOperator? activation@8;
+};
+
+// Represents the `MLGemmOptions`.
+[Stable]
+struct GemmOptions {
+  uint32 c_id@0;
+  float alpha@1 = 1.0;
+  float beta@2 = 1.0;
+  bool a_transpose@3 = false;
+  bool b_transpose@4 = false;
+};
+
+// Represents the `MLPool2dType`, the `kUnknown` is used to throw exception for
+// unsupported type in blink.
+[Stable, Extensible]
+enum Pool2dType { kUnknown = 0, kAveragePool2d, kMaxPool2d, kL2Pool2d };
+
+[Stable, Extensible]
+enum RoundingType { kFloor, kCeil };
+
+// Represents the `MLPool2dOptions`.
+[Stable]
+struct Pool2dOptions {
+  array<int32> window_dimensions@0;
+  array<int32> padding@1;
+  array<int32> strides@2;
+  array<int32> dilations@3;
+  AutoPad auto_pad@4 = AutoPad.kExplicit;
+  InputOperandLayout layout@5 = InputOperandLayout.kNchw;
+  RoundingType rounding_type@6 = RoundingType.kFloor;
+  array<int32> output_sizes@7;
+};
+
+// Represents the `MLClampOptions`.
+[Stable]
+struct ClampOptions {
+  float minValue@0;
+  float maxValue@1;
+};
+
+// Represents element-wise binary operation, the `kUnknown` is used to throw
+// exception for unsupported type in blink.
+[Stable, Extensible]
+enum BinaryOperandType {
+  kUnknown = 0,
+  kAdd,
+  kSub,
+  kMul,
+  kDiv,
+  kMax,
+  kMin,
+  kMatMul,
+  kPower,
+};
+
+// Represents unary operation, the `kUnknown` is used to throw exception for
+// unsupported type in blink.
+[Stable, Extensible]
+enum UnaryOperandType {
+  kUnknown = 0,
+  kRelu,
+  kSoftmax,
+  kSigmoid,
+};
+
+// Describe the information of inputs / outputs data in shared buffer. 
+[Stable]
+struct MemoryInfo {
+  uint64 byte_offset@0;
+  uint64 byte_length@1;
+};
+
+// Represents the `MLNamedInputs`.
+[Stable]
+struct NamedInputs {
+  map<string, MemoryInfo> inputs@0;
+  handle<shared_buffer> memory@1;
+};
+
+// Represents the `MLNamedOutputs`.
+[Stable]
+struct NamedOutputs {
+  map<string, MemoryInfo> outputs@0;
+  handle<shared_buffer> memory@1;
+};
+
+// Used by `BuildGraph()` of interface Graph.
+[Stable, Extensible]
+enum BuildResult {
+  kOk,
+  kUnknownError,
+};
+
+// Used by `ComputeGraph()` of interface Graph.
+[Stable, Extensible]
+enum ComputeResult {
+  kOk,
+  kUnknownError,
+};
+
+// Corresponds to the `MLGraph` object in the WebIDL definition.
+[Stable]
+interface Graph {
+  AddInput@0(string name, OperandDescriptor desc);
+
+  AddConstant@1(OperandDescriptor desc, array<uint8> array_buffer);
+
+  AddOutput@2(string name, uint32 operand_id);
+
+  AddElementWiseBinary@3(uint32 a_id, uint32 b_id, BinaryOperandType type,
+      OperandDescriptor output_desc);
+
+  AddClamp@4(uint32 input_id, ClampOptions options,
+      OperandDescriptor output_desc);
+
+  AddConv2d@5(uint32 input_id, uint32 filter_id, Conv2dOptions options,
+      OperandDescriptor output_desc);
+
+  AddReshape@6(uint32 input_id, OperandDescriptor output_desc);
+
+  AddGemm@7(uint32 a_id, uint32 b_id, GemmOptions options,
+      OperandDescriptor output_desc);
+
+  AddPool2d@8(uint32 input_id, Pool2dOptions options, Pool2dType type,
+      OperandDescriptor output_desc);
+
+  AddUnary@9(uint32 input_id, UnaryOperandType type,
+      OperandDescriptor output_desc);
+
+  AddFusionClamp@10(ClampOptions options, uint32 operator_id);
+
+  BuildGraph@11() => (BuildResult result);
+
+  ComputeGraph@12(NamedInputs named_inputs)
+      => (ComputeResult result, NamedOutputs? named_outputs);
+};

@@ -10,8 +10,11 @@
 
 [
   RuntimeEnabled=MachineLearningModelLoader,
-  Exposed=Window
+  Exposed=(Window, DedicatedWorker)
 ] interface ML {
   [CallWith=ScriptState, RaisesException]
       Promise<MLContext> createContext(optional MLContextOptions options = {});
+
+  [RaisesException, Exposed=DedicatedWorker]
+      MLContext createContextSync(optional MLContextOptions options = {});
 };
