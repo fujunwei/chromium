@@ -12,7 +12,10 @@ namespace blink {
 MLOperator::MLOperator(MLGraphBuilder* builder,
                        OperatorKind kind,
                        const bindings::DictionaryBase* options)
-    : builder_(builder), kind_(kind), options_(options) {}
+    : MLObject(builder->GetContext()),
+      builder_(builder),
+      kind_(kind),
+      options_(options) {}
 
 MLOperator::~MLOperator() = default;
 
@@ -21,7 +24,7 @@ void MLOperator::Trace(Visitor* visitor) const {
   visitor->Trace(options_);
   visitor->Trace(inputs_);
   visitor->Trace(outputs_);
-  ScriptWrappable::Trace(visitor);
+  MLObject::Trace(visitor);
 }
 
 MLOperator::OperatorKind MLOperator::Kind() const {

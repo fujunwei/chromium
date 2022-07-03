@@ -1050,6 +1050,9 @@ extern const char kCanvas2DLayersDescription[];
 extern const char kEnableMachineLearningModelLoaderWebPlatformApiName[];
 extern const char kEnableMachineLearningModelLoaderWebPlatformApiDescription[];
 
+extern const char kEnableMachineLearningNeuralNetworkApiName[];
+extern const char kEnableMachineLearningNeuralNetworkApiDescription[];
+
 extern const char kDestroyProfileOnBrowserCloseName[];
 extern const char kDestroyProfileOnBrowserCloseDescription[];
 

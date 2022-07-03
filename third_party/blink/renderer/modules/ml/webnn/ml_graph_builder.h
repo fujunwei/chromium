@@ -5,6 +5,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_ML_WEBNN_ML_GRAPH_BUILDER_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_ML_WEBNN_ML_GRAPH_BUILDER_H_
 
+#include "third_party/blink/renderer/bindings/core/v8/script_promise.h"
 #include "third_party/blink/renderer/core/typed_arrays/array_buffer_view_helpers.h"
 #include "third_party/blink/renderer/core/typed_arrays/dom_array_buffer_view.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operator.h"
@@ -21,9 +22,11 @@ class MLContext;
 class MLClampOptions;
 class MLConv2dOptions;
 class MLGemmOptions;
+class MLGraph;
 class MLPool2dOptions;
 class MLOperand;
 class MLOperandDescriptor;
+class ScriptPromise;
 
 typedef HeapVector<std::pair<String, Member<MLOperand>>> MLNamedOperands;
 
@@ -41,6 +44,8 @@ class MODULES_EXPORT MLGraphBuilder final : public ScriptWrappable {
   ~MLGraphBuilder() override;
 
   void Trace(Visitor* visitor) const override;
+
+  MLContext* GetContext() const;
 
   // ml_graph_builder.idl
   MLOperand* input(String name,
@@ -103,6 +108,18 @@ class MODULES_EXPORT MLGraphBuilder final : public ScriptWrappable {
                      ExceptionState& exception_state);
 
   MLOperand* softmax(const MLOperand* input, ExceptionState& exception_state);
+
+  ScriptPromise build(ScriptState* script_state,
+                      MLNamedOperands outputs,
+                      ExceptionState& exception_state);
+
+  MLGraph* buildSync(MLNamedOperands outputs, ExceptionState& exception_state);
+
+  static void SortOperators(
+      const MLNamedOperands& named_outputs,
+      HeapVector<Member<const MLOperand>>& inputs,
+      HeapVector<Member<const MLOperand>>& constants,
+      HeapVector<Member<const MLOperator>>& sorted_operators);
 
  private:
   Member<MLContext> ml_context_;

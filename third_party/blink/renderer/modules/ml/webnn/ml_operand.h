@@ -8,6 +8,7 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_operand_descriptor.h"
 #include "third_party/blink/renderer/core/typed_arrays/array_buffer_view_helpers.h"
 #include "third_party/blink/renderer/core/typed_arrays/dom_array_buffer_view.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_object.h"
 #include "third_party/blink/renderer/modules/modules_export.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
@@ -15,10 +16,19 @@
 
 namespace blink {
 
+absl::optional<size_t> ValidateAndCalculateElementsNumber(
+    const Vector<uint32_t>& dimensions,
+    String& error_message);
+
+absl::optional<size_t> ValidateAndCalculateByteLength(
+    V8MLOperandType::Enum type,
+    const Vector<uint32_t>& dimensions,
+    String& error_message);
+
 class MLGraphBuilder;
 class MLOperator;
 
-class MODULES_EXPORT MLOperand final : public ScriptWrappable {
+class MODULES_EXPORT MLOperand final : public MLObject {
   DEFINE_WRAPPERTYPEINFO();
 
  public:
