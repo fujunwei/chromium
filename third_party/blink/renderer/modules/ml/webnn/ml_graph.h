@@ -5,7 +5,11 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_ML_WEBNN_ML_GRAPH_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_ML_WEBNN_ML_GRAPH_H_
 
+#include "third_party/blink/renderer/bindings/core/v8/v8_union_arraybufferallowshared_arraybufferviewallowshared.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_operand_descriptor.h"
+#include "third_party/blink/renderer/bindings/modules/v8/v8_union_arraybufferviewallowshared_mltensor.h"
+#include "third_party/blink/renderer/core/typed_arrays/array_buffer_view_helpers.h"
+#include "third_party/blink/renderer/core/typed_arrays/dom_array_buffer_view.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
 #include "third_party/blink/renderer/modules/modules_export.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
@@ -16,7 +20,18 @@
 namespace blink {
 
 class MLContext;
+class MLOperand;
 class ScriptPromiseResolver;
+
+typedef std::pair<String, Member<V8UnionArrayBufferViewAllowSharedOrMLTensor>>
+    MLNamedInput;
+typedef HeapVector<MLNamedInput> MLNamedArrayInputs;
+typedef std::pair<
+    String,
+    Member<V8UnionArrayBufferAllowSharedOrArrayBufferViewAllowShared>>
+    MLNamedOutput;
+typedef HeapVector<MLNamedOutput> MLNamedArrayOutputs;
+typedef HeapVector<std::pair<String, Member<MLOperand>>> MLNamedOperands;
 
 class MODULES_EXPORT MLGraph : public ScriptWrappable {
   DEFINE_WRAPPERTYPEINFO();
@@ -28,6 +43,15 @@ class MODULES_EXPORT MLGraph : public ScriptWrappable {
   ~MLGraph() override;
 
   void Trace(Visitor* visitor) const override;
+
+  virtual ScriptPromise ComputeImpl(ScriptState* script_state,
+                                    MLNamedArrayInputs inputs,
+                                    MLNamedArrayOutputs outputs,
+                                    ExceptionState& exception_state) = 0;
+
+  virtual void ComputeSyncImpl(MLNamedArrayInputs inputs,
+                               MLNamedArrayOutputs outputs,
+                               ExceptionState& exception_state) = 0;
 
   // The members of ResourceInfo are used to validate the inputs and outputs of
   // an MLGraph execution. The validation steps are described by WebNN spec of
@@ -64,6 +88,19 @@ class MODULES_EXPORT MLGraph : public ScriptWrappable {
   // rejected with a DOMException accordingly.
   virtual void BuildAsyncImpl(const MLNamedOperands& outputs,
                               ScriptPromiseResolver* resolver) = 0;
+
+  struct ComputeRequest final : public GarbageCollected<ComputeRequest> {
+    ComputeRequest(MLNamedArrayInputs inputs, MLNamedArrayOutputs outputs);
+    void Trace(Visitor*) const;
+
+    MLNamedArrayInputs inputs_;
+    MLNamedArrayOutputs outputs_;
+  };
+
+  DOMArrayBufferView* ValidateInputBuffer(const MLNamedInput& named_input,
+                                          String& error_message);
+  void* ValidateOutputBuffer(const MLNamedOutput& named_output,
+                             String& error_message);
 
   Member<MLContext> ml_context_;
   bool resources_info_initialized_{false};

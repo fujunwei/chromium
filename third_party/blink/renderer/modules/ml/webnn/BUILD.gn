@@ -21,6 +21,12 @@ blink_modules_sources("webnn") {
     "ml_operand.h",
     "ml_operator.cc",
     "ml_operator.h",
+    "mojo_client.cc",
+    "mojo_client.h",
+    "mojo_graph.cc",
+    "mojo_graph.h",
+    "mojo_model_info.cc",
+    "mojo_model_info.h",
   ]
 
   deps = [

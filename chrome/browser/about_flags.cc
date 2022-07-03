@@ -7920,6 +7920,13 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kChipLocationBarIconOverrideDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(permissions::features::kChipLocationBarIconOverride)},
 
+    {"enable-machine-learning-neural-network-api",
+     flag_descriptions::kEnableMachineLearningNeuralNetworkApiName,
+     flag_descriptions::kEnableMachineLearningNeuralNetworkApiDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         blink::features::kEnableMachineLearningNeuralNetworkApi)},
+
     {"enable-translate-sub-frames",
      flag_descriptions::kEnableTranslateSubFramesName,
      flag_descriptions::kEnableTranslateSubFramesDescription, kOsAll,

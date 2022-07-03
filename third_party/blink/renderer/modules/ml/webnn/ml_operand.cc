@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
 
+#include "components/ml/mojom/webnn_graph.mojom-blink.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operator.h"
 
@@ -199,7 +200,7 @@ const DOMArrayBufferView* MLOperand::ArrayBufferView() const {
 }
 
 const MLOperator* MLOperand::Operator() const {
-  DCHECK_EQ(kind_, OperandKind::kOutput);
+  // DCHECK_EQ(kind_, OperandKind::kOutput);
   return operator_.Get();
 }
 

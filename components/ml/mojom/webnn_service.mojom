@@ -1,0 +1,37 @@
+// Copyright 2022 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+module ml.webnn.mojom;
+
+import "components/ml/mojom/web_platform_model.mojom";
+import "components/ml/mojom/webnn_context.mojom";
+import "sandbox/policy/mojom/sandbox.mojom";
+
+const sandbox.mojom.Sandbox kWebnnSandbox = sandbox.mojom.Sandbox.kUtility;
+
+[Stable]
+struct ContextOptions {
+  // The device to be used (e.g. "auto", "cpu", "gpu" etc.).
+  ml.model_loader.mojom.DevicePreference device_preference@0;
+  // The power preference indicates preference as related to power consumption.
+  ml.model_loader.mojom.PowerPreference power_preference@1;
+};
+
+// The interface is used to factory interfaces in WebNN such as `MLContext`.
+[Stable]
+interface MojoServer {
+  // Called by the renderer to ask the GPU process to create a `MLContext`, a
+  // global state can be initialized when creating context, for example
+  // GPUDevice for GPU backend.
+  CreateContext@0(ContextOptions options) => (pending_remote<Context>? remote);
+};
+
+// Represents the WebNN service, there is only one instance in the GPU process
+// to communicate with renderer process.
+[ServiceSandbox=kWebnnSandbox]
+interface WebnnService {
+  // The `MojoServer` is one-to-one mapping with `navigator.ml`, and there is
+  // a corresponding remote interface named `MojoClient` in renderer process.
+  BindMojoServer(pending_receiver<MojoServer> receiver);
+};

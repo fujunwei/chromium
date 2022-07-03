@@ -7,6 +7,8 @@
 #include "content/gpu/gpu_child_thread.h"
 
 #include "base/no_destructor.h"
+#include "base/task/thread_pool.h"
+#include "base/threading/thread_task_runner_handle.h"
 #include "build/branding_buildflags.h"
 #include "build/chromeos_buildflags.h"
 #include "media/mojo/buildflags.h"

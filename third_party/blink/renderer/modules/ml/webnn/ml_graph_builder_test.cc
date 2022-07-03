@@ -41,7 +41,8 @@ MLGraphBuilder* CreateMLGraphBuilder(V8TestingScope& scope,
   auto* ml = MakeGarbageCollected<ML>(scope.GetExecutionContext());
   auto* context = MakeGarbageCollected<MLContext>(
       options->devicePreference(), options->powerPreference(),
-      options->modelFormat(), options->numThreads(), ml);
+      options->modelFormat(), options->numThreads(),
+      scope.GetExecutionContext(), ml);
   auto* builder = MLGraphBuilder::Create(context);
   EXPECT_NE(builder, nullptr);
   return builder;
@@ -2046,6 +2047,14 @@ class FakeMLGraphBackend final : public MLGraph {
                       ScriptPromiseResolver* resolver) override {
     resolver->Resolve(this);
   }
+
+  ScriptPromise ComputeImpl(ScriptState* script_state,
+                            MLNamedArrayInputs inputs,
+                            MLNamedArrayOutputs outputs,
+                            ExceptionState& exception_state) override {}
+  void ComputeSyncImpl(MLNamedArrayInputs inputs,
+                       MLNamedArrayOutputs outputs,
+                       ExceptionState& exception_state) override {}
 };
 
 FakeMLGraphBackend* ToFakeMLGraphBackend(V8TestingScope* scope,

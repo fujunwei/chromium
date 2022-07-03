@@ -25,10 +25,11 @@ class MLGemmOptions;
 class MLPool2dOptions;
 class MLOperand;
 class MLOperandDescriptor;
+class ScriptPromise;
 
 typedef HeapVector<std::pair<String, Member<MLOperand>>> MLNamedOperands;
 
-class MODULES_EXPORT MLGraphBuilder final : public ScriptWrappable {
+class MODULES_EXPORT MLGraphBuilder : public ScriptWrappable {
   DEFINE_WRAPPERTYPEINFO();
 
  public:
@@ -113,6 +114,11 @@ class MODULES_EXPORT MLGraphBuilder final : public ScriptWrappable {
   ScriptPromise buildAsync(ScriptState* script_state,
                            const MLNamedOperands& outputs,
                            ExceptionState& exception_state);
+  static void SortOperators(
+      const MLNamedOperands& named_outputs,
+      HeapVector<Member<const MLOperand>>& inputs,
+      HeapVector<Member<const MLOperand>>& constants,
+      HeapVector<Member<const MLOperator>>& sorted_operators);
 
  private:
   Member<MLContext> ml_context_;

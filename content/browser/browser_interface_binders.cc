@@ -14,6 +14,7 @@
 #include "build/branding_buildflags.h"
 #include "build/build_config.h"
 #include "cc/base/switches.h"
+#include "components/ml/mojom/webnn_service.mojom.h"
 #include "content/browser/aggregation_service/aggregation_service_internals.mojom.h"
 #include "content/browser/aggregation_service/aggregation_service_internals_ui.h"
 #include "content/browser/attribution_reporting/attribution_internals.mojom.h"
@@ -39,6 +40,7 @@
 #include "content/browser/media/midi_host.h"
 #include "content/browser/media/session/media_session_service_impl.h"
 #include "content/browser/ml/ml_service_factory.h"
+#include "content/browser/ml/webnn/buildflags.h"
 #include "content/browser/network/reporting_service_proxy.h"
 #include "content/browser/picture_in_picture/picture_in_picture_service_impl.h"
 #include "content/browser/preloading/prerender/prerender_internals.mojom.h"
@@ -71,6 +73,7 @@
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
+#include "content/public/browser/service_process_host.h"
 #include "content/public/browser/service_worker_context.h"
 #include "content/public/browser/service_worker_version_base_info.h"
 #include "content/public/browser/shared_worker_instance.h"
@@ -259,6 +262,27 @@ void BindFaceDetectionProvider(
 void BindTextDetection(
     mojo::PendingReceiver<shape_detection::mojom::TextDetection> receiver) {
   GetShapeDetectionService()->BindTextDetection(std::move(receiver));
+}
+
+ml::webnn::mojom::WebnnService* GetWebnnService() {
+  static base::NoDestructor<mojo::Remote<ml::webnn::mojom::WebnnService>>
+      remote;
+  if (!*remote) {
+#if BUILDFLAG(ENABLE_MOJO_WEBNN_IN_UTILITY_PROCESS)
+    // Running WebNN Service in Utility process.
+    ServiceProcessHost::Launch<ml::webnn::mojom::WebnnService>(
+        remote->BindNewPipeAndPassReceiver(),
+        ServiceProcessHost::Options().WithDisplayName("WebNN Service").Pass());
+#endif
+    remote->reset_on_disconnect();
+  }
+
+  return remote->get();
+}
+
+void BindMojoServer(
+    mojo::PendingReceiver<ml::webnn::mojom::MojoServer> receiver) {
+  GetWebnnService()->BindMojoServer(std::move(receiver));
 }
 
 #if BUILDFLAG(IS_MAC)
@@ -807,6 +831,12 @@ void PopulateFrameBinders(RenderFrameHostImpl* host, mojo::BinderMap* map) {
           features::kEnableMachineLearningModelLoaderWebPlatformApi)) {
     map->Add<ml::model_loader::mojom::MLService>(
         base::BindRepeating(&CreateMLService));
+  }
+
+  if (base::FeatureList::IsEnabled(
+          blink::features::kEnableMachineLearningNeuralNetworkApi)) {
+    map->Add<ml::webnn::mojom::MojoServer>(
+        base::BindRepeating(&BindMojoServer));
   }
 
   if (base::FeatureList::IsEnabled(blink::features::kPendingBeaconAPI)) {

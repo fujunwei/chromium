@@ -46,6 +46,7 @@ source_set("utility") {
     "//components/services/storage",
     "//components/services/storage/public/mojom",
     "//content:export",
+    "//content/browser/ml/webnn:lib",
     "//content/child",
     "//content/public/child:child_sources",
     "//content/public/common:common_sources",

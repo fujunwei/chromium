@@ -10,4 +10,12 @@ mojom("mojom") {
     "web_platform_model.mojom",
   ]
   deps = [ "//mojo/public/mojom/base" ]
+
+  # WebNN mojom
+  sources += [
+    "webnn_context.mojom",
+    "webnn_graph.mojom",
+    "webnn_service.mojom",
+  ]
+  deps += [ "//sandbox/policy/mojom" ]
 }

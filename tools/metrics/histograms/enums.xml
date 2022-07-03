@@ -58504,6 +58504,8 @@ from previous Chrome versions.
   <int value="-1473537658" label="DeprecateLowUsageCodecs:disabled"/>
   <int value="-1473136627" label="enable-web-payments"/>
   <int value="-1472825316" label="ContextualSearchLongpressResolve:enabled"/>
+  <int value="-1471902304"
+      label="EnableMachineLearningNeuralNetworkApi:enabled"/>
   <int value="-1471353813" label="AddToHomescreenIPH:disabled"/>
   <int value="-1471021059"
       label="OmniboxUIExperimentShowSuggestionFavicons:disabled"/>
@@ -59169,6 +59171,8 @@ from previous Chrome versions.
   <int value="-1104746914" label="CrostiniVirtualKeyboardSupport:enabled"/>
   <int value="-1104609838" label="UserMediaCaptureOnFocus:enabled"/>
   <int value="-1104006220" label="AssistantNonPersonalizedVoiceSearch:enabled"/>
+  <int value="-1103433897"
+      label="EnableMachineLearningNeuralNetworkApi:disabled"/>
   <int value="-1103400515" label="VirtualKeyboardDarkMode:enabled"/>
   <int value="-1103221768" label="DefaultChatWebApp:enabled"/>
   <int value="-1103099187" label="NotificationStackingBarRedesign:disabled"/>
