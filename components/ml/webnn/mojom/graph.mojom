@@ -155,7 +155,6 @@ interface Graph {
   AddFusionClamp(ClampOptions options, uint32 operator_id);
 
   BuildAsync() => (BuildResult result);
-  ComputeAsync(NamedInputs named_inputs,
-      array<string> output_names) => (ComputeResult result,
-                                    array<array<uint8>>? output_buffers);
+  ComputeAsync(NamedInputs named_inputs) => (ComputeResult result,
+                                    NamedOutputs? named_outputs);
 };

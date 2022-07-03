@@ -33,6 +33,7 @@ using ml::webnn::mojom::blink::ComputeResult;
 using ml::webnn::mojom::blink::Conv2dFilterOperandLayout;
 using ml::webnn::mojom::blink::FusionType;
 using ml::webnn::mojom::blink::InputOperandLayout;
+using ml::webnn::mojom::blink::MemoryInfoPtr;
 using ml::webnn::mojom::blink::OperandType;
 using ml::webnn::mojom::blink::Pool2dType;
 using ml::webnn::mojom::blink::RoundingType;
@@ -432,14 +433,14 @@ ScriptPromise WebnnGraph::ComputeAsyncImpl(ScriptState* script_state,
   named_inputs->memory =
       input_buffer_->Clone(mojo::SharedBufferHandle::AccessMode::READ_ONLY);
 
-  Vector<String> output_names;
-  for (const auto& output : outputs) {
-    output_names.push_back(output.first);
-  }
+  // Vector<String> output_names;
+  // for (const auto& output : outputs) {
+  //   output_names.push_back(output.first);
+  // }
   ScriptPromiseResolver* resolver =
       MakeGarbageCollected<ScriptPromiseResolver>(script_state);
   remote_graph_->ComputeAsync(
-      std::move(named_inputs), std::move(output_names),
+      std::move(named_inputs),
       WTF::Bind(&WebnnGraph::OnGraphComputed, WrapPersistent(this),
                 WrapPersistent(resolver)));
   named_array_outputs_ = std::move(outputs);
@@ -476,18 +477,16 @@ void WebnnGraph::OnGraphCreated(
   return;
 }
 
-void WebnnGraph::OnGraphComputed(
-    ScriptPromiseResolver* resolver,
-    ComputeResult result,
-    const absl::optional<Vector<Vector<uint8_t>>>& output_buffers) {
-  if (result != ComputeResult::kOk || !output_buffers.has_value()) {
+void WebnnGraph::OnGraphComputed(ScriptPromiseResolver* resolver,
+                                 ComputeResult result,
+                                 NamedOutputsPtr named_outputs) {
+  if (result != ComputeResult::kOk) {
     resolver->Reject(MakeGarbageCollected<DOMException>(
         DOMExceptionCode::kOperationError,
         "Failed to obtain the computation result."));
     return;
   }
-  wtf_size_t i = 0;
-  for (const auto& [_, output] : named_array_outputs_) {
+  for (const auto& [name, output] : named_array_outputs_) {
     void* output_buffer_address = nullptr;
     if (output->IsArrayBufferViewAllowShared()) {
       DOMArrayBufferView* array_buffer_view =
@@ -498,8 +497,19 @@ void WebnnGraph::OnGraphComputed(
       output_buffer_address = array_buffer->DataMaybeShared();
     }
     DCHECK(output_buffer_address);
-    const Vector<uint8_t>& output_buffer = output_buffers.value().at(i++);
-    memcpy(output_buffer_address, output_buffer.data(), output_buffer.size());
+    auto iter = named_outputs->outputs.find(name);
+    if (iter == named_outputs->outputs.end()) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kOperationError,
+          "Failed to get result for the output."));
+      return;
+    }
+    MemoryInfoPtr memory_info = std::move(iter->value);
+    mojo::ScopedSharedBufferHandle buffer_handle =
+        std::move(named_outputs->memory);
+    mojo::ScopedSharedBufferMapping mapping = buffer_handle->MapAtOffset(
+        memory_info->byte_length, memory_info->byte_offset);
+    memcpy(output_buffer_address, mapping.get(), memory_info->byte_length);
   }
   resolver->Resolve();
   return;

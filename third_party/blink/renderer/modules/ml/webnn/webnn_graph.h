@@ -19,6 +19,7 @@ class ExecutionContext;
 class ScriptPromiseResolver;
 
 using ml::webnn::mojom::blink::FusionOperatorPtr;
+using ml::webnn::mojom::blink::NamedOutputsPtr;
 using ml::webnn::mojom::blink::OperandDescriptorPtr;
 
 class WebnnGraph : public MLGraph {
@@ -61,10 +62,9 @@ class WebnnGraph : public MLGraph {
                       mojo::PendingRemote<ml::webnn::mojom::blink::Graph>);
   void OnBuildFinished(ScriptPromiseResolver*,
                        ml::webnn::mojom::blink::BuildResult);
-  void OnGraphComputed(
-      ScriptPromiseResolver* resolver,
-      ml::webnn::mojom::blink::ComputeResult result,
-      const absl::optional<Vector<Vector<uint8_t>>>& output_buffers);
+  void OnGraphComputed(ScriptPromiseResolver* resolver,
+                       ml::webnn::mojom::blink::ComputeResult result,
+                       NamedOutputsPtr named_outputs);
 
   HeapMojoRemote<ml::webnn::mojom::blink::Graph> remote_graph_;
   MLNamedOperands named_outputs_;

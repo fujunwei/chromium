@@ -72,7 +72,6 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
 
   void BuildAsync(BuildAsyncCallback callback) override;
   void ComputeAsync(NamedInputsPtr named_inputs,
-                    const std::vector<std::string>& output_names,
                     ComputeAsyncCallback callback) override;
 
   std::unique_ptr<GraphDMLNativeImpl> native_graph_dml_;

@@ -45,6 +45,9 @@ using ml::webnn::mojom::OperandType;
 DmlTensorDesc::DmlTensorDesc() = default;
 DmlTensorDesc::~DmlTensorDesc() = default;
 
+MemoryInfo::MemoryInfo() = default;
+MemoryInfo::~MemoryInfo() = default;
+
 #define DAWN_INTERNAL_ERROR(MESSAGE)            \
   do {                                          \
     error_messages_ = MESSAGE;                  \
@@ -1456,9 +1459,9 @@ void GraphDMLNativeImpl::FillUploadResourceAndInputBindings(
         offset = utils::RoundUpToMultiple(
             offset, (uint64_t)DML_MINIMUM_BUFFER_TENSOR_ALIGNMENT);
         MemoryInfoPtr memory_info = std::move(namedInputs->inputs[input->name]);
-        mojo::ScopedSharedBufferHandle output_buffer =
+        mojo::ScopedSharedBufferHandle input_buffer =
             std::move(namedInputs->memory);
-        mojo::ScopedSharedBufferMapping mapping = output_buffer->MapAtOffset(
+        mojo::ScopedSharedBufferMapping mapping = input_buffer->MapAtOffset(
             memory_info->byte_length, memory_info->byte_offset);
         inputBufferBinding[i].Buffer = mInputResource.Get();
         inputBufferBinding[i].Offset = offset;
@@ -1644,7 +1647,18 @@ BuildResult GraphDMLNativeImpl::CompileImpl() {
                               ->TotalTensorSizeInBytes;
     uint64_t offset = utils::RoundUpToMultiple(
         mOutputsResourceSize, (uint64_t)DML_MINIMUM_BUFFER_TENSOR_ALIGNMENT);
+    MemoryInfo memory_info = {};
+    memory_info.byte_offset = offset;
+    memory_info.byte_length = byteLength;
+
+    outputs_info_map_[mOutputs[i].name] = memory_info;
     mOutputsResourceSize = offset + byteLength;
+  }
+  outputs_buffer_ = mojo::SharedBufferHandle::Create(mOutputsResourceSize);
+  for (auto& output : mOutputs) {
+    MemoryInfo memory_info = outputs_info_map_[output.name];
+    named_buffer_map_[output.name] = outputs_buffer_->MapAtOffset(
+        memory_info.byte_length, memory_info.byte_offset);
   }
 
   if (mOutputsResourceSize) {
@@ -1669,10 +1683,8 @@ BuildResult GraphDMLNativeImpl::CompileImpl() {
   return {};
 }
 
-ComputeResult GraphDMLNativeImpl::ComputeImpl(
-    NamedInputsPtr named_inputs,
-    const std::vector<std::string>& output_names,
-    std::vector<std::vector<uint8_t>>& output_buffers) {
+ComputeResult GraphDMLNativeImpl::ComputeImpl(NamedInputsPtr named_inputs,
+                                              NamedOutputsPtr& named_outputs) {
   // Bind and execute the operator on the GPU.
   // Reset the binding table to bind for the operator we want to execute (it
   // was previously used to bind for the initializer).
@@ -1723,7 +1735,6 @@ ComputeResult GraphDMLNativeImpl::ComputeImpl(
   // The sort of the outputs from Graph Compute is different from the
   // outputs from Graph Build, so the offset need to be found the corrent output
   // with name to read back from GPU buffer.
-  assert(mOutputs.size() == output_names.size());
   base::flat_map<std::string, DML_BUFFER_BINDING> output_buffer_binding;
   uint64_t outputOffset = 0;
   for (size_t i = 0; i < mOutputs.size(); ++i) {
@@ -1763,14 +1774,19 @@ ComputeResult GraphDMLNativeImpl::ComputeImpl(
   WEBNN_CHECK(mReadBackResource->Map(
       0, &tensorBufferRange, reinterpret_cast<void**>(&readBackBuffer)));
 
-  assert(mOutputs.size() == output_names.size());
-  for (auto& output_name : output_names) {
-    DML_BUFFER_BINDING buffer_binding = output_buffer_binding[output_name];
+  for (auto& [name, memory_info] : outputs_info_map_) {
+    auto mojo_memory_info = ml::webnn::mojom::MemoryInfo::New();
+    mojo_memory_info->byte_offset = memory_info.byte_offset;
+    mojo_memory_info->byte_length = memory_info.byte_length;
+    named_outputs->outputs[name] = std::move(mojo_memory_info);
+
+    DML_BUFFER_BINDING buffer_binding = output_buffer_binding[name];
     std::vector<uint8_t> output_buffer(buffer_binding.SizeInBytes);
-    memcpy(output_buffer.data(), readBackBuffer + buffer_binding.Offset,
-           buffer_binding.SizeInBytes);
-    output_buffers.push_back(std::move(output_buffer));
+    memcpy(named_buffer_map_[name].get(),
+           readBackBuffer + buffer_binding.Offset, buffer_binding.SizeInBytes);
   }
+  named_outputs->memory =
+      outputs_buffer_->Clone(mojo::SharedBufferHandle::AccessMode::READ_ONLY);
 
   mReadBackResource->Unmap(0, nullptr);
   return ComputeResult::kOk;

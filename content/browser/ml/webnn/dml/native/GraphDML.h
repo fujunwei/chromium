@@ -40,6 +40,7 @@ using ml::webnn::mojom::Conv2dOptionsPtr;
 using ml::webnn::mojom::FusionOperator;
 using ml::webnn::mojom::GemmOptionsPtr;
 using ml::webnn::mojom::NamedInputsPtr;
+using ml::webnn::mojom::NamedOutputsPtr;
 using ml::webnn::mojom::OperandDescriptorPtr;
 using ml::webnn::mojom::Pool2dOptions;
 using ml::webnn::mojom::Pool2dOptionsPtr;
@@ -47,6 +48,13 @@ using ml::webnn::mojom::Pool2dType;
 using ml::webnn::mojom::UnaryOperandType;
 
 class FusionOperators;
+
+struct MemoryInfo {
+  MemoryInfo();
+  ~MemoryInfo();
+  size_t byte_offset;
+  size_t byte_length;
+};
 
 // Represent the DirectML tensor description.
 struct DmlTensorDesc {
@@ -116,8 +124,7 @@ class GraphDMLNativeImpl {
   void AddFusionClamp(ClampOptionsPtr options, uint32_t operator_id);
   BuildResult CompileImpl();
   ComputeResult ComputeImpl(NamedInputsPtr named_inputs,
-                            const std::vector<std::string>& output_names,
-                            std::vector<std::vector<uint8_t>>& output_buffers);
+                            NamedOutputsPtr& named_outputs);
 
   void AddEdgesToThisNode(
       std::vector<std::shared_ptr<EdgeInfoBase>> inputNodes);
@@ -197,6 +204,10 @@ class GraphDMLNativeImpl {
   std::string error_messages_;
   BuildResult build_result_;
   std::unique_ptr<FusionOperators> fusion_operators_;
+
+  std::map<std::string, MemoryInfo> outputs_info_map_;
+  std::map<std::string, mojo::ScopedSharedBufferMapping> named_buffer_map_;
+  mojo::ScopedSharedBufferHandle outputs_buffer_;
 };
 
 }  // namespace webnn

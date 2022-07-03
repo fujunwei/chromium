@@ -109,12 +109,11 @@ void GraphDMLImpl::BuildAsync(BuildAsyncCallback callback) {
 }
 
 void GraphDMLImpl::ComputeAsync(NamedInputsPtr named_inputs,
-                                const std::vector<std::string>& output_names,
                                 ComputeAsyncCallback callback) {
-  std::vector<std::vector<uint8_t>> output_buffers;
-  ComputeResult result = native_graph_dml_->ComputeImpl(
-      std::move(named_inputs), output_names, output_buffers);
-  std::move(callback).Run(result, output_buffers);
+  auto named_outputs = ml::webnn::mojom::NamedOutputs::New();
+  ComputeResult result =
+      native_graph_dml_->ComputeImpl(std::move(named_inputs), named_outputs);
+  std::move(callback).Run(result, std::move(named_outputs));
 }
 
 }  // namespace webnn
