@@ -2494,6 +2494,11 @@
     "expiry_milestone": 130
   },
   {
+    "name": "enable-machine-learning-neural-network-api",
+    "owners": [ "honglinyu" ],
+    "expiry_milestone": 130
+  },
+  {
     "name": "enable-magnifier-continuous-mouse-following-mode-setting",
     "owners": [ "josiahk", "//ui/accessibility/OWNERS" ],
     "expiry_milestone": 98

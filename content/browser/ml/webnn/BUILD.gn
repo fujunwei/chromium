@@ -1,0 +1,44 @@
+# Copyright 2022 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/buildflag_header.gni")
+
+buildflag_header("buildflags") {
+  header = "buildflags.h"
+
+  # Consider webnn service running in browser or utility process for other
+  # platform.
+  enable_mojo_webnn_in_gpu_process = false
+
+  if (is_win) {
+    enable_mojo_webnn_in_gpu_process = true
+  }
+
+  flags =
+      [ "ENABLE_MOJO_WEBNN_IN_GPU_PROCESS=$enable_mojo_webnn_in_gpu_process" ]
+}
+
+source_set("lib") {
+  sources = [
+    "context_dml_impl.cc",
+    "context_dml_impl.h",
+    "fusion_operators.cc",
+    "fusion_operators.h",
+    "graph_dml_impl.cc",
+    "graph_dml_impl.h",
+    "mojo_server_dml_impl.cc",
+    "mojo_server_dml_impl.h",
+    "mojo_server_impl.cc",
+    "mojo_server_impl.h",
+    "webnn_service.cc",
+    "webnn_service.h",
+  ]
+
+  deps = [
+    "//base",
+    "//components/ml/mojom",
+    "//mojo/public/cpp/bindings",
+    "//ui/gfx",
+  ]
+}

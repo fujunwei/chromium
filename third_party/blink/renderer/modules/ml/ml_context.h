@@ -8,6 +8,7 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_device_preference.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_model_format.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_power_preference.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
 #include "third_party/blink/renderer/platform/heap/visitor.h"
@@ -15,8 +16,10 @@
 namespace blink {
 
 class ML;
+class ScriptState;
+class MLGraph;
 
-class MLContext final : public ScriptWrappable {
+class MLContext : public ScriptWrappable {
   DEFINE_WRAPPERTYPEINFO();
 
  public:
@@ -39,6 +42,18 @@ class MLContext final : public ScriptWrappable {
   ML* GetML();
 
   void Trace(Visitor* visitor) const override;
+
+  // ml_context.idl
+  ScriptPromise compute(ScriptState* script_state,
+                        MLGraph* graph,
+                        const MLNamedArrayInputs& inputs,
+                        const MLNamedArrayOutputs& outputs,
+                        ExceptionState& exception_state);
+
+  void computeSync(MLGraph* graph,
+                   const MLNamedArrayInputs& inputs,
+                   const MLNamedArrayOutputs& outputs,
+                   ExceptionState& exception_state);
 
  private:
   V8MLDevicePreference device_preference_;

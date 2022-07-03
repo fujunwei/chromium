@@ -9,9 +9,10 @@
 //     https://github.com/webmachinelearning/webnn/blob/main/explainer.md
 
 [
+  Exposed=Window,
   SecureContext,
-  ImplementedAs=NavigatorML,
-  RuntimeEnabled=MachineLearningModelLoader
+  ImplementedAs=ML,
+  RuntimeEnabled=MachineLearningCommon
 ] partial interface Navigator {
   [SameObject] readonly attribute ML ml;
 };

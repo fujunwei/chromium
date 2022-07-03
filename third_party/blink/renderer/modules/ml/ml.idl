@@ -9,9 +9,12 @@
 //     https://github.com/webmachinelearning/webnn/blob/main/explainer.md
 
 [
-  RuntimeEnabled=MachineLearningModelLoader,
-  Exposed=Window
+  RuntimeEnabled=MachineLearningCommon,
+  Exposed=(Window, DedicatedWorker)
 ] interface ML {
   [CallWith=ScriptState, RaisesException]
       Promise<MLContext> createContext(optional MLContextOptions options = {});
+
+  [RaisesException, Exposed=DedicatedWorker]
+      MLContext createContextSync(optional MLContextOptions options = {});
 };

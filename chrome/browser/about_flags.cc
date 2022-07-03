@@ -7281,6 +7281,13 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          features::kEnableMachineLearningModelLoaderWebPlatformApi)},
 
+    {"enable-machine-learning-neural-network-api",
+     flag_descriptions::kEnableMachineLearningNeuralNetworkApiName,
+     flag_descriptions::kEnableMachineLearningNeuralNetworkApiDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         blink::features::kEnableMachineLearningNeuralNetworkApi)},
+
     {"enable-translate-sub-frames",
      flag_descriptions::kEnableTranslateSubFramesName,
      flag_descriptions::kEnableTranslateSubFramesDescription, kOsAll,

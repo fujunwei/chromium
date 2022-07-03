@@ -33,7 +33,15 @@ enum MLModelFormat {
   "tflite"
 };
 
+enum MLContextType {
+  "webnn",
+  "model-loader"
+};
+
 dictionary MLContextOptions {
+  // Experimental context type
+  MLContextType type = "model-loader";
+
   // Preferred kind of device used.
   MLDevicePreference devicePreference = "auto";
 
