@@ -5100,17 +5100,23 @@ interface ML
     method createContext
 interface MLContext
     attribute @@toStringTag
+    method compute
+    method constructor
+interface MLGraph
+    attribute @@toStringTag
     method constructor
 interface MLGraphBuilder
     attribute @@toStringTag
     method add
     method averagePool2d
+    method build
     method clamp
     method constant
     method constructor
     method conv2d
     method gemm
     method input
+    method relu
     method reshape
     method softmax
 interface MLModelLoader

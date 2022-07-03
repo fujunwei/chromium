@@ -2,6 +2,7 @@ include_rules = [
   "+components/tracing",
   "+components/metal_util",
   "+components/viz",
+  "+content/browser/ml/webnn",
   "+content/child",
   "+content/public/gpu",
   "+libEGL",

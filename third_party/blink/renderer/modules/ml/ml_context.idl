@@ -12,9 +12,18 @@
 // In the future, this interface may be extended when WebNN is implemented so
 // a dictionary may be insufficient.
 
+// TODO: align MLArrayInput and MLTensor
+typedef record<DOMString, ([AllowShared] ArrayBufferView or MLTensor)> MLNamedArrayInputs;
+typedef record<DOMString, ([AllowShared] ArrayBufferView or [AllowShared] ArrayBuffer)> MLNamedArrayOutputs;
+
 [
-  RuntimeEnabled=MachineLearningModelLoader,
+  RuntimeEnabled=MachineLearningCommon,
   SecureContext,
-  Exposed=Window
+  Exposed=(Window, DedicatedWorker)
 ] interface MLContext {
+  [RuntimeEnabled=MachineLearningNeuralNetwork, CallWith=ScriptState, RaisesException]
+      Promise<void> compute(MLGraph graph, MLNamedArrayInputs inputs, MLNamedArrayOutputs outputs);
+
+  [RuntimeEnabled=MachineLearningNeuralNetwork, RaisesException, Exposed=DedicatedWorker]
+      void computeSync(MLGraph graph, MLNamedArrayInputs inputs, MLNamedArrayOutputs outputs);
 };

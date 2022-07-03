@@ -200,6 +200,9 @@ BLINK_COMMON_EXPORT extern const base::Feature kFileHandlingIcons;
 BLINK_COMMON_EXPORT extern const base::Feature kAllowSyncXHRInPageDismissal;
 BLINK_COMMON_EXPORT extern const base::Feature kPrefetchPrivacyChanges;
 
+BLINK_COMMON_EXPORT extern const base::Feature
+    kEnableMachineLearningNeuralNetworkApi;
+
 BLINK_COMMON_EXPORT extern const base::Feature kDecodeJpeg420ImagesToYUV;
 BLINK_COMMON_EXPORT extern const base::Feature kDecodeLossyWebPImagesToYUV;
 

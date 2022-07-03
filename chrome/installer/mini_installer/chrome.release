@@ -28,6 +28,7 @@ d3dcompiler_47.dll: %(VersionDir)s\
 eventlog_provider.dll: %(VersionDir)s\
 icudtl.dat: %(VersionDir)s\
 libEGL.dll: %(VersionDir)s\
+DirectML.dll: %(VersionDir)s\
 libGLESv2.dll: %(VersionDir)s\
 mojo_core.dll: %(VersionDir)s\
 nacl64.exe: %(VersionDir)s\

@@ -1798,6 +1798,11 @@ const char kEnableMachineLearningModelLoaderWebPlatformApiName[] =
 const char kEnableMachineLearningModelLoaderWebPlatformApiDescription[] =
     "Enables the Machine Learning Model Loader Web Platform API.";
 
+const char kEnableMachineLearningNeuralNetworkApiName[] =
+    "Enables Machine Learning Neural Network Web Platform API";
+const char kEnableMachineLearningNeuralNetworkApiDescription[] =
+    "Enables the Machine Learning Neural Network Web Platform API.";
+
 const char kSystemProxyForSystemServicesName[] =
     "Enable system-proxy for selected system services";
 const char kSystemProxyForSystemServicesDescription[] =

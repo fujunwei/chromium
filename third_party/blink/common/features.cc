@@ -485,6 +485,9 @@ const base::Feature kFileHandlingIcons{"FileHandlingIcons",
 const base::Feature kAllowSyncXHRInPageDismissal{
     "AllowSyncXHRInPageDismissal", base::FEATURE_DISABLED_BY_DEFAULT};
 
+const base::Feature kEnableMachineLearningNeuralNetworkApi{
+    "EnableMachineLearningNeuralNetworkApi", base::FEATURE_DISABLED_BY_DEFAULT};
+
 // Font enumeration and data access. https://crbug.com/535764
 const base::Feature kFontAccess {
   "FontAccess",

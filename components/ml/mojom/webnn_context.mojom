@@ -1,0 +1,18 @@
+// Copyright 2022 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+module ml.webnn.mojom;
+
+import "components/ml/mojom/webnn_graph.mojom";
+
+// Represents the `MLContext` object in the WebIDL definition that is a global
+// state of neural network compute workload and execution processes.
+[Stable]
+interface Context {
+  // Create a graph to compile and compute with system framework. The `graph_id`
+  // is generated in blink when building a `MLGraph` from `MLGraphBuild`, it's
+  // to identify the Graph in server side which will be used for interoperating
+  // with WebGPU.
+  CreateGraph@0(uint32 graph_id) => (pending_remote<Graph>? remote);
+};

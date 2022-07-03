@@ -1,0 +1,87 @@
+# Copyright 2022 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/buildflag_header.gni")
+
+buildflag_header("buildflags") {
+  header = "buildflags.h"
+
+  # Consider webnn service running in browser or utility process for other
+  # platform.
+  enable_mojo_webnn_in_gpu_process = false
+
+  if (is_win) {
+    enable_mojo_webnn_in_gpu_process = true
+  }
+
+  flags =
+      [ "ENABLE_MOJO_WEBNN_IN_GPU_PROCESS=$enable_mojo_webnn_in_gpu_process" ]
+}
+
+source_set("lib") {
+  sources = [
+    "dml/adapter_dml.cc",
+    "dml/adapter_dml.h",
+    "dml/command_recorder.cc",
+    "dml/command_recorder.h",
+    "dml/context_dml_impl.cc",
+    "dml/context_dml_impl.h",
+    "dml/execution_context.cc",
+    "dml/execution_context.h",
+    "dml/execution_resources.cc",
+    "dml/execution_resources.h",
+    "dml/graph_dml_impl.cc",
+    "dml/graph_dml_impl.h",
+    "dml/graph_desc_builder.cc",
+    "dml/graph_desc_builder.h",
+    "dml/graph_node_output.cc",
+    "dml/graph_node_output.h",
+    "dml/mojo_server_dml_impl.cc",
+    "dml/mojo_server_dml_impl.h",
+    "dml/readback_heap.cc",
+    "dml/readback_heap.h",
+    "dml/upload_heap.cc",
+    "dml/upload_heap.h",
+    "dml/utils_dml.h",
+    "dml/webnn_service_dml_impl.cc",
+    "dml/webnn_service_dml_impl.h",
+    "fusion_operators.cc",
+    "fusion_operators.h",
+    "mojo_server_impl.cc",
+    "mojo_server_impl.h",
+    "webnn_service_factory.cc",
+    "webnn_service_factory.h",
+  ]
+
+  deps = [
+    "//base",
+    "//components/ml/mojom",
+    "//mojo/public/cpp/bindings",
+    "//ui/gfx",
+  ]
+
+  if (is_win) {
+    include_dirs = [ "//third_party/microsoft.ai.directml.1.8.2/include" ]
+
+    lib_dirs = [ "//third_party/microsoft.ai.directml.1.8.2/bin/x64-win" ]
+
+    libs = [
+      "dxgi.lib",
+      "d3d12.lib",
+      "directml.lib",
+    ]
+
+    data_deps = [ ":copy_dml_dll" ]
+  }
+}
+
+if (is_win) {
+  dml_dll = "DirectML.dll"
+  os_folder = "x64-win"
+  dml_dll_path = "//third_party/microsoft.ai.directml.1.8.2/bin/${os_folder}"
+  copy("copy_dml_dll") {
+    sources = [ "${dml_dll_path}/${dml_dll}" ]
+    outputs = [ "$root_out_dir/{{source_file_part}}" ]
+  }
+}
