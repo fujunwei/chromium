@@ -27,7 +27,7 @@ interface MojoServer {
 };
 
 // Represents the WebNN service, there is only one instance in the GPU process
-// to commuicate with renderer process.
+// to communicate with renderer process.
 [ServiceSandbox=kWebnnSandbox]
 interface WebnnService {
   // The `MojoServer` is one-to-one mapping with `navigator.ml`, and there is

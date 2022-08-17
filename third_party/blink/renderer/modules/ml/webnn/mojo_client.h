@@ -22,7 +22,7 @@ using ObjectId = uint32_t;
 using ml::webnn::mojom::blink::ContextOptionsPtr;
 using ml::webnn::mojom::blink::MojoServer;
 
-// The class is used to manager all objects id and create context in server side
+// The class is used to manage all objects id and create context in server side
 // with `MojoServer`.
 // `MojoServer` is a one-to-one mapping with `MojoClient`.
 class MojoClient final : public RefCounted<MojoClient> {
