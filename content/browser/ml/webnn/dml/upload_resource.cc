@@ -74,7 +74,7 @@ HRESULT UploadResource::UploadConstants(ID3D12Resource* dst_resource,
   DCHECK(upload_resource_ != nullptr);
 
   return UploadResourceToGpu<base::flat_map<UINT64, MemoryInfoPtr>>(
-      execution_context_, dst_resource, upload_resource_.Get(),
+      execution_context_, dst_resource, upload_resource_->GetResource(),
       shared_memory_region, constants_info->constants);
 }
 
@@ -94,7 +94,7 @@ HRESULT UploadResource::UploadInputs(ID3D12Resource* dst_resource,
   DCHECK(upload_resource_ != nullptr);
 
   return UploadResourceToGpu<base::flat_map<std::string, MemoryInfoPtr>>(
-      execution_context_, dst_resource, upload_resource_.Get(),
+      execution_context_, dst_resource, upload_resource_->GetResource(),
       shared_memory_region, named_inputs->inputs);
 }
 
@@ -122,10 +122,13 @@ HRESULT UploadResource::CreateUploadResource(size_t byte_length) {
   resource_desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
   resource_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-  HRESULT hr = execution_context_->GetD3D12Device()->CreateCommittedResource(
-      &heap_properties, D3D12_HEAP_FLAG_NONE, &resource_desc,
-      D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-      IID_PPV_ARGS(&upload_resource_));
+  gpgmm::d3d12::ALLOCATION_DESC allocation_descriptor = {};
+  allocation_descriptor.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+
+  HRESULT hr = execution_context_->GetResourceAllocator()->CreateResource(
+      allocation_descriptor, resource_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+      nullptr, &upload_resource_);
+
   if (FAILED(hr)) {
     return hr;
   }
