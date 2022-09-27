@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "content/browser/ml/webnn/dml/readback_heap.h"
+#include "content/browser/ml/webnn/dml/readback_resource.h"
 
 #include <memory>
 
@@ -10,12 +10,12 @@
 
 namespace content::webnn {
 
-ReadbackHeap::ReadbackHeap(ExecutionContext* execution_context)
+ReadbackResource::ReadbackResource(ExecutionContext* execution_context)
     : execution_context_(execution_context), readback_resource_(nullptr) {}
 
-ReadbackHeap::~ReadbackHeap() = default;
+ReadbackResource::~ReadbackResource() = default;
 
-HRESULT ReadbackHeap::InitializeResource(
+HRESULT ReadbackResource::InitializeResource(
     std::map<std::string, size_t>& named_outputs) {
   uint64_t aligned_offset = 0;
   for (auto& [name, byte_length] : named_outputs) {
@@ -39,10 +39,8 @@ HRESULT ReadbackHeap::InitializeResource(
 }
 
 // Readback inference result from GPU that is stored in named_outputs.
-HRESULT ReadbackHeap::ReadbackResource(NamedOutputsPtr& named_outputs,
-                                       ID3D12Resource* src_resource) {
-  // TODO:: Don't need add barrier to reset source resource from COPY_SOURCE
-  // to UNORDERED_ACCESS?
+HRESULT ReadbackResource::ReadResourceFromGpu(NamedOutputsPtr& named_outputs,
+                                              ID3D12Resource* src_resource) {
   // Copy buffer from GPU resource to CPU data.
   execution_context_->CopyBufferRegion(readback_resource_.Get(), src_resource,
                                        outputs_resource_size_,
@@ -74,14 +72,14 @@ HRESULT ReadbackHeap::ReadbackResource(NamedOutputsPtr& named_outputs,
   return S_OK;
 }
 
-size_t ReadbackHeap::GetOutputsResourceSize() const {
+size_t ReadbackResource::GetOutputsResourceSize() const {
   return outputs_resource_size_;
 }
 
-ReadbackHeap::MemoryInfo::MemoryInfo() = default;
-ReadbackHeap::MemoryInfo::~MemoryInfo() = default;
+ReadbackResource::MemoryInfo::MemoryInfo() = default;
+ReadbackResource::MemoryInfo::~MemoryInfo() = default;
 
-HRESULT ReadbackHeap::CreateReadbackResource(size_t byte_length) {
+HRESULT ReadbackResource::CreateReadbackResource(size_t byte_length) {
   D3D12_HEAP_PROPERTIES heap_properties;
   // TODO::Support Unified Memory Architecture (UMA) that don't need to copy
   // anything there because GPU heaps are always mappable by CPU on unified,

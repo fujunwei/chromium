@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "content/browser/ml/webnn/dml/upload_heap.h"
+#include "content/browser/ml/webnn/dml/upload_resource.h"
 
 #include <memory>
 
@@ -15,15 +15,16 @@ namespace {
 using ml::webnn::mojom::MemoryInfoPtr;
 
 template <typename T>
-HRESULT UploadResource(ExecutionContext* execution_context,
-                       ID3D12Resource* dst_resource,
-                       ID3D12Resource* src_resource,
-                       base::ReadOnlySharedMemoryRegion& shared_memory_region,
-                       T& named_inputs) {
+HRESULT UploadResourceToGpu(
+    ExecutionContext* execution_context,
+    ID3D12Resource* dst_resource,
+    ID3D12Resource* src_resource,
+    base::ReadOnlySharedMemoryRegion& shared_memory_region,
+    T& named_inputs) {
   // Map the upload heap and copy the source data into it. A null pointer
   // indicates the entire subresource might be read by the CPU.
-  void* upload_heap_data = nullptr;
-  HRESULT hr = src_resource->Map(0, nullptr, &upload_heap_data);
+  void* upload_data = nullptr;
+  HRESULT hr = src_resource->Map(0, nullptr, &upload_data);
   if (FAILED(hr)) {
     return hr;
   }
@@ -35,7 +36,7 @@ HRESULT UploadResource(ExecutionContext* execution_context,
     DCHECK(shared_memory_region.IsValid());
     base::ReadOnlySharedMemoryMapping shared_memory_mapping =
         shared_memory_region.MapAt(memory_info->byte_offset, byte_length);
-    memcpy(static_cast<byte*>(upload_heap_data) + memory_info->byte_offset,
+    memcpy(static_cast<byte*>(upload_data) + memory_info->byte_offset,
            shared_memory_mapping.GetMemoryAs<uint8_t>(), byte_length);
   }
   src_resource->Unmap(0, nullptr);
@@ -50,15 +51,15 @@ HRESULT UploadResource(ExecutionContext* execution_context,
 
 }  // namespace
 
-UploadHeap::UploadHeap(ExecutionContext* execution_context)
+UploadResource::UploadResource(ExecutionContext* execution_context)
     : execution_context_(execution_context), upload_resource_(nullptr) {}
 
-UploadHeap::~UploadHeap() = default;
+UploadResource::~UploadResource() = default;
 
 // The destination state represent the the state of destination resource that
 // need to transition.
-HRESULT UploadHeap::UploadConstants(ID3D12Resource* dst_resource,
-                                    ConstantsInfoPtr& constants_info) {
+HRESULT UploadResource::UploadConstants(ID3D12Resource* dst_resource,
+                                        ConstantsInfoPtr& constants_info) {
   base::ReadOnlySharedMemoryRegion& shared_memory_region =
       constants_info->shared_memory;
   size_t constants_byte_length = shared_memory_region.GetSize();
@@ -72,13 +73,13 @@ HRESULT UploadHeap::UploadConstants(ID3D12Resource* dst_resource,
   }
   DCHECK(upload_resource_ != nullptr);
 
-  return UploadResource<base::flat_map<uint32_t, MemoryInfoPtr>>(
+  return UploadResourceToGpu<base::flat_map<uint32_t, MemoryInfoPtr>>(
       execution_context_, dst_resource, upload_resource_.Get(),
       shared_memory_region, constants_info->constants);
 }
 
-HRESULT UploadHeap::UploadInputs(ID3D12Resource* dst_resource,
-                                 NamedInputsPtr& named_inputs) {
+HRESULT UploadResource::UploadInputs(ID3D12Resource* dst_resource,
+                                     NamedInputsPtr& named_inputs) {
   base::ReadOnlySharedMemoryRegion& shared_memory_region =
       named_inputs->shared_memory;
   size_t inputs_byte_length = shared_memory_region.GetSize();
@@ -92,19 +93,17 @@ HRESULT UploadHeap::UploadInputs(ID3D12Resource* dst_resource,
   }
   DCHECK(upload_resource_ != nullptr);
 
-  return UploadResource<base::flat_map<std::string, MemoryInfoPtr>>(
+  return UploadResourceToGpu<base::flat_map<std::string, MemoryInfoPtr>>(
       execution_context_, dst_resource, upload_resource_.Get(),
       shared_memory_region, named_inputs->inputs);
 }
 
 // Create entire memory for uploading resource that will be uploaded piece by
 // piece in GMM resource management.
-HRESULT UploadHeap::CreateUploadResource(size_t byte_length) {
+HRESULT UploadResource::CreateUploadResource(size_t byte_length) {
   D3D12_HEAP_PROPERTIES heap_properties;
   // TODO::Support Unified Memory Architecture (UMA) that don't need to copy
-  // anything there because GPU heaps are always mappable by CPU on unified,
-  // D3D12_HEAP_TYPE_CUSTOM specify the memory pool and CPU cache properties
-  // directly, which can be useful for UMA optimizations.
+  // anything there because GPU heaps are always mappable by CPU on unified.
   heap_properties.Type = D3D12_HEAP_TYPE_UPLOAD;
   heap_properties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
   heap_properties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;

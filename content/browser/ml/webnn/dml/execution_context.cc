@@ -5,7 +5,7 @@
 #include "content/browser/ml/webnn/dml/execution_context.h"
 
 #include "content/browser/ml/webnn/dml/adapter_dml.h"
-#include "content/browser/ml/webnn/dml/upload_heap.h"
+#include "content/browser/ml/webnn/dml/upload_resource.h"
 
 namespace content::webnn {
 
@@ -16,7 +16,7 @@ ExecutionContext::ExecutionContext(scoped_refptr<AdapterDML> adapter)
 
 ExecutionContext::~ExecutionContext() = default;
 
-// Queues a CopyBufferRegion for execution. Transition barriers are
+// Record a CopyBufferRegion for execution. Transition barriers are
 // automatically inserted to transition the source and destination resources to
 // COPY_SOURCE and COPY_DEST if necessary.
 void ExecutionContext::CopyBufferRegion(ID3D12Resource* dest_resource,

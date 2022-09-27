@@ -9,7 +9,7 @@
 #include "content/browser/ml/webnn/dml/execution_context.h"
 #include "content/browser/ml/webnn/dml/execution_resources.h"
 #include "content/browser/ml/webnn/dml/graph_dml_impl.h"
-#include "content/browser/ml/webnn/dml/upload_heap.h"
+#include "content/browser/ml/webnn/dml/upload_resource.h"
 #include "content/browser/ml/webnn/fusion_operators.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "utils_dml.h"
@@ -310,9 +310,9 @@ GraphDMLImpl::GraphDMLImpl(scoped_refptr<ExecutionContext> execution_context,
     : graph_id_(graph_id),
       execution_context_(execution_context),
       input_resource_uploader_(
-          std::make_unique<UploadHeap>(execution_context_.get())),
+          std::make_unique<UploadResource>(execution_context_.get())),
       output_resource_readback_(
-          std::make_unique<ReadbackHeap>(execution_context_.get())),
+          std::make_unique<ReadbackResource>(execution_context_.get())),
       graph_desc_builder_(std::make_unique<GraphDescBuilder>(
           execution_context->GetDMLDevice())),
       fusion_operators_(std::make_unique<FusionOperators>()) {}
@@ -321,8 +321,7 @@ void GraphDMLImpl::AddInput(const std::string& name,
                             OperandDescriptorPtr desc) {
   // TODO: return directly if BuildResult has error message.
   Node input_node = graph_desc_builder_->CreateInputNode(std::move(name));
-  TensorDesc tensor_desc(GetTensorDataType(desc->data_type),
-                         desc->dimensions);
+  TensorDesc tensor_desc(GetTensorDataType(desc->data_type), desc->dimensions);
   auto node_output = graph_desc_builder_->CreateNodeOutput(
       input_node, 0, std::move(tensor_desc));
   node_output_map_[desc->object_id] = std::move(node_output);
@@ -337,8 +336,7 @@ void GraphDMLImpl::AddConstant(OperandDescriptorPtr desc) {
   }
   Node constant_node = graph_desc_builder_->CreateConstantNode(desc->object_id);
   TensorDesc tensor_desc(GetTensorDataType(desc->data_type),
-                         DML_TENSOR_FLAG_OWNED_BY_DML,
-                         desc->dimensions);
+                         DML_TENSOR_FLAG_OWNED_BY_DML, desc->dimensions);
   auto node_output = graph_desc_builder_->CreateNodeOutput(
       constant_node, 0, std::move(tensor_desc));
   node_output_map_[desc->object_id] = std::move(node_output);
@@ -890,8 +888,8 @@ void GraphDMLImpl::Build(
 
   // Upload the data to GPU so that the constant data are not saved as member
   // variable.
-  std::unique_ptr<UploadHeap> uploader =
-      std::make_unique<UploadHeap>(execution_context_.get());
+  std::unique_ptr<UploadResource> uploader =
+      std::make_unique<UploadResource>(execution_context_.get());
   ComPtr<ID3D12Resource> constants_resource = nullptr;
   if (constants_info.get() != nullptr) {
     base::ReadOnlySharedMemoryRegion& shared_memory_region =
@@ -1000,8 +998,8 @@ void GraphDMLImpl::Compute(NamedInputsPtr named_inputs,
                                    input_binding_desc, output_binding_desc);
 
   auto named_outputs = ml::webnn::mojom::NamedOutputs::New();
-  HRESULT hr = output_resource_readback_->ReadbackResource(named_outputs,
-                                                           outputs_resource);
+  HRESULT hr = output_resource_readback_->ReadResourceFromGpu(named_outputs,
+                                                              outputs_resource);
   if (FAILED(hr)) {
     std::move(callback).Run(ComputeResult::kUnknownError, nullptr);
     return;

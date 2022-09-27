@@ -48,7 +48,7 @@ enum PowerPreference {
   [Default] kDefault = 0,
   // Prioritizes execution speed over power consumption.
   kHighPerformance = 1,
-  // Prioritizes power consumption over other considerations such as execution speed.
+  // Prioritizes power consumption over execution speed.
   kLowPower = 2,
 };
 

@@ -20,8 +20,8 @@
 #include "components/ml/mojom/webnn_graph.mojom.h"
 #include "content/browser/ml/webnn/dml/graph_desc_builder.h"
 #include "content/browser/ml/webnn/dml/graph_node_output.h"
-#include "content/browser/ml/webnn/dml/readback_heap.h"
-#include "content/browser/ml/webnn/dml/upload_heap.h"
+#include "content/browser/ml/webnn/dml/readback_resource.h"
+#include "content/browser/ml/webnn/dml/upload_resource.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "utils_dml.h"
 
@@ -112,8 +112,8 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
 
   uint32_t graph_id_;
   scoped_refptr<ExecutionContext> execution_context_;
-  std::unique_ptr<UploadHeap> input_resource_uploader_;
-  std::unique_ptr<ReadbackHeap> output_resource_readback_;
+  std::unique_ptr<UploadResource> input_resource_uploader_;
+  std::unique_ptr<ReadbackResource> output_resource_readback_;
   std::unique_ptr<GraphDescBuilder> graph_desc_builder_;
 
   // IDMLCompiledOperator represents the DirectML graph's output which need to

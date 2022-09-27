@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef CONTENT_BROWSER_ML_WEBNN_DML_READBACK_HEAP_H_
-#define CONTENT_BROWSER_ML_WEBNN_DML_READBACK_HEAP_H_
+#ifndef CONTENT_BROWSER_ML_WEBNN_DML_READBACK_RESOURCE_H_
+#define CONTENT_BROWSER_ML_WEBNN_DML_READBACK_RESOURCE_H_
 
 #include <wrl.h>
 #include <vector>
@@ -19,14 +19,14 @@ using ml::webnn::mojom::NamedOutputsPtr;
 
 class ExecutionContext;
 
-class ReadbackHeap final {
+class ReadbackResource final {
  public:
-  explicit ReadbackHeap(ExecutionContext* execution_context);
-  ~ReadbackHeap();
+  explicit ReadbackResource(ExecutionContext* execution_context);
+  ~ReadbackResource();
 
   HRESULT InitializeResource(std::map<std::string, size_t>& named_outputs);
-  HRESULT ReadbackResource(NamedOutputsPtr& named_outputs,
-                           ID3D12Resource* src_resource);
+  HRESULT ReadResourceFromGpu(NamedOutputsPtr& named_outputs,
+                              ID3D12Resource* src_resource);
   size_t GetOutputsResourceSize() const;
 
  private:
@@ -50,4 +50,4 @@ class ReadbackHeap final {
 
 }  // namespace content::webnn
 
-#endif  // CONTENT_BROWSER_ML_WEBNN_DML_READBACK_HEAP_H_
+#endif  // CONTENT_BROWSER_ML_WEBNN_DML_READBACK_RESOURCE_H_

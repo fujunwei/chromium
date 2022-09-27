@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef CONTENT_BROWSER_ML_WEBNN_DML_UPLOAD_HEAP_H_
-#define CONTENT_BROWSER_ML_WEBNN_DML_UPLOAD_HEAP_H_
+#ifndef CONTENT_BROWSER_ML_WEBNN_DML_UPLOAD_RESOURCE_H_
+#define CONTENT_BROWSER_ML_WEBNN_DML_UPLOAD_RESOURCE_H_
 
 #include <wrl.h>
-#include <vector>
 
 #include "DirectML.h"
 #include "components/ml/mojom/webnn_graph.mojom.h"
@@ -19,10 +18,10 @@ using ml::webnn::mojom::NamedInputsPtr;
 class ExecutionContext;
 
 // A ring-buffer style upload heap for copying CPU data to GPU resources.
-class UploadHeap final {
+class UploadResource final {
  public:
-  explicit UploadHeap(ExecutionContext* execution_context);
-  ~UploadHeap();
+  explicit UploadResource(ExecutionContext* execution_context);
+  ~UploadResource();
 
   HRESULT UploadConstants(ID3D12Resource* dst_resource,
                           ConstantsInfoPtr& constants_info);
@@ -42,4 +41,4 @@ class UploadHeap final {
 
 }  // namespace content::webnn
 
-#endif  // CONTENT_BROWSER_ML_WEBNN_DML_UPLOAD_HEAP_H_
+#endif  // CONTENT_BROWSER_ML_WEBNN_DML_UPLOAD_RESOURCE_H_
