@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "DirectML.h"
+#include "content/browser/ml/webnn/dml/graph_dml_impl.h"
 
 namespace content::webnn {
 
@@ -36,11 +37,11 @@ class ExecutionResources final {
   // Allocate a resource that is owned by a graph and reused for execution.
   ID3D12Resource* Allocate(ResourceType type,
                            UINT64 resource_size,
-                           UINT32 graph_id);
-  ID3D12Resource* GetResource(UINT32 graph_id, ResourceType type);
+                           GraphDMLImpl* graph);
+  ID3D12Resource* GetResource(GraphDMLImpl* graph, ResourceType type);
   // Free a resource that is owned by graph such as temporary, persistent,
   // input and output unordered resouce for execution.
-  void Free(UINT32 graph_id);
+  void Free(GraphDMLImpl* graph);
 
  private:
   struct Resources {
@@ -51,7 +52,7 @@ class ExecutionResources final {
   };
 
   ExecutionContext* execution_context_;
-  std::map<uint32_t, Resources> pool_;
+  std::map<GraphDMLImpl*, Resources> pool_;
 };
 
 }  // namespace content::webnn

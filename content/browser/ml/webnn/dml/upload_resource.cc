@@ -73,7 +73,7 @@ HRESULT UploadResource::UploadConstants(ID3D12Resource* dst_resource,
   }
   DCHECK(upload_resource_ != nullptr);
 
-  return UploadResourceToGpu<base::flat_map<uint32_t, MemoryInfoPtr>>(
+  return UploadResourceToGpu<base::flat_map<UINT64, MemoryInfoPtr>>(
       execution_context_, dst_resource, upload_resource_.Get(),
       shared_memory_region, constants_info->constants);
 }

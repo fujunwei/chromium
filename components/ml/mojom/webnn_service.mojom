@@ -24,8 +24,7 @@ interface MojoServer {
   // Called by the renderer to ask the GPU process to create a `MLContext`, a
   // global state can be initialized when creating context, for example
   // GPUDevice for GPU backend.
-  CreateContext@0(ContextOptions options, uint32 context_id)
-      => (pending_remote<Context>? remote);
+  CreateContext@0(ContextOptions options) => (pending_remote<Context>? remote);
 };
 
 // Represents the WebNN service, there is only one instance in the GPU process

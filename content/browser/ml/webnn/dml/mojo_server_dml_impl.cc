@@ -34,7 +34,6 @@ MojoServerDMLImpl::MojoServerDMLImpl(WebnnServiceDMLImpl* webnn_service)
 
 void MojoServerDMLImpl::CreateContext(
     ContextOptionsPtr options,
-    uint32_t context_id,
     MojoServer::CreateContextCallback callback) {
   auto adapter = webnn_service_->RequestAdapter(options->power_preference);
   if (!adapter) {

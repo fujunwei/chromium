@@ -14,5 +14,5 @@ interface Context {
   // is generated in blink when building a `MLGraph` from `MLGraphBuild`, it's
   // to identify the Graph in server side which will be used for interoperating
   // with WebGPU.
-  CreateGraph@0(uint32 graph_id) => (pending_remote<Graph>? remote);
+  CreateGraph@0() => (pending_remote<Graph>? remote);
 };

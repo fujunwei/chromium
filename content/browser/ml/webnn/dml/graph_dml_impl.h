@@ -41,6 +41,7 @@ using ml::webnn::mojom::FusionOperator;
 using ml::webnn::mojom::GemmOptionsPtr;
 using ml::webnn::mojom::NamedInputsPtr;
 using ml::webnn::mojom::NamedOutputsPtr;
+using ml::webnn::mojom::ObjectHandlePtr;
 using ml::webnn::mojom::OperandDescriptorPtr;
 using ml::webnn::mojom::Pool2dOptions;
 using ml::webnn::mojom::Pool2dOptionsPtr;
@@ -56,46 +57,46 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
  public:
   ~GraphDMLImpl() override;
   static void Create(mojo::PendingReceiver<ml::webnn::mojom::Graph> receiver,
-                     scoped_refptr<ExecutionContext> execution_context,
-                     uint32_t graph_id);
+                     scoped_refptr<ExecutionContext> execution_context);
 
   GraphDMLImpl(const GraphDMLImpl&) = delete;
   GraphDMLImpl& operator=(const GraphDMLImpl&) = delete;
 
  protected:
-  GraphDMLImpl(scoped_refptr<ExecutionContext> execution_context,
-               uint32_t graph_id);
+  GraphDMLImpl(scoped_refptr<ExecutionContext> execution_context);
 
  private:
   // ml::webnn::mojom::Graph
   void AddInput(const std::string&, OperandDescriptorPtr) override;
   void AddConstant(OperandDescriptorPtr) override;
-  void AddElementWiseBinary(uint32_t,
-                            uint32_t,
+  void AddElementWiseBinary(ObjectHandlePtr,
+                            ObjectHandlePtr,
                             BinaryOperandType,
                             OperandDescriptorPtr) override;
-  void AddClamp(uint32_t input_id,
+  void AddClamp(ObjectHandlePtr input_handle,
                 ClampOptionsPtr options,
                 OperandDescriptorPtr desc) override;
-  void AddConv2d(uint32_t input_id,
-                 uint32_t filter_id,
+  void AddConv2d(ObjectHandlePtr input_handle,
+                 ObjectHandlePtr filter_handle,
                  Conv2dOptionsPtr options,
                  OperandDescriptorPtr desc) override;
-  void AddReshape(uint32_t input_id, OperandDescriptorPtr desc) override;
-  void AddGemm(uint32_t,
-               uint32_t,
+  void AddReshape(ObjectHandlePtr input_handle,
+                  OperandDescriptorPtr desc) override;
+  void AddGemm(ObjectHandlePtr,
+               ObjectHandlePtr,
                GemmOptionsPtr,
                OperandDescriptorPtr) override;
-  void AddPool2d(uint32_t input_id,
+  void AddPool2d(ObjectHandlePtr input_handle,
                  Pool2dOptionsPtr options,
                  Pool2dType type,
                  OperandDescriptorPtr desc) override;
-  void AddUnary(uint32_t input_id,
+  void AddUnary(ObjectHandlePtr input_handle,
                 UnaryOperandType type,
                 OperandDescriptorPtr desc) override;
-  void AddFusionClamp(ClampOptionsPtr options, uint32_t operator_id) override;
+  void AddFusionClamp(ClampOptionsPtr options,
+                      ObjectHandlePtr operator_handle) override;
 
-  void Build(const base::flat_map<std::string, uint32_t>& named_operands,
+  void Build(const base::flat_map<std::string, uint64_t>& named_operands,
              ConstantsInfoPtr constants_info,
              BuildCallback callback) override;
   void Compute(NamedInputsPtr named_inputs, ComputeCallback callback) override;
@@ -108,9 +109,8 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
   void TransposeOutputToNhwc(std::unique_ptr<NodeOutput>& input_node,
                              const std::vector<UINT>& nchwOutputDims);
 
-  void AddOutput(const std::string&, uint32_t);
+  void AddOutput(const std::string&, UINT64);
 
-  uint32_t graph_id_;
   scoped_refptr<ExecutionContext> execution_context_;
   std::unique_ptr<UploadResource> input_resource_uploader_;
   std::unique_ptr<ReadbackResource> output_resource_readback_;
@@ -120,7 +120,7 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
   // be initialized by IDMLOperatorInitializer.
   ComPtr<IDMLCompiledOperator> mCompiledOperator;
 
-  std::map<uint32_t, std::unique_ptr<NodeOutput>> node_output_map_;
+  std::map<UINT64, std::unique_ptr<NodeOutput>> node_output_map_;
 
   std::string error_messages_;
   BuildResult build_result_;

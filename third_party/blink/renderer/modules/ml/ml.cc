@@ -80,9 +80,8 @@ ScriptPromise ML::createContext(ScriptState* script_state,
           "Machine Learning Neural Network feature is not supported."));
       return promise;
     }
-    ml_context = MakeGarbageCollected<MojoContext>(WrapPersistent(script_state),
-                                                   WrapPersistent(resolver),
-                                                   GetMojoClient(), this);
+    ml_context = MakeGarbageCollected<MojoContext>(
+        WrapPersistent(script_state), WrapPersistent(resolver), this);
   } else {
     // Create MLContext for Model Loader.
     ml_context = MakeGarbageCollected<MLContext>(

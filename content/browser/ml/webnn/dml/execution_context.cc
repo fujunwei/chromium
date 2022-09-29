@@ -68,26 +68,26 @@ HRESULT ExecutionContext::Initialize() {
     return hr;
   }
 
-  unordered_resources_ = std::make_unique<ExecutionResources>(this);
-  command_recorder_.SetExecutionResources(unordered_resources_.get());
+  execution_resources_ = std::make_unique<ExecutionResources>(this);
+  command_recorder_.SetExecutionResources(execution_resources_.get());
 
   return S_OK;
 }
 
 HRESULT ExecutionContext::InitializeGraph(
-    uint32_t graph_id,
+    GraphDMLImpl* graph,
     IDMLCompiledOperator* compiled_operator,
     const DML_BINDING_DESC& input_array_binding) {
-  return command_recorder_.InitializeGraph(graph_id, compiled_operator,
+  return command_recorder_.InitializeGraph(graph, compiled_operator,
                                            input_array_binding);
 }
 
 HRESULT ExecutionContext::ExecuteGraph(
-    uint32_t graph_id,
+    GraphDMLImpl* graph,
     IDMLCompiledOperator* compiled_operator,
     const std::vector<DML_BINDING_DESC>& input_bindings,
     const std::vector<DML_BINDING_DESC>& output_bindings) {
-  return command_recorder_.ExecuteGraph(graph_id, compiled_operator,
+  return command_recorder_.ExecuteGraph(graph, compiled_operator,
                                         input_bindings, output_bindings);
 }
 
@@ -104,7 +104,7 @@ ComPtr<ID3D12CommandQueue> ExecutionContext::GetCommandQueue() const {
 }
 
 ExecutionResources* ExecutionContext::GetExecutionResources() {
-  return unordered_resources_.get();
+  return execution_resources_.get();
 }
 
 ComPtr<ID3D12CommandAllocator> ExecutionContext::GetCommandAllocator() {

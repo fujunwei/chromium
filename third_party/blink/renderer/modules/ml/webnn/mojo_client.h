@@ -18,7 +18,6 @@ namespace blink {
 
 class ScriptPromiseResolver;
 
-using ObjectId = uint32_t;
 using ml::webnn::mojom::blink::ContextOptionsPtr;
 using ml::webnn::mojom::blink::MojoServer;
 
@@ -35,7 +34,6 @@ class MojoClient final : public RefCounted<MojoClient> {
   MojoClient& operator=(const MojoClient&) = delete;
 
   void CreateMojoContext(ScriptPromiseResolver*,
-                         ObjectId,
                          ContextOptionsPtr,
                          MojoServer::CreateContextCallback);
 

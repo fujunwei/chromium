@@ -6,14 +6,20 @@
 
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_tensor.h"
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operator.h"
 
 namespace blink {
 
-MLGraph::MLGraph(MLContext* context) : MLObject(context) {}
+MLGraph::MLGraph(MLContext* context) : context_(context) {}
 
 MLGraph::~MLGraph() = default;
+
+void MLGraph::Trace(Visitor* visitor) const {
+  visitor->Trace(context_);
+  ScriptWrappable::Trace(visitor);
+}
 
 MLGraph::BuildRequest::BuildRequest(MLNamedOperands named_outputs)
     : outputs_(std::move(named_outputs)) {

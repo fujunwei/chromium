@@ -5,18 +5,24 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_ML_WEBNN_ML_GRAPH_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_ML_WEBNN_ML_GRAPH_H_
 
+#include "third_party/blink/renderer/bindings/core/v8/script_promise.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_union_arraybufferallowshared_arraybufferviewallowshared.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_union_arraybufferviewallowshared_mltensor.h"
 #include "third_party/blink/renderer/core/typed_arrays/array_buffer_view_helpers.h"
 #include "third_party/blink/renderer/core/typed_arrays/dom_array_buffer_view.h"
-#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_object.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_vector.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
 #include "third_party/blink/renderer/platform/heap/visitor.h"
+#include "third_party/blink/renderer/platform/wtf/text/string_hash.h"
+#include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
 
 namespace blink {
+
+class MLContext;
+class MLOperator;
+class MLOperand;
 
 typedef std::pair<String, Member<V8UnionArrayBufferViewAllowSharedOrMLTensor>>
     MLNamedInput;
@@ -26,12 +32,9 @@ typedef std::pair<
     Member<V8UnionArrayBufferAllowSharedOrArrayBufferViewAllowShared>>
     MLNamedOutput;
 typedef HeapVector<MLNamedOutput> MLNamedArrayOutputs;
+typedef HeapVector<std::pair<String, Member<MLOperand>>> MLNamedOperands;
 
-class MLContext;
-class MLOperator;
-class MLOperand;
-
-class MLGraph : public MLObject {
+class MLGraph : public ScriptWrappable {
   DEFINE_WRAPPERTYPEINFO();
 
  public:
@@ -41,6 +44,8 @@ class MLGraph : public MLObject {
   MLGraph& operator=(const MLGraph&) = delete;
 
   ~MLGraph() override;
+
+  void Trace(Visitor* visitor) const override;
 
   virtual ScriptPromise BuildImpl(ScriptState* script_state,
                                   MLNamedOperands named_outputs,
@@ -82,6 +87,7 @@ class MLGraph : public MLObject {
   void* ValidateOutputBuffer(const MLNamedOutput& named_output,
                              String& error_message);
 
+  Member<MLContext> context_;
   // The map of input name and input data length.
   HashMap<String, size_t> inputs_byte_length_;
   // The map of output name and output data length.

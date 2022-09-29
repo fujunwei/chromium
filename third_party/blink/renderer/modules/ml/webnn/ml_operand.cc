@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
 
+#include "components/ml/mojom/webnn_graph.mojom-blink.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operator.h"
 

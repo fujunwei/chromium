@@ -25,13 +25,12 @@ HRESULT ContextDMLImpl::Initialize() {
   return hr;
 }
 
-void ContextDMLImpl::CreateGraph(uint32_t graph_id,
-                                 CreateGraphCallback callback) {
+void ContextDMLImpl::CreateGraph(CreateGraphCallback callback) {
   // The remote sent to the renderer.
   mojo::PendingRemote<ml::webnn::mojom::Graph> blink_remote;
   // The receiver bind to GraphDMLImpl.
   GraphDMLImpl::Create(blink_remote.InitWithNewPipeAndPassReceiver(),
-                       execution_context_, graph_id);
+                       execution_context_);
   std::move(callback).Run(std::move(blink_remote));
 }
 

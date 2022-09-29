@@ -17,28 +17,22 @@ namespace blink {
 class ML;
 class ScriptState;
 class ScriptPromiseResolver;
-class MojoClient;
 
 using ml::webnn::mojom::blink::Context;
 
 // The class represents the remote of WebNN context which is bound to the
 // context of server side. The `MLContext` is a global state of neural network
 // compute workload and execution processes.
-class MojoContext : public MLContext, public ObjectHandle {
+class MojoContext : public MLContext {
  public:
-  MojoContext(ScriptState*,
-              ScriptPromiseResolver*,
-              scoped_refptr<MojoClient>,
-              ML*);
+  MojoContext(ScriptState*, ScriptPromiseResolver*, ML*);
 
   MojoContext(const MojoContext&) = delete;
   MojoContext& operator=(const MojoContext&) = delete;
 
   ~MojoContext() override;
 
-  void CreateGraph(ScriptPromiseResolver*,
-                   ObjectId,
-                   Context::CreateGraphCallback);
+  void CreateGraph(ScriptPromiseResolver*, Context::CreateGraphCallback);
 
   void Trace(Visitor* visitor) const override;
 

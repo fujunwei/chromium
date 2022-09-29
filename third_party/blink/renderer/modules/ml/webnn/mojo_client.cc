@@ -24,7 +24,6 @@ MojoClient::MojoClient(ExecutionContext* execution_context)
 }
 
 void MojoClient::CreateMojoContext(ScriptPromiseResolver* resolver,
-                                   ObjectId context_id,
                                    ContextOptionsPtr options,
                                    MojoServer::CreateContextCallback callback) {
   if (!mojo_server_.is_bound()) {
@@ -32,8 +31,7 @@ void MojoClient::CreateMojoContext(ScriptPromiseResolver* resolver,
         DOMExceptionCode::kNotSupportedError, "WebNN server unavailable."));
     return;
   }
-  mojo_server_->CreateContext(std::move(options), context_id,
-                              std::move(callback));
+  mojo_server_->CreateContext(std::move(options), std::move(callback));
 }
 
 void MojoClient::Trace(Visitor* visitor) const {

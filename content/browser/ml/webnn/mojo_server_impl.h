@@ -26,7 +26,6 @@ class MojoServerImpl : public ml::webnn::mojom::MojoServer {
  private:
   // ml::webnn::mojom::MojoServer
   void CreateContext(ml::webnn::mojom::ContextOptionsPtr options,
-                     uint32_t context_id,
                      CreateContextCallback callback) override;
 };
 

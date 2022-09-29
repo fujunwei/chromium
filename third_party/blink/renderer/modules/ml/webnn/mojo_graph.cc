@@ -36,6 +36,8 @@ using ml::webnn::mojom::blink::Conv2dFilterOperandLayout;
 using ml::webnn::mojom::blink::FusionType;
 using ml::webnn::mojom::blink::InputOperandLayout;
 using ml::webnn::mojom::blink::MemoryInfoPtr;
+using ml::webnn::mojom::blink::ObjectHandle;
+using ml::webnn::mojom::blink::ObjectHandlePtr;
 using ml::webnn::mojom::blink::OperandType;
 using ml::webnn::mojom::blink::Pool2dType;
 using ml::webnn::mojom::blink::RoundingType;
@@ -169,7 +171,9 @@ void AddClamp(const MLOperator* clamp,
   const MLClampOptions* ml_options =
       static_cast<const MLClampOptions*>(clamp->Options());
   auto* input = clamp->Inputs()[0].Get();
-  remote_graph->AddClamp(input->GetObjectId(),
+  auto input_handle = ObjectHandle::New();
+  input_handle->value = input->GetMojoHandle().value();
+  remote_graph->AddClamp(std::move(input_handle),
                          BlinkClampOptioinToMojo(ml_options),
                          std::move(output_desc));
 }
@@ -180,10 +184,12 @@ FusionOperatorPtr AddFusionOperator(
   auto fusion_operation = ml::webnn::mojom::blink::FusionOperator::New();
   switch (activation->Kind()) {
     case MLOperator::OperatorKind::kClamp: {
+      auto operator_handle = ObjectHandle::New();
+      operator_handle->value = activation->GetMojoHandle().value();
       const MLClampOptions* ml_options =
           static_cast<const MLClampOptions*>(activation->Options());
       remote_graph->AddFusionClamp(BlinkClampOptioinToMojo(ml_options),
-                                   activation->GetObjectId());
+                                   std::move(operator_handle));
 
       fusion_operation->fusion_type = FusionType::kClamp;
       break;
@@ -197,7 +203,9 @@ FusionOperatorPtr AddFusionOperator(
       break;
     }
   }
-  fusion_operation->object_id = activation->GetObjectId();
+  auto operator_handle = ObjectHandle::New();
+  operator_handle->value = activation->GetMojoHandle().value();
+  fusion_operation->handler = std::move(operator_handle);
   return fusion_operation;
 }
 
@@ -220,15 +228,22 @@ void AddConv2d(const MLOperator* conv2d,
       BlinkInputOperandLayoutToMojo(ml_options->inputLayout().AsEnum());
   options->filterLayout =
       BlinkConv2dFilterOperandLayoutToMojo(ml_options->filterLayout().AsEnum());
-  options->bias_id =
-      ml_options->hasBias() ? ml_options->bias()->GetObjectId() : 0;
+  if (ml_options->hasBias()) {
+    auto bias_handle = ObjectHandle::New();
+    bias_handle->value = ml_options->bias()->GetMojoHandle().value();
+    options->bias_handle = std::move(bias_handle);
+  }
   if (ml_options->hasActivation()) {
     options->activation =
         AddFusionOperator(ml_options->activation(), remote_graph);
   }
 
+  auto input_handle = ObjectHandle::New();
+  input_handle->value = input->GetMojoHandle().value();
   auto* filter = conv2d->Inputs()[1].Get();
-  remote_graph->AddConv2d(input->GetObjectId(), filter->GetObjectId(),
+  auto filter_handle = ObjectHandle::New();
+  filter_handle->value = filter->GetMojoHandle().value();
+  remote_graph->AddConv2d(std::move(input_handle), std::move(filter_handle),
                           std::move(options), std::move(output_desc));
 }
 
@@ -257,7 +272,9 @@ void AddPool2d(const MLOperator* pool2d,
   options->output_sizes = ml_options->hasOutputSizes()
                               ? ml_options->outputSizes()
                               : Vector<int32_t>();
-  remote_graph->AddPool2d(input->GetObjectId(), std::move(options),
+  auto input_handle = ObjectHandle::New();
+  input_handle->value = input->GetMojoHandle().value();
+  remote_graph->AddPool2d(std::move(input_handle), std::move(options),
                           BlinkPool2dTypeToMojo(pool2d->Kind()),
                           std::move(output_desc));
 }
@@ -270,14 +287,22 @@ void AddGemm(const MLOperator* gemm,
   auto* input_a = gemm->Inputs()[0].Get();
   auto* input_b = gemm->Inputs()[1].Get();
   auto options = ml::webnn::mojom::blink::GemmOptions::New();
-  options->c_id = ml_options->hasC() ? ml_options->c()->GetObjectId() : 0;
+  if (ml_options->hasC()) {
+    auto operand_handle = ObjectHandle::New();
+    operand_handle->value = ml_options->c()->GetMojoHandle().value();
+    options->c_handle = std::move(operand_handle);
+  }
   options->alpha = ml_options->hasAlpha() ? ml_options->alpha() : 1.0;
   options->beta = ml_options->hasBeta() ? ml_options->beta() : 1.0;
   options->a_transpose =
       ml_options->hasATranspose() ? ml_options->aTranspose() : false;
   options->b_transpose =
       ml_options->hasBTranspose() ? ml_options->bTranspose() : false;
-  remote_graph->AddGemm(input_a->GetObjectId(), input_b->GetObjectId(),
+  auto a_input_handle = ObjectHandle::New();
+  a_input_handle->value = input_a->GetMojoHandle().value();
+  auto b_input_handle = ObjectHandle::New();
+  b_input_handle->value = input_b->GetMojoHandle().value();
+  remote_graph->AddGemm(std::move(a_input_handle), std::move(b_input_handle),
                         std::move(options), std::move(output_desc));
 }
 
@@ -286,8 +311,12 @@ void AddBinary(const MLOperator* binary,
                ml::webnn::mojom::blink::Graph* remote_graph) {
   auto* input0 = binary->Inputs()[0].Get();
   auto* input1 = binary->Inputs()[1].Get();
+  auto input0_handle = ObjectHandle::New();
+  input0_handle->value = input0->GetMojoHandle().value();
+  auto input1_handle = ObjectHandle::New();
+  input1_handle->value = input1->GetMojoHandle().value();
   remote_graph->AddElementWiseBinary(
-      input0->GetObjectId(), input1->GetObjectId(),
+      std::move(input0_handle), std::move(input1_handle),
       BlinkBinaryOperandTypeToMojo(binary->Kind()), std::move(output_desc));
 }
 
@@ -295,7 +324,9 @@ void AddUnary(const MLOperator* unary,
               OperandDescriptorPtr output_desc,
               ml::webnn::mojom::blink::Graph* remote_graph) {
   auto* input = unary->Inputs()[0].Get();
-  remote_graph->AddUnary(input->GetObjectId(),
+  auto input_handle = ObjectHandle::New();
+  input_handle->value = input->GetMojoHandle().value();
+  remote_graph->AddUnary(std::move(input_handle),
                          BlinkUnaryOperandTypeToMojo(unary->Kind()),
                          std::move(output_desc));
 }
@@ -304,7 +335,9 @@ void AddReshape(const MLOperator* reshape,
                 OperandDescriptorPtr output_desc,
                 ml::webnn::mojom::blink::Graph* remote_graph) {
   auto* input = reshape->Inputs()[0].Get();
-  remote_graph->AddReshape(input->GetObjectId(), std::move(output_desc));
+  auto input_handle = ObjectHandle::New();
+  input_handle->value = input->GetMojoHandle().value();
+  remote_graph->AddReshape(std::move(input_handle), std::move(output_desc));
 }
 
 typedef void (*OperatorFunc)(const MLOperator*,
@@ -346,9 +379,9 @@ ScriptPromise MojoGraph::BuildImpl(ScriptState* script_state,
                                    ExceptionState& exception_state) {
   auto* request = MakeGarbageCollected<BuildRequest>(std::move(named_outputs));
   auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
-  MojoContext* mojo_context = static_cast<MojoContext*>(GetContext());
+  MojoContext* mojo_context = static_cast<MojoContext*>(context_.Get());
   mojo_context->CreateGraph(
-      resolver, GetObjectId(),
+      resolver,
       WTF::BindOnce(&MojoGraph::OnGraphCreated, WrapPersistent(this),
                     WrapPersistent(script_state), WrapPersistent(resolver),
                     WrapPersistent(request)));
@@ -443,7 +476,13 @@ void MojoGraph::OnGraphCreated(
     auto desc = ml::webnn::mojom::blink::OperandDescriptor::New();
     desc->data_type = BlinkOperandTypeToMojo(input->Type());
     desc->dimensions = input->Dimensions();
-    desc->object_id = input->GetObjectId();
+    // The message pipe handle can't be made multiple ScopedHanlde to pass to
+    // GPU process wit mojo::MakeScopedHandle(input->GetMojoHandle()), it will
+    // crash in serializing the argument, so wrap the mojo handle value in a
+    // struct named ObjectHandle.
+    auto operand_handle = ObjectHandle::New();
+    operand_handle->value = input->GetMojoHandle().value();
+    desc->handler = std::move(operand_handle);
     remote_graph_->AddInput(input->Name(), std::move(desc));
 
     inputs_byte_length_.insert(input->Name(), input_byte_length.value());
@@ -470,7 +509,9 @@ void MojoGraph::OnGraphCreated(
     auto desc = ml::webnn::mojom::blink::OperandDescriptor::New();
     desc->data_type = BlinkOperandTypeToMojo(constant->Type());
     desc->dimensions = constant->Dimensions();
-    desc->object_id = constant->GetObjectId();
+    auto operand_handle = ObjectHandle::New();
+    operand_handle->value = constant->GetMojoHandle().value();
+    desc->handler = std::move(operand_handle);
     remote_graph_->AddConstant(std::move(desc));
 
     auto memory_info = ml::webnn::mojom::blink::MemoryInfo::New();
@@ -484,7 +525,7 @@ void MojoGraph::OnGraphCreated(
                        memory_info->byte_offset;
     memcpy(address, array_buffer_view->BaseAddressMaybeShared(),
            array_buffer_view->byteLength());
-    constants_info->constants.insert(constant->GetObjectId(),
+    constants_info->constants.insert(constant->GetMojoHandle().value(),
                                      std::move(memory_info));
   }
   constants_info->shared_memory = constants_shm_region.region.Duplicate();
@@ -493,7 +534,9 @@ void MojoGraph::OnGraphCreated(
     auto* output = op->Outputs()[0].Get();
     auto output_desc = ml::webnn::mojom::blink::OperandDescriptor::New();
     output_desc->dimensions = output->Dimensions();
-    output_desc->object_id = output->GetObjectId();
+    auto output_handle = ObjectHandle::New();
+    output_handle->value = output->GetMojoHandle().value();
+    output_desc->handler = std::move(output_handle);
     OperatorFunc add_operator_func = GetOperatorFunc(op->Kind());
     if (add_operator_func == nullptr) {
       resolver->Reject(MakeGarbageCollected<DOMException>(
@@ -504,7 +547,7 @@ void MojoGraph::OnGraphCreated(
     add_operator_func(op, std::move(output_desc), remote_graph_.get());
   }
 
-  WTF::HashMap<WTF::String, uint32_t> named_operands;
+  WTF::HashMap<WTF::String, uint64_t> named_operands;
   for (const auto& [name, output] : request->outputs_) {
     String error_message;
     absl::optional<size_t> output_byte_length = ValidateAndCalculateByteLength(
@@ -518,7 +561,7 @@ void MojoGraph::OnGraphCreated(
     }
 
     outputs_byte_length_.insert(name, output_byte_length.value());
-    named_operands.insert(name, output->GetObjectId());
+    named_operands.insert(name, output->GetMojoHandle().value());
   }
   remote_graph_->Build(
       std::move(named_operands),

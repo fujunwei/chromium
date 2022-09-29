@@ -10,6 +10,7 @@
 
 #include "DirectML.h"
 #include "components/ml/mojom/webnn_graph.mojom.h"
+#include "content/browser/ml/webnn/dml/graph_dml_impl.h"
 #include "content/browser/ml/webnn/dml/utils_dml.h"
 
 namespace content::webnn {
@@ -38,11 +39,11 @@ class CommandRecorder final {
                         uint64_t src_offset,
                         uint64_t byte_length);
 
-  HRESULT InitializeGraph(uint32_t graph_id,
+  HRESULT InitializeGraph(GraphDMLImpl* graph,
                           IDMLCompiledOperator* compiled_operator,
                           const DML_BINDING_DESC& input_array_binding);
 
-  HRESULT ExecuteGraph(uint32_t graph_id,
+  HRESULT ExecuteGraph(GraphDMLImpl* graph,
                        IDMLCompiledOperator* compiled_operator,
                        const std::vector<DML_BINDING_DESC>& input_bindings,
                        const std::vector<DML_BINDING_DESC>& output_bindings);
@@ -66,7 +67,7 @@ class CommandRecorder final {
   ComPtr<IDMLOperatorInitializer> operator_initializer_;
   ComPtr<IDMLCommandRecorder> command_recorder_;
 
-  ExecutionResources* unordered_resources_;
+  ExecutionResources* execution_resources_;
 
   ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
   DML_BINDING_TABLE_DESC mBindingTableDesc;

@@ -26,11 +26,11 @@ class FusionOperators final {
   FusionOperators(const FusionOperators&) = delete;
   FusionOperators& operator=(const FusionOperators&) = delete;
 
-  void AddClampOption(uint32_t operator_id, ClampOptionsPtr options);
-  const ClampOptions* GetClampOption(uint32_t operator_id);
+  void AddClampOption(UINT64 operator_id, ClampOptionsPtr options);
+  const ClampOptions* GetClampOption(UINT64 operator_id);
 
  private:
-  std::map<uint32_t, ClampOptionsPtr> clamp_options_;
+  std::map<UINT64, ClampOptionsPtr> clamp_options_;
 };
 
 }  // namespace content::webnn

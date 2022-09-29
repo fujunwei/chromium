@@ -27,7 +27,6 @@ MojoServerImpl::~MojoServerImpl() = default;
 MojoServerImpl::MojoServerImpl() = default;
 
 void MojoServerImpl::CreateContext(ContextOptionsPtr options,
-                                   uint32_t context_id,
                                    MojoServer::CreateContextCallback callback) {
   // TODO(crbug.com/1273291): Supporting Webnn Service on the platform.
   std::move(callback).Run(mojo::NullRemote());

@@ -29,7 +29,6 @@ class MojoServerDMLImpl : public ml::webnn::mojom::MojoServer {
  private:
   // ml::webnn::mojom::MojoServer
   void CreateContext(ml::webnn::mojom::ContextOptionsPtr options,
-                     uint32_t context_id,
                      CreateContextCallback callback) override;
   // WebNN service is no destructor object that will not be outlived.
   raw_ptr<WebnnServiceDMLImpl> webnn_service_;

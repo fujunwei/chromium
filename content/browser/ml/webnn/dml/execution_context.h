@@ -12,6 +12,7 @@
 #include "base/memory/ref_counted.h"
 #include "content/browser/ml/webnn/dml/command_recorder.h"
 #include "content/browser/ml/webnn/dml/execution_resources.h"
+#include "content/browser/ml/webnn/dml/graph_dml_impl.h"
 
 namespace content::webnn {
 
@@ -33,11 +34,11 @@ class ExecutionContext final : public base::RefCounted<ExecutionContext> {
                         D3D12_RESOURCE_STATES state,
                         bool needBarrierEnd = true);
 
-  HRESULT InitializeGraph(uint32_t graph_id,
+  HRESULT InitializeGraph(GraphDMLImpl* graph,
                           IDMLCompiledOperator* compiled_operator,
                           const DML_BINDING_DESC& input_array_binding);
 
-  HRESULT ExecuteGraph(uint32_t graph_id,
+  HRESULT ExecuteGraph(GraphDMLImpl* graph,
                        IDMLCompiledOperator* compiled_operator,
                        const std::vector<DML_BINDING_DESC>& input_bindings,
                        const std::vector<DML_BINDING_DESC>& output_bindings);
@@ -65,7 +66,7 @@ class ExecutionContext final : public base::RefCounted<ExecutionContext> {
   // There is one active command recorder at a time.
   CommandRecorder command_recorder_;
 
-  std::unique_ptr<ExecutionResources> unordered_resources_;
+  std::unique_ptr<ExecutionResources> execution_resources_;
 };
 
 }  // namespace content::webnn

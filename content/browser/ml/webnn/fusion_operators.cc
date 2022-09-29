@@ -10,12 +10,12 @@ FusionOperators::~FusionOperators() = default;
 
 FusionOperators::FusionOperators() = default;
 
-void FusionOperators::AddClampOption(uint32_t operator_id,
+void FusionOperators::AddClampOption(UINT64 operator_id,
                                      ClampOptionsPtr options) {
   clamp_options_[operator_id] = std::move(options);
 }
 
-const ClampOptions* FusionOperators::GetClampOption(uint32_t operator_id) {
+const ClampOptions* FusionOperators::GetClampOption(UINT64 operator_id) {
   if (clamp_options_.find(operator_id) == clamp_options_.end()) {
     return nullptr;
   }

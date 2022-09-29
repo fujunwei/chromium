@@ -60,7 +60,7 @@ HRESULT CommandRecorder::Initialize() {
 }
 
 HRESULT CommandRecorder::InitializeGraph(
-    uint32_t graph_id,
+    GraphDMLImpl* graph,
     IDMLCompiledOperator* compiled_operator,
     const DML_BINDING_DESC& input_array_binding) {
   // Reset the initializer to reference the compiled operator.
@@ -117,8 +117,8 @@ HRESULT CommandRecorder::InitializeGraph(
                executeBindingProperties.TemporaryResourceSize);
   // Bind and initialize the operator on the GPU.
   if (temporary_resource_size != 0) {
-    ID3D12Resource* temporary_resource = unordered_resources_->Allocate(
-        ResourceType::kTemporary, temporary_resource_size, graph_id);
+    ID3D12Resource* temporary_resource = execution_resources_->Allocate(
+        ResourceType::kTemporary, temporary_resource_size, graph);
     if (initializeBindingProperties.TemporaryResourceSize != 0) {
       DML_BUFFER_BINDING bufferBinding{temporary_resource, 0,
                                        temporary_resource_size};
@@ -133,8 +133,8 @@ HRESULT CommandRecorder::InitializeGraph(
   UINT64 persistent_resource_size =
       executeBindingProperties.PersistentResourceSize;
   if (persistent_resource_size != 0) {
-    ID3D12Resource* persistent_resource = unordered_resources_->Allocate(
-        ResourceType::kPersistent, persistent_resource_size, graph_id);
+    ID3D12Resource* persistent_resource = execution_resources_->Allocate(
+        ResourceType::kPersistent, persistent_resource_size, graph);
     DML_BUFFER_BINDING bufferBinding{persistent_resource, 0,
                                      persistent_resource_size};
     DML_BINDING_DESC bindingDesc{DML_BINDING_TYPE_BUFFER, &bufferBinding};
@@ -158,7 +158,7 @@ HRESULT CommandRecorder::InitializeGraph(
 }
 
 HRESULT CommandRecorder::ExecuteGraph(
-    uint32_t graph_id,
+    GraphDMLImpl* graph,
     IDMLCompiledOperator* compiled_operator,
     const std::vector<DML_BINDING_DESC>& input_bindings,
     const std::vector<DML_BINDING_DESC>& output_bindings) {
@@ -173,7 +173,7 @@ HRESULT CommandRecorder::ExecuteGraph(
   UINT64 temporary_resource_size = binding_properties.TemporaryResourceSize;
   if (temporary_resource_size != 0) {
     ID3D12Resource* temporary_resource =
-        unordered_resources_->GetResource(graph_id, ResourceType::kTemporary);
+        execution_resources_->GetResource(graph, ResourceType::kTemporary);
     DML_BUFFER_BINDING bufferBinding{temporary_resource, 0,
                                      temporary_resource_size};
     DML_BINDING_DESC bindingDesc{DML_BINDING_TYPE_BUFFER, &bufferBinding};
@@ -183,7 +183,7 @@ HRESULT CommandRecorder::ExecuteGraph(
   UINT64 persistent_resource_size = binding_properties.PersistentResourceSize;
   if (persistent_resource_size != 0) {
     ID3D12Resource* persistent_resource =
-        unordered_resources_->GetResource(graph_id, ResourceType::kPersistent);
+        execution_resources_->GetResource(graph, ResourceType::kPersistent);
     DML_BUFFER_BINDING bufferBinding{persistent_resource, 0,
                                      persistent_resource_size};
     DML_BINDING_DESC bindingDesc{DML_BINDING_TYPE_BUFFER, &bufferBinding};
@@ -217,7 +217,7 @@ void CommandRecorder::CloseAndExecute() {
 }
 
 void CommandRecorder::SetExecutionResources(ExecutionResources* resources) {
-  unordered_resources_ = resources;
+  execution_resources_ = resources;
 }
 
 ComPtr<ID3D12CommandAllocator> CommandRecorder::GetCommandAllocator() {

@@ -66,21 +66,21 @@ ComPtr<ID3D12Resource> ExecutionResources::Allocate(UINT64 resource_size) {
 
 ID3D12Resource* ExecutionResources::Allocate(ResourceType type,
                                              UINT64 resource_size,
-                                             UINT32 graph_id) {
-  DCHECK_GT(graph_id, (uint32_t)(0));
+                                             GraphDMLImpl* graph) {
+  DCHECK(graph != nullptr);
   ComPtr<ID3D12Resource> resource = Allocate(resource_size);
-  if (pool_.find(graph_id) == pool_.end()) {
-    pool_[graph_id] = Resources(type, resource);
+  if (pool_.find(graph) == pool_.end()) {
+    pool_[graph] = Resources(type, resource);
   } else {
-    auto& resources = pool_[graph_id].resources;
+    auto& resources = pool_[graph].resources;
     resources[type] = resource;
   }
   return resource.Get();
 }
 
-ID3D12Resource* ExecutionResources::GetResource(UINT32 graph_id,
+ID3D12Resource* ExecutionResources::GetResource(GraphDMLImpl* graph,
                                                 ResourceType type) {
-  auto iter = pool_.find(graph_id);
+  auto iter = pool_.find(graph);
   if (iter == pool_.end()) {
     return nullptr;
   }
@@ -92,8 +92,8 @@ ID3D12Resource* ExecutionResources::GetResource(UINT32 graph_id,
   return resources[type].Get();
 }
 
-void ExecutionResources::Free(UINT32 graph_id) {
-  auto iter = pool_.find(graph_id);
+void ExecutionResources::Free(GraphDMLImpl* graph) {
+  auto iter = pool_.find(graph);
   if (iter != pool_.end()) {
     pool_.erase(iter);
   }
