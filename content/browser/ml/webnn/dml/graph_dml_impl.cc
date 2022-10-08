@@ -285,7 +285,7 @@ std::vector<UINT> CalculateStridesForBroadcast(
                                                  &operator_desc);
 
 // Append IDENTITY to remove the strides of input tensor. Use this to implement
-// Reshape, Squeeze, Transpose and avoid creating an invaild graph with input =
+// Reshape, Squeeze, Transpose and avoid creating an invalid graph with input =
 // output.
 #define APPEND_IDENTITY(input_tensor, output_tensor, node) \
   DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC operator_desc{}; \
@@ -980,7 +980,7 @@ void GraphDMLImpl::Compute(NamedInputsPtr named_inputs,
   auto& output_length_map = graph_desc_builder_->GetNamedOutputs();
   std::vector<DML_BINDING_DESC> output_binding_desc(output_length_map.size());
   // The sort of the outputs from Graph Compute is different from the
-  // outputs from Graph Build, so the offset need to be found the corrent output
+  // outputs from Graph Build, so the offset need to be found the correct output
   // with name to read back from GPU buffer.
   base::flat_map<std::string, DML_BUFFER_BINDING> output_buffer_binding;
   uint64_t aligned_offset = 0;

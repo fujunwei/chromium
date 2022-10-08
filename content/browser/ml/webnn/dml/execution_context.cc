@@ -22,44 +22,41 @@ ExecutionContext::~ExecutionContext() = default;
 void ExecutionContext::CopyBufferRegion(ID3D12Resource* dest_resource,
                                         ID3D12Resource* src_resource,
                                         UINT64 resource_size,
-                                        D3D12_RESOURCE_STATES state,
-                                        bool needBarrierEnd) {
+                                        D3D12_RESOURCE_STATES state) {
   DCHECK(state == D3D12_RESOURCE_STATE_COPY_DEST ||
          state == D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-  D3D12_RESOURCE_BARRIER resourceBarrier;
+  D3D12_RESOURCE_BARRIER transition_barrier;
   // D3D12_RESOURCE_STATE_COPY_DEST is used to upload CPU data to GPU resource,
   // the resource state of source is GENERIC_READ that doesn't need to be
   // COPY_SOURCE. The destination resource state is UNORDERED_ACCESS that need
   // to transform to COPY_DEST.
   if (state == D3D12_RESOURCE_STATE_COPY_DEST) {
-    resourceBarrier.Transition.pResource = dest_resource;
+    transition_barrier.Transition.pResource = dest_resource;
   } else if (state == D3D12_RESOURCE_STATE_COPY_SOURCE) {
     // D3D12_RESOURCE_STATE_COPY_SOURCE is used to read back resource from GPU
     // to CPU buffer, the source resource state is UNORDERED_ACCESS that need to
     // transform to COPY_SOURCE, the destination resource state is COPY_DEST
     // when creating the committed resource, so the barrier is unnecessary for
     // it.
-    resourceBarrier.Transition.pResource = src_resource;
+    transition_barrier.Transition.pResource = src_resource;
   }
-  resourceBarrier.Transition.StateBefore =
+  transition_barrier.Transition.StateBefore =
       D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-  resourceBarrier.Transition.StateAfter = state;
-  resourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-  resourceBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-  resourceBarrier.Transition.Subresource =
+  transition_barrier.Transition.StateAfter = state;
+  transition_barrier.Transition.Subresource =
       D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-  command_recorder_.ResourceBarrier({resourceBarrier});
+  transition_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+  transition_barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
   command_recorder_.CopyBufferRegion(dest_resource, 0, src_resource, 0,
                                      resource_size);
-  // if (needBarrierEnd) {
-  // Reset the destination state of COPY_DEST to UNORDERED_ACCESS when uploading
-  // data from CPU to GPU, the source state of COPY_SOURCE to UNORDERED_ACCESS
-  // when read back GPU resource to CPU buffer.
-  resourceBarrier.Transition.StateBefore = state;
-  resourceBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-  command_recorder_.ResourceBarrier({resourceBarrier});
-  // }
+  D3D12_RESOURCE_BARRIER reset_barrier = transition_barrier;
+  reset_barrier.Transition.StateBefore = state;
+  reset_barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+  // Both transitions to/from UAV can be combined into a single ResourceBarrier
+  // call, and the transition barrier command can be enqueued after
+  // CopyBufferRegion.
+  command_recorder_.ResourceBarrier({transition_barrier, reset_barrier});
 }
 
 HRESULT ExecutionContext::Initialize() {

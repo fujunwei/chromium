@@ -43,7 +43,7 @@ class ExecutionResources final {
                            GraphDMLImpl* graph);
   ID3D12Resource* GetResource(GraphDMLImpl* graph, ResourceType type);
   // Free a resource that is owned by graph such as temporary, persistent,
-  // input and output unordered resouce for execution.
+  // input and output unordered resource for execution.
   void Free(GraphDMLImpl* graph);
 
  private:

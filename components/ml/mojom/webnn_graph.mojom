@@ -32,7 +32,7 @@ enum OperandType {
 // message pipe handle which is uint64 type.
 [Stable]
 struct ObjectHandle {
-  // The value is the MojoHanlde of message pipe that is generated when creating
+  // The value is the MojoHandle of message pipe that is generated when creating
   // the MLOperand object in blink side.
   uint64 value@0;
 };

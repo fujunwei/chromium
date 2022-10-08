@@ -32,8 +32,7 @@ class ExecutionContext final : public base::RefCounted<ExecutionContext> {
   void CopyBufferRegion(ID3D12Resource* dest_resource,
                         ID3D12Resource* src_resource,
                         UINT64 resource_size,
-                        D3D12_RESOURCE_STATES state,
-                        bool needBarrierEnd = true);
+                        D3D12_RESOURCE_STATES state);
 
   HRESULT InitializeGraph(GraphDMLImpl* graph,
                           IDMLCompiledOperator* compiled_operator,

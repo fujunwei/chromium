@@ -476,7 +476,7 @@ void MojoGraph::OnGraphCreated(
     auto desc = ml::webnn::mojom::blink::OperandDescriptor::New();
     desc->data_type = BlinkOperandTypeToMojo(input->Type());
     desc->dimensions = input->Dimensions();
-    // The message pipe handle can't be made multiple ScopedHanlde to pass to
+    // The message pipe handle can't be made multiple ScopedHandle to pass to
     // GPU process wit mojo::MakeScopedHandle(input->GetMojoHandle()), it will
     // crash in serializing the argument, so wrap the mojo handle value in a
     // struct named ObjectHandle.
