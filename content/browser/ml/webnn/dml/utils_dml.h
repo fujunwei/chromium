@@ -7,12 +7,6 @@
 
 #include "base/logging.h"
 
-#define WEBNN_CHECK(hr)                   \
-  if (((HRESULT)(hr)) < 0) {              \
-    LOG(ERROR) << "Failed to do " << #hr; \
-    assert(0);                            \
-  }
-
 namespace content::webnn {
 
 using Microsoft::WRL::ComPtr;

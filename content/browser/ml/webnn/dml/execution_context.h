@@ -10,6 +10,7 @@
 #include <wrl.h>
 
 #include "base/memory/ref_counted.h"
+#include "content/browser/ml/webnn/dml/command_queue.h"
 #include "content/browser/ml/webnn/dml/command_recorder.h"
 #include "content/browser/ml/webnn/dml/execution_resources.h"
 #include "content/browser/ml/webnn/dml/gpgmm_d3d12.h"
@@ -44,16 +45,15 @@ class ExecutionContext final : public base::RefCounted<ExecutionContext> {
                        const std::vector<DML_BINDING_DESC>& output_bindings);
 
   // Forces all queued work to begin executing on the GPU.
-  void Flush();
+  void Flush() const;
+  // Blocks until the current fence is signaled.
+  void WaitForSignal() const;
+  void ReferenceUntilCompleted(ComPtr<IUnknown> object);
+  void ReleaseCompletedResources() const;
 
   ComPtr<ID3D12Device> GetD3D12Device() const;
-  ComPtr<ID3D12CommandQueue> GetCommandQueue() const;
-  ExecutionResources* GetExecutionResources();
-
-  // TODO
-  ComPtr<ID3D12CommandAllocator> GetCommandAllocator();
-  ComPtr<ID3D12GraphicsCommandList> GetCommandList();
   ComPtr<IDMLDevice> GetDMLDevice();
+  ExecutionResources* GetExecutionResources();
   ComPtr<gpgmm::d3d12::ResourceAllocator> GetResourceAllocator();
 
  private:
@@ -62,11 +62,12 @@ class ExecutionContext final : public base::RefCounted<ExecutionContext> {
 
   // Device is owned by adapter.
   ComPtr<ID3D12Device> d3d12_device_;
-  // Open discussion: Another design is to share command queue for all contexts.
-  ComPtr<ID3D12CommandQueue> command_queue_;
   // There is one active command recorder at a time.
   CommandRecorder command_recorder_;
+  scoped_refptr<CommandQueue> command_queue_;
 
+  // ResourceAllocator is owned by adapter
+  ComPtr<gpgmm::d3d12::ResourceAllocator> resource_allocator_;
   std::unique_ptr<ExecutionResources> execution_resources_;
 };
 

@@ -11,8 +11,9 @@ namespace content::webnn {
 
 ExecutionContext::ExecutionContext(scoped_refptr<AdapterDML> adapter)
     : d3d12_device_(adapter->GetD3D12Device()),
+      command_recorder_(adapter, adapter->GetDMLDevice()),
       command_queue_(adapter->GetCommandQueue()),
-      command_recorder_(adapter, adapter->GetDMLDevice(), command_queue_) {}
+      resource_allocator_(adapter->GetResourceAllocator()) {}
 
 ExecutionContext::~ExecutionContext() = default;
 
@@ -88,28 +89,32 @@ HRESULT ExecutionContext::ExecuteGraph(
                                         input_bindings, output_bindings);
 }
 
-void ExecutionContext::Flush() {
+void ExecutionContext::Flush() const {
   command_recorder_.CloseAndExecute();
+}
+
+void ExecutionContext::WaitForSignal() const {
+  command_queue_->Wait();
+  // Unlike ID3D12GraphicsCommandList::Reset, it is not recommended to call
+  // Reset on the command allocator while a command list is still being
+  // executed.
+  command_recorder_.ResetCommandList();
+}
+
+void ExecutionContext::ReferenceUntilCompleted(ComPtr<IUnknown> object) {
+  command_queue_->ReferenceUntilCompleted(std::move(object));
+}
+
+void ExecutionContext::ReleaseCompletedResources() const {
+  command_queue_->ReleaseCompletedResources();
 }
 
 ComPtr<ID3D12Device> ExecutionContext::GetD3D12Device() const {
   return d3d12_device_;
 }
 
-ComPtr<ID3D12CommandQueue> ExecutionContext::GetCommandQueue() const {
-  return command_queue_;
-}
-
 ExecutionResources* ExecutionContext::GetExecutionResources() {
   return execution_resources_.get();
-}
-
-ComPtr<ID3D12CommandAllocator> ExecutionContext::GetCommandAllocator() {
-  return command_recorder_.GetCommandAllocator();
-}
-
-ComPtr<ID3D12GraphicsCommandList> ExecutionContext::GetCommandList() {
-  return command_recorder_.GetCommandList();
 }
 
 ComPtr<IDMLDevice> ExecutionContext::GetDMLDevice() {
@@ -118,7 +123,8 @@ ComPtr<IDMLDevice> ExecutionContext::GetDMLDevice() {
 
 ComPtr<gpgmm::d3d12::ResourceAllocator>
 ExecutionContext::GetResourceAllocator() {
-  return command_recorder_.GetResourceAllocator();
+  DCHECK(resource_allocator_.Get() != nullptr);
+  return resource_allocator_;
 }
 
 }  // namespace content::webnn

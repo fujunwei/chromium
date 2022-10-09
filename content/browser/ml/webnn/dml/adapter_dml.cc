@@ -19,15 +19,6 @@ HRESULT AdapterDML::Initialize() {
     return hr;
   }
 
-  D3D12_COMMAND_QUEUE_DESC command_queue_desc = {};
-  command_queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-  command_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-  hr = d3d12_device_->CreateCommandQueue(&command_queue_desc,
-                                         IID_PPV_ARGS(&command_queue_));
-  if (FAILED(hr)) {
-    return hr;
-  }
-
   hr = DMLCreateDevice(d3d12_device_.Get(), DML_CREATE_DEVICE_FLAG_NONE,
                        IID_PPV_ARGS(&dml_device_));
   if (FAILED(hr)) {
@@ -49,12 +40,30 @@ HRESULT AdapterDML::Initialize() {
         (arch.UMA) ? AdapterType::kIntegratedGPU : AdapterType::kDiscreteGPU;
   }
 
-  return hr;
-}
+  command_queue_ = base::MakeRefCounted<CommandQueue>();
+  hr = command_queue_->Initialize(d3d12_device_.Get());
+  if (FAILED(hr)) {
+    return hr;
+  }
 
-ComPtr<IDXGIAdapter3> AdapterDML::GetHardwareAdapter() const {
-  DCHECK(hardware_adapter_.Get() != nullptr);
-  return hardware_adapter_;
+  D3D12_FEATURE_DATA_D3D12_OPTIONS options = {};
+  hr = d3d12_device_->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options,
+                                          sizeof(options));
+  if (FAILED(hr)) {
+    return hr;
+  }
+  gpgmm::d3d12::ALLOCATOR_DESC allocator_desc = {};
+  allocator_desc.Adapter = hardware_adapter_;
+  allocator_desc.Device = d3d12_device_;
+  allocator_desc.ResourceHeapTier = options.ResourceHeapTier;
+  // TODO: Enable residency management.
+  hr = gpgmm::d3d12::ResourceAllocator::CreateAllocator(allocator_desc,
+                                                        &resource_allocator_);
+  if (FAILED(hr)) {
+    return hr;
+  }
+
+  return hr;
 }
 
 AdapterType AdapterDML::GetAdapterType() {
@@ -72,9 +81,14 @@ ComPtr<IDMLDevice> AdapterDML::GetDMLDevice() const {
   return dml_device_;
 }
 
-ComPtr<ID3D12CommandQueue> AdapterDML::GetCommandQueue() const {
-  DCHECK(command_queue_.Get() != nullptr);
+scoped_refptr<CommandQueue> AdapterDML::GetCommandQueue() const {
+  DCHECK(command_queue_.get() != nullptr);
   return command_queue_;
+}
+
+ComPtr<gpgmm::d3d12::ResourceAllocator> AdapterDML::GetResourceAllocator() {
+  DCHECK(resource_allocator_.Get() != nullptr);
+  return resource_allocator_;
 }
 
 }  // namespace content::webnn

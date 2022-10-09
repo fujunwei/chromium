@@ -926,6 +926,8 @@ void GraphDMLImpl::Build(
                                       input_binding_desc);
 
   execution_context_->Flush();
+  execution_context_->WaitForSignal();
+  execution_context_->ReleaseCompletedResources();
 
   auto& named_outputs = graph_desc_builder_->GetNamedOutputs();
   HRESULT hr = output_resource_readback_->InitializeResource(named_outputs);

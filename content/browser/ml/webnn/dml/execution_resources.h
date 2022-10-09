@@ -10,9 +10,8 @@
 #include <vector>
 
 #include "DirectML.h"
-#include "content/browser/ml/webnn/dml/graph_dml_impl.h"
-
 #include "content/browser/ml/webnn/dml/gpgmm_d3d12.h"
+#include "content/browser/ml/webnn/dml/graph_dml_impl.h"
 #include "content/browser/ml/webnn/dml/utils_dml.h"
 
 namespace content::webnn {

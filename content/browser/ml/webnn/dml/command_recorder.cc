@@ -12,11 +12,8 @@ namespace content::webnn {
 CommandRecorder::~CommandRecorder() = default;
 
 CommandRecorder::CommandRecorder(scoped_refptr<AdapterDML> adapter,
-                                 ComPtr<IDMLDevice> dml_device,
-                                 ComPtr<ID3D12CommandQueue> command_queue)
-    : adapter_(std::move(adapter)),
-      dml_device_(std::move(dml_device)),
-      command_queue_(std::move(command_queue)) {}
+                                 ComPtr<IDMLDevice> dml_device)
+    : adapter_(std::move(adapter)), dml_device_(std::move(dml_device)) {}
 
 void CommandRecorder::ResourceBarrier(
     std::vector<const D3D12_RESOURCE_BARRIER> barriers) {
@@ -57,23 +54,6 @@ HRESULT CommandRecorder::Initialize() {
     return hr;
   }
   hr = dml_device_->CreateCommandRecorder(IID_PPV_ARGS(&command_recorder_));
-  if (FAILED(hr)) {
-    return hr;
-  }
-
-  D3D12_FEATURE_DATA_D3D12_OPTIONS options = {};
-  hr = d3d12_device_->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options,
-                                          sizeof(options));
-  if (FAILED(hr)) {
-    return hr;
-  }
-  gpgmm::d3d12::ALLOCATOR_DESC allocatorDesc = {};
-  allocatorDesc.Adapter = adapter_->GetHardwareAdapter();
-  allocatorDesc.Device = d3d12_device_;
-  allocatorDesc.ResourceHeapTier = options.ResourceHeapTier;
-  // TODO: Enable residency management.
-  hr = gpgmm::d3d12::ResourceAllocator::CreateAllocator(allocatorDesc,
-                                                        &resource_allocator_);
   if (FAILED(hr)) {
     return hr;
   }
@@ -224,39 +204,29 @@ HRESULT CommandRecorder::ExecuteGraph(
   return S_OK;
 }
 
-void CommandRecorder::CloseAndExecute() {
-  WEBNN_CHECK(command_list_->Close());
-  ID3D12CommandList* command_lists[] = {command_list_.Get()};
-  command_queue_->ExecuteCommandLists(ARRAYSIZE(command_lists), command_lists);
-  WEBNN_CHECK(command_queue_.Get()->GetDevice(IID_PPV_ARGS(&d3d12_device_)));
-  ComPtr<ID3D12Fence> fence;
-  WEBNN_CHECK(d3d12_device_->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-                                         IID_PPV_ARGS(&fence)));
-  WEBNN_CHECK(command_queue_.Get()->Signal(fence.Get(), 1));
-  WEBNN_CHECK(fence->SetEventOnCompletion(1, nullptr));
-  WEBNN_CHECK(command_allocator_->Reset());
-  WEBNN_CHECK(command_list_->Reset(command_allocator_.Get(), nullptr));
+void CommandRecorder::CloseAndExecute() const {
+  const auto& command_queue = adapter_->GetCommandQueue();
+  HRESULT hr = command_list_->Close();
+  if (FAILED(hr)) {
+    return;
+  }
+  command_queue->ExecuteCommandLists({command_list_.Get()});
+}
+
+HRESULT CommandRecorder::ResetCommandList() const {
+  HRESULT hr = command_allocator_->Reset();
+  if (FAILED(hr)) {
+    return hr;
+  }
+  return command_list_->Reset(command_allocator_.Get(), nullptr);
 }
 
 void CommandRecorder::SetExecutionResources(ExecutionResources* resources) {
   execution_resources_ = resources;
 }
 
-ComPtr<ID3D12CommandAllocator> CommandRecorder::GetCommandAllocator() {
-  return command_allocator_;
-}
-
-ComPtr<ID3D12GraphicsCommandList> CommandRecorder::GetCommandList() {
-  return command_list_;
-}
-
 ComPtr<IDMLDevice> CommandRecorder::GetDMLDevice() {
   return dml_device_;
-}
-
-ComPtr<gpgmm::d3d12::ResourceAllocator>
-CommandRecorder::GetResourceAllocator() {
-  return resource_allocator_;
 }
 
 }  // namespace content::webnn

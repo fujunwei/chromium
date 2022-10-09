@@ -10,7 +10,6 @@
 
 #include "DirectML.h"
 #include "components/ml/mojom/webnn_graph.mojom.h"
-#include "content/browser/ml/webnn/dml/gpgmm_d3d12.h"
 #include "content/browser/ml/webnn/dml/graph_dml_impl.h"
 #include "content/browser/ml/webnn/dml/utils_dml.h"
 
@@ -24,9 +23,8 @@ class ExecutionResources;
 
 class CommandRecorder final {
  public:
-  explicit CommandRecorder(scoped_refptr<AdapterDML> adpter,
-                           ComPtr<IDMLDevice> dml_device,
-                           ComPtr<ID3D12CommandQueue> command_queue);
+  CommandRecorder(scoped_refptr<AdapterDML> adpter,
+                  ComPtr<IDMLDevice> dml_device);
   ~CommandRecorder();
 
   CommandRecorder(const CommandRecorder&) = delete;
@@ -51,15 +49,15 @@ class CommandRecorder final {
                        const std::vector<DML_BINDING_DESC>& input_bindings,
                        const std::vector<DML_BINDING_DESC>& output_bindings);
 
-  void CloseAndExecute();
+  void CloseAndExecute() const;
+  // TODO:: The command allocator can't be reset while a command list is still
+  // executing, so reset the command allocator when opening a new command
+  // recorder.
+  HRESULT ResetCommandList() const;
 
   void SetExecutionResources(ExecutionResources* resources);
 
-  // TODO:
-  ComPtr<ID3D12CommandAllocator> GetCommandAllocator();
-  ComPtr<ID3D12GraphicsCommandList> GetCommandList();
   ComPtr<IDMLDevice> GetDMLDevice();
-  ComPtr<gpgmm::d3d12::ResourceAllocator> GetResourceAllocator();
 
  private:
   scoped_refptr<AdapterDML> adapter_;
@@ -67,14 +65,12 @@ class CommandRecorder final {
   ComPtr<ID3D12Device> d3d12_device_;
   ComPtr<ID3D12CommandAllocator> command_allocator_;
   ComPtr<ID3D12GraphicsCommandList> command_list_;
-  ComPtr<ID3D12CommandQueue> command_queue_;
 
   ComPtr<IDMLOperatorInitializer> operator_initializer_;
   ComPtr<IDMLCommandRecorder> command_recorder_;
 
   ExecutionResources* execution_resources_;
 
-  ComPtr<gpgmm::d3d12::ResourceAllocator> resource_allocator_;
   ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
   DML_BINDING_TABLE_DESC mBindingTableDesc;
   ComPtr<IDMLBindingTable> mBindingTable;

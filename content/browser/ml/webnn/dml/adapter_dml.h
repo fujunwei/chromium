@@ -11,6 +11,8 @@
 
 #include "DirectML.h"
 #include "base/memory/ref_counted.h"
+#include "content/browser/ml/webnn/dml/command_queue.h"
+#include "content/browser/ml/webnn/dml/gpgmm_d3d12.h"
 
 namespace content::webnn {
 
@@ -32,11 +34,11 @@ class AdapterDML final : public base::RefCounted<AdapterDML> {
   AdapterDML& operator=(const AdapterDML&) = delete;
 
   HRESULT Initialize();
-  ComPtr<IDXGIAdapter3> GetHardwareAdapter() const;
   AdapterType GetAdapterType();
   ComPtr<ID3D12Device> GetD3D12Device() const;
   ComPtr<IDMLDevice> GetDMLDevice() const;
-  ComPtr<ID3D12CommandQueue> GetCommandQueue() const;
+  scoped_refptr<CommandQueue> GetCommandQueue() const;
+  ComPtr<gpgmm::d3d12::ResourceAllocator> GetResourceAllocator();
 
  private:
   friend class base::RefCounted<AdapterDML>;
@@ -45,10 +47,11 @@ class AdapterDML final : public base::RefCounted<AdapterDML> {
   ComPtr<IDXGIAdapter3> hardware_adapter_;
   AdapterType adapter_type_ = AdapterType::kUnknow;
   ComPtr<ID3D12Device> d3d12_device_;
-  ComPtr<ID3D12CommandQueue> command_queue_;
+  scoped_refptr<CommandQueue> command_queue_;
   // Represents a DirectML device, which is used to create operators, binding
   // tables, command recorders.
   ComPtr<IDMLDevice> dml_device_;
+  ComPtr<gpgmm::d3d12::ResourceAllocator> resource_allocator_;
 };
 
 }  // namespace content::webnn

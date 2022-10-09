@@ -47,11 +47,16 @@ HRESULT ReadbackResource::ReadResourceFromGpu(NamedOutputsPtr& named_outputs,
                                        D3D12_RESOURCE_STATE_COPY_SOURCE);
 
   execution_context_->Flush();
+  execution_context_->WaitForSignal();
+  execution_context_->ReleaseCompletedResources();
 
   D3D12_RANGE tensorBufferRange{0, outputs_resource_size_};
   int8_t* readBackBuffer;
-  WEBNN_CHECK(readback_resource_->Map(
-      0, &tensorBufferRange, reinterpret_cast<void**>(&readBackBuffer)));
+  HRESULT hr = readback_resource_->Map(
+      0, &tensorBufferRange, reinterpret_cast<void**>(&readBackBuffer));
+  if (FAILED(hr)) {
+    return hr;
+  }
 
   for (auto& [name, memory_info] : outputs_info_map_) {
     auto mojo_memory_info = ml::webnn::mojom::MemoryInfo::New();

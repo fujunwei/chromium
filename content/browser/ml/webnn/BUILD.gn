@@ -31,6 +31,8 @@ source_set("lib") {
     sources += [
       "dml/adapter_dml.cc",
       "dml/adapter_dml.h",
+      "dml/command_queue.cc",
+      "dml/command_queue.h",
       "dml/command_recorder.cc",
       "dml/command_recorder.h",
       "dml/context_dml_impl.cc",

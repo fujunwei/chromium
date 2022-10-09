@@ -53,11 +53,12 @@ ComPtr<gpgmm::d3d12::ResourceAllocation> ExecutionResources::Allocate(
   // be managed by residency management.
   gpgmm::d3d12::ALLOCATION_DESC allocation_descriptor = {};
   allocation_descriptor.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-
   execution_context_->GetResourceAllocator()->CreateResource(
       allocation_descriptor, resource_desc,
       D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, &resource);
 
+  // Reference the resource allocation until execution completed.
+  execution_context_->ReferenceUntilCompleted(resource);
   return resource;
 }
 
