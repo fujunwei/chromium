@@ -38,12 +38,13 @@ using ml::webnn::mojom::ClampOptionsPtr;
 using ml::webnn::mojom::ComputeResult;
 using ml::webnn::mojom::ConstantsInfoPtr;
 using ml::webnn::mojom::Conv2dOptionsPtr;
-using ml::webnn::mojom::FusionOperator;
 using ml::webnn::mojom::GemmOptionsPtr;
+using ml::webnn::mojom::ModelInfoPtr;
 using ml::webnn::mojom::NamedInputsPtr;
 using ml::webnn::mojom::NamedOutputsPtr;
-using ml::webnn::mojom::ObjectHandlePtr;
-using ml::webnn::mojom::OperandDescriptorPtr;
+using ml::webnn::mojom::OperandDescPtr;
+using ml::webnn::mojom::OperationInfo;
+using ml::webnn::mojom::OperationInfoPtr;
 using ml::webnn::mojom::Pool2dOptions;
 using ml::webnn::mojom::Pool2dOptionsPtr;
 using ml::webnn::mojom::Pool2dType;
@@ -51,7 +52,6 @@ using ml::webnn::mojom::UnaryOperandType;
 
 }  // namespace
 
-class FusionOperators;
 class ExecutionContext;
 
 class GraphDMLImpl : public ml::webnn::mojom::Graph {
@@ -68,43 +68,44 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
 
  private:
   // ml::webnn::mojom::Graph
-  void AddInput(const std::string&, OperandDescriptorPtr) override;
-  void AddConstant(OperandDescriptorPtr) override;
-  void AddElementWiseBinary(ObjectHandlePtr,
-                            ObjectHandlePtr,
-                            BinaryOperandType,
-                            OperandDescriptorPtr) override;
-  void AddClamp(ObjectHandlePtr input_handle,
+  void AddInput(const std::string&, OperandDescPtr, UINT64 index);
+  void AddConstant(OperandDescPtr, UINT64 index);
+  void AddClamp(UINT64 input_index,
                 ClampOptionsPtr options,
-                OperandDescriptorPtr desc) override;
-  void AddConv2d(ObjectHandlePtr input_handle,
-                 ObjectHandlePtr filter_handle,
+                UINT64 output_index);
+  void AddConv2d(UINT64 input_index,
+                 UINT64 filter_index,
                  Conv2dOptionsPtr options,
-                 OperandDescriptorPtr desc) override;
-  void AddReshape(ObjectHandlePtr input_handle,
-                  OperandDescriptorPtr desc) override;
-  void AddGemm(ObjectHandlePtr,
-               ObjectHandlePtr,
+                 OperandDescPtr desc,
+                 UINT64 output_index);
+  void AddElementWiseBinary(UINT64,
+                            UINT64,
+                            BinaryOperandType,
+                            OperandDescPtr,
+                            UINT64 output_index);
+  void AddGemm(UINT64,
+               UINT64,
                GemmOptionsPtr,
-               OperandDescriptorPtr) override;
-  void AddPool2d(ObjectHandlePtr input_handle,
+               OperandDescPtr,
+               UINT64 output_index);
+  void AddPool2d(UINT64 input_index,
                  Pool2dOptionsPtr options,
                  Pool2dType type,
-                 OperandDescriptorPtr desc) override;
-  void AddUnary(ObjectHandlePtr input_handle,
+                 OperandDescPtr desc,
+                 UINT64 output_index);
+  void AddUnary(UINT64 input_index,
                 UnaryOperandType type,
-                OperandDescriptorPtr desc) override;
-  void AddFusionClamp(ClampOptionsPtr options,
-                      ObjectHandlePtr operator_handle) override;
+                OperandDescPtr desc,
+                UINT64 output_index);
+  void AddReshape(UINT64 input_index, OperandDescPtr desc, UINT64 output_index);
 
-  void Build(const base::flat_map<std::string, uint64_t>& named_operands,
-             ConstantsInfoPtr constants_info,
+  void Build(ModelInfoPtr model_info,
              BuildCallback callback) override;
   void Compute(NamedInputsPtr named_inputs, ComputeCallback callback) override;
 
   std::unique_ptr<NodeOutput> Clamp(NodeOutput* input_node,
                                     const ClampOptions* options);
-  void EmulateFusedOperator(const FusionOperator* activation,
+  void EmulateFusedOperator(const OperationInfo* activation,
                             std::unique_ptr<NodeOutput>& input_node,
                             const std::vector<UINT>& inputDims);
   void TransposeOutputToNhwc(std::unique_ptr<NodeOutput>& input_node,
@@ -125,7 +126,6 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
 
   std::string error_messages_;
   BuildResult build_result_;
-  std::unique_ptr<FusionOperators> fusion_operators_;
 };
 
 }  // namespace content::webnn

@@ -39,14 +39,7 @@ class MojoClient final : public RefCounted<MojoClient> {
 
   void Trace(Visitor* visitor) const;
 
-  uint32_t GetNewId();
-
-  void FreeId(uint32_t id);
-
  private:
-  base::CheckedNumeric<uint32_t> current_id_ = 1;
-  Vector<uint32_t> free_ids_;
-
   HeapMojoRemote<MojoServer> mojo_server_;
 };
 

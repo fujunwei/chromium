@@ -10,7 +10,6 @@
 #include "content/browser/ml/webnn/dml/execution_resources.h"
 #include "content/browser/ml/webnn/dml/graph_dml_impl.h"
 #include "content/browser/ml/webnn/dml/upload_resource.h"
-#include "content/browser/ml/webnn/fusion_operators.h"
 #include "mojo/public/c/system/types.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 
@@ -23,12 +22,11 @@ using ml::webnn::mojom::ConstantsInfoPtr;
 using ml::webnn::mojom::Conv2dFilterOperandLayout;
 using ml::webnn::mojom::Conv2dOptions;
 using ml::webnn::mojom::Conv2dOptionsPtr;
-using ml::webnn::mojom::FusionOperator;
-using ml::webnn::mojom::FusionOperatorPtr;
-using ml::webnn::mojom::FusionType;
 using ml::webnn::mojom::InputOperandLayout;
 using ml::webnn::mojom::MemoryInfoPtr;
+using ml::webnn::mojom::ModelInfoPtr;
 using ml::webnn::mojom::OperandType;
+using ml::webnn::mojom::OperationInfo;
 
 enum TransposeType { NhwcToNchw, NchwToNhwc };
 
@@ -69,7 +67,7 @@ std::vector<UINT> transposeStridesToNchw(
 }
 
 DML_OPERATOR_DESC* CreateFusedOperator(
-    const FusionOperator* activation,
+    const OperationInfo* activation,
     DML_ACTIVATION_LINEAR_OPERATOR_DESC& dmlActicationOperatorDesc,
     DML_OPERATOR_DESC& dmlFusedOperatorDesc) {
   if (activation == nullptr) {
@@ -80,11 +78,16 @@ DML_OPERATOR_DESC* CreateFusedOperator(
   dmlActicationOperatorDesc.OutputTensor = nullptr;
   dmlActicationOperatorDesc.Alpha = 0.0;
   dmlActicationOperatorDesc.Beta = 0.0;
-  switch (activation->fusion_type) {
-    case FusionType::kRelu: {
-      dmlFusedOperatorDesc.Type = DML_OPERATOR_ACTIVATION_RELU;
+  switch (activation->which()) {
+    case OperationInfo::Tag::kUnary: {
+      auto& operation = activation->get_unary();
+      if (operation->type == UnaryOperandType::kRelu) {
+        dmlFusedOperatorDesc.Type = DML_OPERATOR_ACTIVATION_RELU;
+      } else {
+        return nullptr;
+      }
     } break;
-    case FusionType::kClamp:
+    case OperationInfo::Tag::kClamp:
       return nullptr;
     default:
       LOG(ERROR) << "This fusion type is not supported.";
@@ -311,46 +314,46 @@ GraphDMLImpl::GraphDMLImpl(scoped_refptr<ExecutionContext> execution_context)
       output_resource_readback_(
           std::make_unique<ReadbackResource>(execution_context_.get())),
       graph_desc_builder_(std::make_unique<GraphDescBuilder>(
-          execution_context->GetDMLDevice())),
-      fusion_operators_(std::make_unique<FusionOperators>()) {}
+          execution_context->GetDMLDevice())) {}
 
 void GraphDMLImpl::AddInput(const std::string& name,
-                            OperandDescriptorPtr desc) {
+                            OperandDescPtr desc,
+                            UINT64 index) {
   // TODO: return directly if BuildResult has error message.
   Node input_node = graph_desc_builder_->CreateInputNode(std::move(name));
   TensorDesc tensor_desc(GetTensorDataType(desc->data_type), desc->dimensions);
   auto node_output = graph_desc_builder_->CreateNodeOutput(
       input_node, 0, std::move(tensor_desc));
-  node_output_map_[desc->handler->value] = std::move(node_output);
+  node_output_map_[index] = std::move(node_output);
   return;
 }
 
-void GraphDMLImpl::AddConstant(OperandDescriptorPtr desc) {
+void GraphDMLImpl::AddConstant(OperandDescPtr desc, UINT64 index) {
   // TODO: return directly if BuildResult has error message.
-  if (node_output_map_.find(desc->handler->value) != node_output_map_.end()) {
+  if (node_output_map_.find(index) != node_output_map_.end()) {
     LOG(ERROR) << "There are issues in sorting graph";
     return;
   }
-  Node constant_node =
-      graph_desc_builder_->CreateConstantNode(desc->handler->value);
+  Node constant_node = graph_desc_builder_->CreateConstantNode(index);
   TensorDesc tensor_desc(GetTensorDataType(desc->data_type),
                          DML_TENSOR_FLAG_OWNED_BY_DML, desc->dimensions);
   auto node_output = graph_desc_builder_->CreateNodeOutput(
       constant_node, 0, std::move(tensor_desc));
-  node_output_map_[desc->handler->value] = std::move(node_output);
+  node_output_map_[index] = std::move(node_output);
   return;
 }
 
-void GraphDMLImpl::AddElementWiseBinary(ObjectHandlePtr a_handle,
-                                        ObjectHandlePtr b_handle,
+void GraphDMLImpl::AddElementWiseBinary(UINT64 a_index,
+                                        UINT64 b_index,
                                         BinaryOperandType type,
-                                        OperandDescriptorPtr output_desc) {
+                                        OperandDescPtr output_desc,
+                                        UINT64 output_index) {
   // TODO: return directly if BuildResult has error message.
-  DCHECK(node_output_map_.find(a_handle->value) != node_output_map_.end());
-  DCHECK(node_output_map_.find(b_handle->value) != node_output_map_.end());
+  DCHECK(node_output_map_.find(a_index) != node_output_map_.end());
+  DCHECK(node_output_map_.find(b_index) != node_output_map_.end());
 
-  auto* a_node_output = node_output_map_[a_handle->value].get();
-  auto* b_node_output = node_output_map_[b_handle->value].get();
+  auto* a_node_output = node_output_map_[a_index].get();
+  auto* b_node_output = node_output_map_[b_index].get();
   auto output_dims = output_desc->dimensions;
   std::vector<UINT> output_new_dims = output_dims;
 
@@ -407,7 +410,7 @@ void GraphDMLImpl::AddElementWiseBinary(ObjectHandlePtr a_handle,
   graph_desc_builder_->Connect({a_node_output, b_node_output}, {node});
   auto node_output =
       graph_desc_builder_->CreateNodeOutput(node, 0, std::move(output_tensor));
-  node_output_map_[output_desc->handler->value] = std::move(node_output);
+  node_output_map_[output_index] = std::move(node_output);
   return;
 }
 
@@ -430,17 +433,16 @@ std::unique_ptr<NodeOutput> GraphDMLImpl::Clamp(NodeOutput* input_node,
                                                std::move(output_tensor));
 }
 
-void GraphDMLImpl::AddClamp(ObjectHandlePtr input_handle,
+void GraphDMLImpl::AddClamp(UINT64 input_index,
                             ClampOptionsPtr options,
-                            OperandDescriptorPtr output_desc) {
+                            UINT64 output_index) {
   // TODO: return directly if BuildResult has error message.
-  auto* input_node = node_output_map_[input_handle->value].get();
-  node_output_map_[output_desc->handler->value] =
-      Clamp(input_node, options.get());
+  auto* input_node = node_output_map_[input_index].get();
+  node_output_map_[output_index] = Clamp(input_node, options.get());
   return;
 }
 
-void GraphDMLImpl::EmulateFusedOperator(const FusionOperator* activation,
+void GraphDMLImpl::EmulateFusedOperator(const OperationInfo* activation,
                                         std::unique_ptr<NodeOutput>& input_node,
                                         const std::vector<UINT>& input_dims) {
   // HardSwish and Clamp are not supported for fusion, so we add
@@ -450,11 +452,9 @@ void GraphDMLImpl::EmulateFusedOperator(const FusionOperator* activation,
     return;
   }
 
-  auto fusionType = activation->fusion_type;
-  if (fusionType == FusionType::kClamp) {
-    auto* options =
-        fusion_operators_->GetClampOption(activation->handler->value);
-    input_node = Clamp(input_node.get(), options);
+  if (activation->is_clamp()) {
+    auto& clamp = activation->get_clamp();
+    input_node = Clamp(input_node.get(), clamp->options.get());
   }
   return;
 }
@@ -474,16 +474,17 @@ void GraphDMLImpl::TransposeOutputToNhwc(
   return;
 }
 
-void GraphDMLImpl::AddConv2d(ObjectHandlePtr input_handle,
-                             ObjectHandlePtr filter_handle,
+void GraphDMLImpl::AddConv2d(UINT64 input_index,
+                             UINT64 filter_index,
                              Conv2dOptionsPtr options,
-                             OperandDescriptorPtr output_desc) {
+                             OperandDescPtr output_desc,
+                             UINT64 output_index) {
   // TODO: return directly if BuildResult has error message.
-  DCHECK(node_output_map_.find(input_handle->value) != node_output_map_.end());
-  DCHECK(node_output_map_.find(filter_handle->value) != node_output_map_.end());
+  DCHECK(node_output_map_.find(input_index) != node_output_map_.end());
+  DCHECK(node_output_map_.find(filter_index) != node_output_map_.end());
 
-  auto* input_node = node_output_map_[input_handle->value].get();
-  auto* filter_node = node_output_map_[filter_handle->value].get();
+  auto* input_node = node_output_map_[input_index].get();
+  auto* filter_node = node_output_map_[filter_index].get();
 
   auto& input_node_desc = input_node->GetTensorDesc();
   auto input_dims = input_node_desc.GetDimensions();
@@ -523,10 +524,10 @@ void GraphDMLImpl::AddConv2d(ObjectHandlePtr input_handle,
 
   std::vector<NodeOutput*> input_nodes = {input_node, filter_node};
   TensorDesc bias_tensor_desc;
-  if (options->bias_handle) {
-    DCHECK(node_output_map_.find(options->bias_handle->value) !=
+  if (options->bias_index != std::numeric_limits<uint64_t>::max()) {
+    DCHECK(node_output_map_.find(options->bias_index) !=
            node_output_map_.end());
-    auto* bias_node = node_output_map_[options->bias_handle->value].get();
+    auto* bias_node = node_output_map_[options->bias_index].get();
     auto& bias_desc = bias_node->GetTensorDesc();
     auto bias_dims = bias_desc.GetDimensions();
     if (bias_dims[0] != filter_nchw_dims[0] || bias_dims.size() != 1) {
@@ -591,48 +592,50 @@ void GraphDMLImpl::AddConv2d(ObjectHandlePtr input_handle,
   }
 
   EmulateFusedOperator(options->activation.get(), output_node, output_dims);
-  node_output_map_[output_desc->handler->value] = std::move(output_node);
+  node_output_map_[output_index] = std::move(output_node);
   return;
 }
 
-void GraphDMLImpl::AddReshape(ObjectHandlePtr input_handle,
-                              OperandDescriptorPtr output_desc) {
+void GraphDMLImpl::AddReshape(UINT64 input_index,
+                              OperandDescPtr output_desc,
+                              UINT64 output_index) {
   // TODO: return directly if BuildResult has error message.
-  DCHECK(node_output_map_.find(input_handle->value) != node_output_map_.end());
+  DCHECK(node_output_map_.find(input_index) != node_output_map_.end());
 
   auto output_dims = output_desc->dimensions;
-  auto* input_node = node_output_map_[input_handle->value].get();
+  auto* input_node = node_output_map_[input_index].get();
   auto& input_tensor_desc = input_node->GetTensorDesc();
   TensorDesc output_tensor(input_tensor_desc.GetDataType(),
                            input_tensor_desc.GetFlags(), output_dims);
   // Reshape is not a real node in DML, just need to update node output with new
   // tensor.
   auto node = input_node->GetNode();
-  node_output_map_[output_desc->handler->value] =
+  node_output_map_[output_index] =
       graph_desc_builder_->CreateNodeOutput(node, 0, std::move(output_tensor));
   return;
 }
 
-void GraphDMLImpl::AddGemm(ObjectHandlePtr a_handle,
-                           ObjectHandlePtr b_handle,
+void GraphDMLImpl::AddGemm(UINT64 a_index,
+                           UINT64 b_index,
                            GemmOptionsPtr options,
-                           OperandDescriptorPtr output_desc) {
+                           OperandDescPtr output_desc,
+                           UINT64 output_index) {
   // TODO: return directly if BuildResult has error message.
-  DCHECK(node_output_map_.find(a_handle->value) != node_output_map_.end());
-  DCHECK(node_output_map_.find(b_handle->value) != node_output_map_.end());
+  DCHECK(node_output_map_.find(a_index) != node_output_map_.end());
+  DCHECK(node_output_map_.find(b_index) != node_output_map_.end());
 
   // The shape of a tensor is 2D definited in WebNN Spec, but DML only support
   // 4D, so expand dimensions to 4D.
   // TODO: DML_FEATURE_LEVEL_4_0 and above support 2D.
   // DCHECK(a_dims.size() == 2);
-  auto* a_node_output = node_output_map_[a_handle->value].get();
+  auto* a_node_output = node_output_map_[a_index].get();
   auto& a_tensor_desc = a_node_output->GetTensorDesc();
   auto a_expand_dims = ExpandDimensions(a_tensor_desc.GetDimensions(), 4);
   TensorDesc a_expand_tensor(a_tensor_desc.GetDataType(),
                              a_tensor_desc.GetFlags(), a_expand_dims);
 
   // DCHECK(b_dims.size() == 2);
-  auto* b_node_output = node_output_map_[b_handle->value].get();
+  auto* b_node_output = node_output_map_[b_index].get();
   auto& b_tensor_desc = b_node_output->GetTensorDesc();
   auto b_expand_dims = ExpandDimensions(b_tensor_desc.GetDimensions(), 4);
   TensorDesc b_expand_tensor(b_tensor_desc.GetDataType(),
@@ -647,10 +650,9 @@ void GraphDMLImpl::AddGemm(ObjectHandlePtr a_handle,
   // The operand c is optional.
   TensorDesc c_expand_tensor;
   std::vector<NodeOutput*> input_nodes = {a_node_output, b_node_output};
-  if (options->c_handle) {
-    DCHECK(node_output_map_.find(options->c_handle->value) !=
-           node_output_map_.end());
-    auto* c_node_output = node_output_map_[options->c_handle->value].get();
+  if (options->c_index != std::numeric_limits<uint64_t>::max()) {
+    DCHECK(node_output_map_.find(options->c_index) != node_output_map_.end());
+    auto* c_node_output = node_output_map_[options->c_index].get();
     // It is either a scalar, or of the shape that is unidirectionally
     // broadcastable to the shape [M, N] definited in WebNN Spec, DML only
     // support 4D, so broadCast the Shape of optional C to {1, 1, M, N }
@@ -685,20 +687,20 @@ void GraphDMLImpl::AddGemm(ObjectHandlePtr a_handle,
   graph_desc_builder_->Connect(std::move(input_nodes), {operator_node});
   DCHECK_LT(output_dims.size(), output_expand_dims.size());
   TensorDesc output_tensor(b_tensor_desc.GetDataType(), output_dims);
-  node_output_map_[output_desc->handler->value] =
-      graph_desc_builder_->CreateNodeOutput(operator_node, 0,
-                                            std::move(output_tensor));
+  node_output_map_[output_index] = graph_desc_builder_->CreateNodeOutput(
+      operator_node, 0, std::move(output_tensor));
   return;
 }
 
-void GraphDMLImpl::AddPool2d(ObjectHandlePtr input_handle,
+void GraphDMLImpl::AddPool2d(UINT64 input_index,
                              Pool2dOptionsPtr options,
                              Pool2dType type,
-                             OperandDescriptorPtr output_desc) {
+                             OperandDescPtr output_desc,
+                             UINT64 output_index) {
   // TODO: return directly if BuildResult has error message.
-  DCHECK(node_output_map_.find(input_handle->value) != node_output_map_.end());
+  DCHECK(node_output_map_.find(input_index) != node_output_map_.end());
 
-  auto* input_node = node_output_map_[input_handle->value].get();
+  auto* input_node = node_output_map_[input_index].get();
   auto& input_node_desc = input_node->GetTensorDesc();
   auto input_dims = input_node_desc.GetDimensions();
   auto output_dims = output_desc->dimensions;
@@ -808,18 +810,19 @@ void GraphDMLImpl::AddPool2d(ObjectHandlePtr input_handle,
     TransposeOutputToNhwc(output_node, output_nchw_dims);
   }
 
-  node_output_map_[output_desc->handler->value] = std::move(output_node);
+  node_output_map_[output_index] = std::move(output_node);
 
   return;
 }
 
-void GraphDMLImpl::AddUnary(ObjectHandlePtr input_handle,
+void GraphDMLImpl::AddUnary(UINT64 input_index,
                             UnaryOperandType type,
-                            OperandDescriptorPtr output_desc) {
+                            OperandDescPtr output_desc,
+                            UINT64 output_index) {
   // TODO: return directly if BuildResult has error message.
-  DCHECK(node_output_map_.find(input_handle->value) != node_output_map_.end());
+  DCHECK(node_output_map_.find(input_index) != node_output_map_.end());
 
-  auto* input_node = node_output_map_[input_handle->value].get();
+  auto* input_node = node_output_map_[input_index].get();
   auto& input_tensor_desc = input_node->GetTensorDesc();
   Node node;
   switch (type) {
@@ -841,18 +844,13 @@ void GraphDMLImpl::AddUnary(ObjectHandlePtr input_handle,
                                 input_tensor_desc.GetDimensions());
   auto node_output = graph_desc_builder_->CreateNodeOutput(
       node, 0, std::move(output_tensor_desc));
-  node_output_map_[output_desc->handler->value] = std::move(node_output);
+  node_output_map_[output_index] = std::move(node_output);
   return;
 }
 
-void GraphDMLImpl::AddFusionClamp(ClampOptionsPtr options,
-                                  ObjectHandlePtr operator_handle) {
-  fusion_operators_->AddClampOption(operator_handle->value, std::move(options));
-}
-
-void GraphDMLImpl::AddOutput(const std::string& name, UINT64 operand_handle) {
-  DCHECK(node_output_map_.find(operand_handle) != node_output_map_.end());
-  auto* output_node = node_output_map_[operand_handle].get();
+void GraphDMLImpl::AddOutput(const std::string& name, UINT64 index) {
+  DCHECK(node_output_map_.find(index) != node_output_map_.end());
+  auto* output_node = node_output_map_[index].get();
   DCHECK(output_node != nullptr);
 
   // Append identity to avoid directly using graph input as output, and
@@ -876,24 +874,26 @@ void GraphDMLImpl::AddOutput(const std::string& name, UINT64 operand_handle) {
   return;
 }
 
-void GraphDMLImpl::Build(
-    const base::flat_map<std::string, uint64_t>& named_operands,
-    ConstantsInfoPtr constants_info,
-    BuildCallback callback) {
-  // Add Output with named operands.
-  for (auto& [name, operand_handle] : named_operands) {
-    AddOutput(name, operand_handle);
+void GraphDMLImpl::Build(ModelInfoPtr model_info,
+                         BuildCallback callback) {
+  // Add Input
+  for (auto& input : model_info->inputs) {
+    auto& operand_desc = model_info->operands[input->index];
+    AddInput(std::move(input->name), std::move(operand_desc), input->index);
   }
 
-  // Finish the graph build.
-  mCompiledOperator = graph_desc_builder_->Compile(DML_EXECUTION_FLAG_NONE);
-
-  // Upload the data to GPU so that the constant data are not saved as member
-  // variable.
+  // Add Constant
   std::unique_ptr<UploadResource> uploader =
       std::make_unique<UploadResource>(execution_context_.get());
   ComPtr<gpgmm::d3d12::ResourceAllocation> constants_resource = nullptr;
+  auto constants_info = std::move(model_info->constants);
   if (constants_info.get() != nullptr) {
+    for (auto& [index, _] : constants_info->memory_info) {
+      auto& operand_desc = model_info->operands[index];
+      AddConstant(std::move(operand_desc), index);
+    }
+    // Upload the data to GPU so that the constant data are not saved as member
+    // variable.
     base::ReadOnlySharedMemoryRegion& shared_memory_region =
         constants_info->shared_memory;
     size_t constants_byte_length = shared_memory_region.GetSize();
@@ -904,13 +904,78 @@ void GraphDMLImpl::Build(
                               constants_info);
   }
 
+  // Add operations
+  for (auto& operation : model_info->operations) {
+    switch (operation->which()) {
+      case OperationInfo::Tag::kClamp: {
+        auto& clamp = operation->get_clamp();
+        AddClamp(clamp->input_index, std::move(clamp->options),
+                 clamp->output_index);
+        break;
+      }
+      case OperationInfo::Tag::kConv2d: {
+        auto& conv2d = operation->get_conv2d();
+        auto& output_operand = model_info->operands[conv2d->output_index];
+        AddConv2d(conv2d->input_index, conv2d->filter_index,
+                  std::move(conv2d->options), std::move(output_operand),
+                  conv2d->output_index);
+        break;
+      }
+      case OperationInfo::Tag::kBinary: {
+        auto& binary = operation->get_binary();
+        auto& output_operand = model_info->operands[binary->output_index];
+        AddElementWiseBinary(binary->a_index, binary->b_index, binary->type,
+                             std::move(output_operand), binary->output_index);
+        break;
+      }
+      case OperationInfo::Tag::kGemm: {
+        auto& gemm = operation->get_gemm();
+        auto& output_operand = model_info->operands[gemm->output_index];
+        AddGemm(gemm->a_index, gemm->b_index, std::move(gemm->options),
+                std::move(output_operand), gemm->output_index);
+        break;
+      }
+      case OperationInfo::Tag::kPool2d: {
+        auto& pool2d = operation->get_pool2d();
+        auto& output_operand = model_info->operands[pool2d->output_index];
+        AddPool2d(pool2d->input_index, std::move(pool2d->options), pool2d->type,
+                  std::move(output_operand), pool2d->output_index);
+        break;
+      }
+      case OperationInfo::Tag::kUnary: {
+        auto& unary = operation->get_unary();
+        auto& output_operand = model_info->operands[unary->output_index];
+        AddUnary(unary->input_index, unary->type, std::move(output_operand),
+                 unary->output_index);
+        break;
+      }
+      case OperationInfo::Tag::kReshape: {
+        auto& reshape = operation->get_reshape();
+        auto& output_operand = model_info->operands[reshape->output_index];
+        AddReshape(reshape->input_index, std::move(output_operand),
+                   reshape->output_index);
+        break;
+      }
+      default:
+        NOTREACHED();
+    }
+  }
+
+  // Add Output with named operands.
+  for (auto& output : model_info->outputs) {
+    AddOutput(std::move(output->name), output->index);
+  }
+
+  // Finish the graph build.
+  mCompiledOperator = graph_desc_builder_->Compile(DML_EXECUTION_FLAG_NONE);
+
   auto input_nodes = graph_desc_builder_->GetInputNodes();
   std::vector<DML_BUFFER_BINDING> input_buffer_binding(input_nodes.size());
   for (size_t i = 0; i < input_nodes.size(); ++i) {
     auto input = input_nodes[i];
     if (input.type == NodeType::kConstant) {
       input_buffer_binding[i].Buffer = constants_resource->GetResource();
-      auto& memory_info = constants_info->constants[input.object_id];
+      auto& memory_info = constants_info->memory_info[input.object_id];
       input_buffer_binding[i].Offset = memory_info->byte_offset;
       input_buffer_binding[i].SizeInBytes = memory_info->byte_length;
     }

@@ -75,7 +75,7 @@ HRESULT UploadResource::UploadConstants(ID3D12Resource* dst_resource,
 
   return UploadResourceToGpu<base::flat_map<UINT64, MemoryInfoPtr>>(
       execution_context_, dst_resource, upload_resource_->GetResource(),
-      shared_memory_region, constants_info->constants);
+      shared_memory_region, constants_info->memory_info);
 }
 
 HRESULT UploadResource::UploadInputs(ID3D12Resource* dst_resource,

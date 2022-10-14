@@ -38,18 +38,4 @@ void MojoClient::Trace(Visitor* visitor) const {
   visitor->Trace(mojo_server_);
 }
 
-uint32_t MojoClient::GetNewId() {
-  if (free_ids_.empty()) {
-    current_id_++;
-    return current_id_.ValueOrDie();
-  }
-  uint32_t id = free_ids_.back();
-  free_ids_.pop_back();
-  return id;
-}
-
-void MojoClient::FreeId(uint32_t id) {
-  free_ids_.push_back(id);
-}
-
 }  // namespace blink

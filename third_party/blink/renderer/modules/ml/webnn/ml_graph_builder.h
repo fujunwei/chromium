@@ -30,7 +30,7 @@ class ScriptPromise;
 
 typedef HeapVector<std::pair<String, Member<MLOperand>>> MLNamedOperands;
 
-class MODULES_EXPORT MLGraphBuilder final : public ScriptWrappable {
+class MODULES_EXPORT MLGraphBuilder : public ScriptWrappable {
   DEFINE_WRAPPERTYPEINFO();
 
  public:

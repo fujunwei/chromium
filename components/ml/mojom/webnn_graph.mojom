@@ -6,17 +6,7 @@ module ml.webnn.mojom;
 
 import "mojo/public/mojom/base/shared_memory.mojom";
 
-// Represents those object not create message pipe, but the object need to pass
-// cross process such as `MLOperand` or `MLOperator` object in the WebIDL
-// definition. The interface used to generated MojoHandle to identify the
-// MLObject which will talk with Server side, so the message pipi will not be
-// bound in another endpoint.
-[Stable]
-interface MLObject {
-};
-
-// Represents the `MLOperandType` that is the type of operand, the type can not
-// be set for describing output which isn't used in native implementation.
+// Represents the `MLOperandType` that is the type of operand.
 [Stable, Extensible]
 enum OperandType {
   [Default] kFloat32,
@@ -27,54 +17,48 @@ enum OperandType {
   kUint8,
 };
 
-// The message pipe handle can't represents MLOperand to be used by different
-// MLOperator, so the struct ObjectHandle is defined and wrap the value of the
-// message pipe handle which is uint64 type.
-[Stable]
-struct ObjectHandle {
-  // The value is the MojoHandle of message pipe that is generated when creating
-  // the MLOperand object in blink side.
-  uint64 value@0;
-};
-
 // Represents the `MLOperandDescriptor` which describes not only input and
-// constant operand, but also intermediate node.
+// constant operand, but also output node.
 [Stable]
-struct OperandDescriptor {
+struct OperandDesc {
   // The type of the operand.
   OperandType data_type@0;
   // The dimensions of the operand.
   array<uint32> dimensions@1;
-  // The handle of the operand.
-  ObjectHandle handler@2;
 };
 
-// Represents the activation function types, the `kUnknown` is used to throw
-// exception for unsupported type in blink.
-[Stable, Extensible]
-enum FusionType { [Default] kUnknown = 0, kClamp, kRelu };
-
-// Represents the `MLOperator` in the WebIDL definition that is used to fuse
-// into another operation such as conv2d.
+// Represents the `MLClampOptions`.
 [Stable]
-struct FusionOperator {
-  // The mojo handle of the fused operator that is used to get its parameters.
-  ObjectHandle handler@0;
-  // The type of the fusion operator.
-  FusionType fusion_type@1;
+struct ClampOptions {
+  // Specifies the minimum value of the range.
+  float minValue@0;
+  // Specifies the maximum value of the range.
+  float maxValue@1;
+};
+
+// Corresponds to `MLOperand clamp(MLOperand input, MLClampOptions options)`
+// function in `MLGraphBuilder`. The input `MLOperand` is mapping to the
+// struct's input index, the return `MLOperand` is mapping to the struct's
+// output index. `minValue` and `maxValue` are mapping to `MLClampOptions`.
+[Stable]
+struct Clamp {
+  // The index of input operand in the model's operand array.
+  uint64 input_index@0;
+  // MLClampOptions is mapping to ClampOptions.
+  ClampOptions options@1;
+  // The index of output operand in the model's operand array.
+  uint64 output_index@2;
 };
 
 // Represents the `MLInputOperandLayout` that specifies the layout format of
-// the input tensor.
-// N is the batch, C is input channels, H is height and W is the width of the
-// tensor.
+// the input tensor. N is the batch, C is input channels, H is height and W is
+// the width of the tensor.
 [Stable, Extensible]
 enum InputOperandLayout { [Default] kNchw, kNhwc };
 
 // Represents the `MLConv2dFilterOperandLayout` that specifies the layout format
-// of filter tensor.
-// O is the output channel, i is input channel, H is height and W is the width
-//  of the tensor.
+// of filter tensor. O is the output channel, i is input channel, H is height
+// and W is the width of the tensor.
 [Stable, Extensible]
 enum Conv2dFilterOperandLayout { [Default] kOihw, kHwio, kOhwi, kIhwo };
 
@@ -103,20 +87,69 @@ struct Conv2dOptions {
   InputOperandLayout inputLayout@5 = InputOperandLayout.kNchw;
   // The layout format of the filter.
   Conv2dFilterOperandLayout filterLayout@6 = Conv2dFilterOperandLayout.kOihw;
-  // The mojo handle of bias operand that is additional 1-D tensor with the
+  // The index of bias operand that is additional 1-D tensor with the
   // shape of [output_channels] whose values are to be added to the convolution
   // result.
-  ObjectHandle? bias_handle@7;
+  uint64 bias_index@7;
   //The optional activation function that immediately follows the convolution
   // operation.
-  FusionOperator? activation@8;
+  OperationInfo? activation@8;
+};
+
+// Corresponds to `MLOperand conv2d(MLOperand input, MLOperand filter,
+// MLConv2dOptions options)` operation in `MLGraphBuilder`. The input
+// `MLOperand` is mapping to the struct's input index, the filter `MLOperand` is
+// mapping to the struct's filter index, the return `MLOperand` is mapping to
+// the struct's output index.
+[Stable]
+struct Conv2d {
+  // The index of input operand in the model's operand array.
+  uint64 input_index@0;
+  // The index of filter operand in the model's operand array.
+  uint64 filter_index@1;
+  // MLConv2dOptions is mapping to Conv2dOptions.
+  Conv2dOptions options@2;
+  // The index of output operand in the model's operand array.
+  uint64 output_index@3;
+};
+
+// Represents element-wise binary operation, the `kUnknown` is used to throw
+// exception for unsupported type in blink.
+[Stable, Extensible]
+enum BinaryOperandType {
+  [Default] kUnknown = 0,
+  kAdd,
+  kSub,
+  kMul,
+  kDiv,
+  kMax,
+  kMin,
+  kMatMul,
+  kPower,
+};
+
+// Add element-wise binary addition, subtraction, multiplication, division
+// defined in `BinaryOperandType`. Corresponds to `MLOperand add(MLOperand a,
+// MLOperand b)` function in `MLGraphBuilder`. The a `MLOperand` is mapping to
+// the struct's a index, The b `MLOperand` is mapping to the struct's b index,
+// the return `MLOperand` is mapping to the struct's output index.
+[Stable]
+struct Binary {
+  // The type of binary operation.
+  BinaryOperandType type@0;
+  // The index of a operand in the model's operand array.
+  uint64 a_index@1;
+  // The index of b operand in the model's operand array.
+  uint64 b_index@2;
+  // The index of output operand in the model's operand array.
+  uint64 output_index@3;
 };
 
 // Represents the `MLGemmOptions`.
 [Stable]
 struct GemmOptions {
-  // The mojo handle of third input tensor.
-  ObjectHandle? c_handle@0;
+  // The index of third input tensor in the model's operand array.
+  uint64 c_index@0;
   // The scalar multiplier for the first input.
   float alpha@1 = 1.0;
   // The scalar multiplier for the third input.
@@ -125,6 +158,22 @@ struct GemmOptions {
   bool a_transpose@3 = false;
   // If the second  input should be transposed.
   bool b_transpose@4 = false;
+};
+
+// Corresponds to `MLOperand gemm(MLOperand a, MLOperand b, MLGemmOptions
+// options)` function in `MLGraphBuilder`. The a `MLOperand` is mapping to the
+// struct's a index, The b `MLOperand` is mapping to the struct's b index, the
+// return `MLOperand` is mapping to the struct's output index.
+[Stable]
+struct Gemm {
+  // The index of a operand in the model's operand array.
+  uint64 a_index@0;
+  // The index of b operand in the model's operand array.
+  uint64 b_index@1;
+  // MLGemmOptions is mapping to GemmOptions.
+  GemmOptions options@2;
+  // The index of output operand in the model's operand array.
+  uint64 output_index@3;
 };
 
 // Represents the `MLPool2dType`, the `kUnknown` is used to throw exception for
@@ -162,28 +211,22 @@ struct Pool2dOptions {
   array<int32> output_sizes@7;
 };
 
-// Represents the `MLClampOptions`.
+// Add a mean, L2 norm, or max reduction operation defined in `Pool2dType`
+// across all the elements within the moving window over the input tensor.
+// Corresponds to `MLOperand pool2d(MLOperand input, MLPool2dOptions options)`
+// function in `MLGraphBuilder`. The input `MLOperand` is mapping to the
+// struct's input index, the return `MLOperand` is mapping to the struct's
+// output index.
 [Stable]
-struct ClampOptions {
-  // Specifies the minimum value of the range.
-  float minValue@0;
-  // Specifies the maximum value of the range.
-  float maxValue@1;
-};
-
-// Represents element-wise binary operation, the `kUnknown` is used to throw
-// exception for unsupported type in blink.
-[Stable, Extensible]
-enum BinaryOperandType {
-  [Default] kUnknown = 0,
-  kAdd,
-  kSub,
-  kMul,
-  kDiv,
-  kMax,
-  kMin,
-  kMatMul,
-  kPower,
+struct Pool2d {
+  // The type of pool2d operation.
+  Pool2dType type@0;
+  // The index of input operand in the model's operand array.
+  uint64 input_index@1;
+  // MLPool2dOptions is mapping to Pool2dOptions.
+  Pool2dOptions options@2;
+  // The index of output operand in the model's operand array.
+  uint64 output_index@3;
 };
 
 // Represents unary operation, the `kUnknown` is used to throw exception for
@@ -194,6 +237,31 @@ enum UnaryOperandType {
   kRelu,
   kSoftmax,
   kSigmoid,
+};
+
+// Add unary operation relu, softmax, sigmoid defined in `UnaryOperandType`.
+// The input `MLOperand` is mapping to the struct's input index, the return
+// `MLOperand` is mapping to the struct's output index.
+[Stable]
+struct Unary {
+  // The type of unary operation.
+  UnaryOperandType type@0;
+  // The index of input operand in the model's operand array.
+  uint64 input_index@1;
+  // The index of output operand in the model's operand array.
+  uint64 output_index@2;
+};
+
+// Corresponds to `MLOperand reshape(MLOperand input, sequence<long> shape)`
+// function in `MLGraphBuilder`.The input `MLOperand` is mapping to the struct's
+// input index, the `shape` is set with the dimensions of output OperandDesc.
+// the return `MLOperand` is mapping to the struct's output index.
+[Stable]
+struct Reshape {
+  // The index of input operand in the model's operand array.
+  uint64 input_index@0;
+  // The index of output operand in the model's operand array.
+  uint64 output_index@1;
 };
 
 // Describe the information of inputs / outputs data in shared buffer.
@@ -212,18 +280,61 @@ struct NamedInputs {
   mojo_base.mojom.ReadOnlySharedMemoryRegion shared_memory@1;
 };
 
-[Stable]
-struct ConstantsInfo {
-  // The key is mojo handle to identify constant operand.
-  map<uint64, MemoryInfo> constants@0;
-  mojo_base.mojom.ReadOnlySharedMemoryRegion shared_memory@1;
-};
-
 // Represents the `MLNamedOutputs`.
 [Stable]
 struct NamedOutputs {
   map<string, MemoryInfo> outputs@0;
   mojo_base.mojom.ReadOnlySharedMemoryRegion shared_memory@1;
+};
+
+// Represents the operations defined in `MLGraphBuilder`, the information of the
+// operation describe the functional semantics.
+[Stable]
+union OperationInfo {
+  // Keep the order as the same as build methods of `MLGraphBuilder`.
+  Clamp clamp;
+  Conv2d conv2d;
+  Binary binary;
+  Gemm gemm;
+  Pool2d pool2d;
+  Unary unary;
+  Reshape reshape;
+};
+
+// Add a input operand in the graph with name and the descriptor, Corresponds
+// to `MLOperand input(DOMString name, MLOperandDescriptor desc)` function in
+// `MLGraphBuilder`.
+[Stable]
+struct NamedOperand {
+  // The name of input operand.
+  string name;
+  // The index of input in the model's operands array.
+  uint64 index;
+};
+
+// Add a constant operand in the graph with value and the descriptor,
+// Corresponds to `MLOperand constant(MLOperandDescriptor desc, MLBufferView
+// bufferView)` function in `MLGraphBuilder`.
+[Stable]
+struct ConstantsInfo {
+  // The key is index of model's operands array to identify constant operand.
+  map<uint64, MemoryInfo> memory_info@0;
+  mojo_base.mojom.ReadOnlySharedMemoryRegion shared_memory@1;
+};
+
+// The model information.
+[Stable]
+struct ModelInfo {
+  // All operands in the model.
+  array<OperandDesc> operands@0;
+  // All inputs in the model.
+  array<NamedOperand> inputs@1;
+  // All outputs in the models.
+  array<NamedOperand> outputs@2;
+  // All operations in the model.
+  array<OperationInfo> operations@3;
+  // The constants data in shared memory.
+  ConstantsInfo? constants;
 };
 
 // Used by `BuildGraph()` of interface Graph.
@@ -244,78 +355,15 @@ enum ComputeResult {
 // use its `Compute` interface to do inferences.
 [Stable]
 interface Graph {
-  // Corresponds to `MLOperand input(DOMString name, MLOperandDescriptor desc)`
-  // function in `MLGraphBuilder`.
-  // It's to add a input operand in the graph with name and the descriptor,
-  // the `OperandDescriptor` describe its type, dimensions and mojo handle of
-  // input operand.
-  AddInput@0(string name, OperandDescriptor desc);
-
-  // Corresponds to `MLOperand constant(MLOperandDescriptor desc, MLBufferView
-  // bufferView)` array buffer implementation in `MLGraphBuilder`.
-  // It's to add a constant operand in the graph with the descriptor and data
-  // that is cpu buffer.
-  AddConstant@1(OperandDescriptor desc);
-
-  // Add element-wise binary addition, subtraction, multiplication, division
-  // defined in `BinaryOperandType`. `a_handle` is the mojo handle of first
-  // input operand, `b_handle` is the mojo handle of second input operand,
-  // `output_desc` is the descriptor of output operand including mojo handle and
-  // dimensions.
-  AddElementWiseBinary@3(ObjectHandle a_handle, ObjectHandle b_handle,
-      BinaryOperandType type, OperandDescriptor output_desc);
-
-  // Corresponds to `MLOperand clamp(MLOperand x, MLClampOptions options)`
-  // function in `MLGraphBuilder`.
-  // `input_handle` is the mojo handle of input operand `x`.
-  AddClamp@4(ObjectHandle input_handle, ClampOptions options,
-      OperandDescriptor output_desc);
-
-  // Corresponds to `MLOperand conv2d(MLOperand input, MLOperand filter,
-  // MLConv2dOptions options)` function in `MLGraphBuilder`.
-  // `input_handle` is the mojo handle of input operand, `filter_handle` is the
-  //  mojo handle of filter operand.
-  AddConv2d@5(ObjectHandle input_handle, ObjectHandle filter_handle,
-      Conv2dOptions options, OperandDescriptor output_desc);
-
-  // Corresponds to `MLOperand reshape(MLOperand input, sequence<long> shape)`
-  // function in `MLGraphBuilder`.
-  // `input_handle` is the mojo handle of input operand, the `shape` is set with
-  // the dimensions of `output_desc`.
-  AddReshape@6(ObjectHandle input_handle, OperandDescriptor output_desc);
-
-  // Corresponds to `MLOperand gemm(MLOperand a, MLOperand b, MLGemmOptions
-  // options)` function in `MLGraphBuilder`.
-  // `a_handle` is the mojo handle of `a` operand, `b_handle` is the mojo handle
-  // of `b` operand.
-  AddGemm@7(ObjectHandle a_handle, ObjectHandle b_handle, GemmOptions options,
-      OperandDescriptor output_desc);
-
-  // Add a mean, L2 norm, or max reduction operation defined in `Pool2dType`
-  // across all the elements within the moving window over the input tensor.
-  AddPool2d@8(ObjectHandle input_handle, Pool2dOptions options,
-      Pool2dType type, OperandDescriptor output_desc);
-
-  // Add unary operation relu, softmax, sigmoid defined in `UnaryOperandType`.
-  // `input_handle` is the mojo handle of input operand.
-  AddUnary@9(ObjectHandle input_handle, UnaryOperandType type,
-      OperandDescriptor output_desc);
-
-  // Corresponds to `MLOperator clamp(MLClampOptions options)` function in
-  // `MLGraphBuild`.
-  // `operator_handle` is the mojo handle of the clamp fusion operator.
-  AddFusionClamp@10(ClampOptions options, ObjectHandle operator_handle);
-
   // Compile the `MLGraphBuild` state up to the specified output operands into
   // a compiled graph according to the type of `MLContext` that creates it.
   // `result` is the status of building graph.
-  Build@11(map<string, uint64> named_operands,
-      ConstantsInfo? constant_info) => (BuildResult result);
+  Build@0(ModelInfo model_info) => (BuildResult result);
 
   // Carries out the computational workload of a compiled graph.
   // `named_inputs` is the resources of inputs with shared memory,
   // `named_outputs` is the result of inference which return to renderer process
   // with shared memory.
-  Compute@12(NamedInputs named_inputs)
+  Compute@1(NamedInputs named_inputs)
       => (ComputeResult result, NamedOutputs? named_outputs);
 };

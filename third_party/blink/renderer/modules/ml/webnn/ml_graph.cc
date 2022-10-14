@@ -6,7 +6,6 @@
 
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_tensor.h"
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
-#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operator.h"
 
@@ -21,19 +20,6 @@ void MLGraph::Trace(Visitor* visitor) const {
   ScriptWrappable::Trace(visitor);
 }
 
-MLGraph::BuildRequest::BuildRequest(MLNamedOperands named_outputs)
-    : outputs_(std::move(named_outputs)) {
-  MLGraphBuilder::SortOperators(outputs_, inputs_, constants_,
-                                sorted_operators_);
-}
-
-void MLGraph::BuildRequest::Trace(Visitor* visitor) const {
-  visitor->Trace(outputs_);
-  visitor->Trace(inputs_);
-  visitor->Trace(constants_);
-  visitor->Trace(sorted_operators_);
-}
-
 MLGraph::ComputeRequest::ComputeRequest(MLNamedArrayInputs inputs,
                                         MLNamedArrayOutputs outputs)
     : inputs_(std::move(inputs)), outputs_(std::move(outputs)) {}
@@ -45,11 +31,12 @@ void MLGraph::ComputeRequest::Trace(Visitor* visitor) const {
 
 DOMArrayBufferView* MLGraph::ValidateInputBuffer(const MLNamedInput& input,
                                                  String& error_message) {
-  auto iter = inputs_byte_length_.find(input.first);
-  if (iter == inputs_byte_length_.end()) {
-    error_message = "There is unknown input: " + input.first;
-    return nullptr;
-  }
+  // TODO:: Use output_resources_info_ instead of input_length_map_
+  auto iter = input_length_map_.find(input.first);
+  // if (iter == input_length_map_.end()) {
+  //   error_message = "There is unknown input: " + input.first;
+  //   return nullptr;
+  // }
   DOMArrayBufferView* array_buffer_view = nullptr;
   if (input.second->IsArrayBufferViewAllowShared()) {
     array_buffer_view = input.second->GetAsArrayBufferViewAllowShared().Get();
@@ -67,27 +54,28 @@ DOMArrayBufferView* MLGraph::ValidateInputBuffer(const MLNamedInput& input,
 
 void* MLGraph::ValidateOutputBuffer(const MLNamedOutput& output,
                                     String& error_message) {
-  auto iter = outputs_byte_length_.find(output.first);
-  if (iter == outputs_byte_length_.end()) {
-    error_message = "There is unknown output: " + output.first;
-    return nullptr;
-  }
+  // TODO:: Use output_resources_info_ instead of output_length_map_
+  // auto iter = output_length_map_.find(output.first);
+  // if (iter == output_length_map_.end()) {
+  //   error_message = "There is unknown output: " + output.first;
+  //   return nullptr;
+  // }
   void* output_buffer_address = nullptr;
   if (output.second->IsArrayBufferViewAllowShared()) {
     DOMArrayBufferView* array_buffer_view =
         output.second->GetAsArrayBufferViewAllowShared().Get();
-    if (array_buffer_view->byteLength() < iter->value) {
-      error_message = "Wrong size of output: " + output.first;
-      return nullptr;
-    }
+    // if (array_buffer_view->byteLength() < iter->value) {
+    //   error_message = "Wrong size of output: " + output.first;
+    //   return nullptr;
+    // }
     output_buffer_address = array_buffer_view->BaseAddressMaybeShared();
   } else if (output.second->IsArrayBufferAllowShared()) {
     DOMArrayBufferBase* array_buffer =
         output.second->GetAsArrayBufferAllowShared();
-    if (array_buffer->ByteLength() < iter->value) {
-      error_message = "Wrong size of output: " + output.first;
-      return nullptr;
-    }
+    // if (array_buffer->ByteLength() < iter->value) {
+    //   error_message = "Wrong size of output: " + output.first;
+    //   return nullptr;
+    // }
     output_buffer_address = array_buffer->DataMaybeShared();
   }
   return output_buffer_address;

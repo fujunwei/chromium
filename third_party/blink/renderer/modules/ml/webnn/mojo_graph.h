@@ -9,6 +9,7 @@
 #include "base/memory/shared_memory_mapping.h"
 #include "components/ml/mojom/webnn_graph.mojom-blink.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph.h"
+#include "third_party/blink/renderer/modules/ml/webnn/mojo_model_info.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
 #include "third_party/blink/renderer/platform/heap/visitor.h"
 #include "third_party/blink/renderer/platform/mojo/heap_mojo_remote.h"
@@ -17,9 +18,9 @@ namespace blink {
 
 class ScriptPromiseResolver;
 
-using ml::webnn::mojom::blink::FusionOperatorPtr;
 using ml::webnn::mojom::blink::NamedOutputsPtr;
-using ml::webnn::mojom::blink::OperandDescriptorPtr;
+using ml::webnn::mojom::blink::OperandDescPtr;
+using ml::webnn::mojom::blink::ConstantsInfoPtr;
 
 class MojoGraph : public MLGraph {
  public:
@@ -31,8 +32,6 @@ class MojoGraph : public MLGraph {
   ScriptPromise BuildImpl(ScriptState* script_state,
                           MLNamedOperands named_outputs,
                           ExceptionState& exception_state) override;
-  void BuildSyncImpl(MLNamedOperands named_outputs,
-                     ExceptionState& exception_state) override;
 
   ScriptPromise ComputeImpl(ScriptState* script_state,
                             MLNamedArrayInputs inputs,
@@ -45,7 +44,6 @@ class MojoGraph : public MLGraph {
  private:
   void OnGraphCreated(ScriptState*,
                       ScriptPromiseResolver*,
-                      BuildRequest* request,
                       mojo::PendingRemote<ml::webnn::mojom::blink::Graph>);
   void OnGraphBuilt(ScriptPromiseResolver*,
                     ml::webnn::mojom::blink::BuildResult);
@@ -54,6 +52,7 @@ class MojoGraph : public MLGraph {
                        ml::webnn::mojom::blink::ComputeResult result,
                        NamedOutputsPtr named_outputs);
 
+  MLNamedOperands named_outputs_;
   // The map of input name and input data offset.
   HashMap<String, size_t> inputs_byte_offset_;
   base::MappedReadOnlyRegion inputs_shm_region_;

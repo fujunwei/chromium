@@ -566,7 +566,9 @@ MLOperand* MLGraphBuilder::input(String name,
   // If no dimensions, it represents a scalar. Set dimensions to {1}.
   Vector<uint32_t> dimensions = desc->getDimensionsOr({1});
   String error_message;
-  if (!ValidateAndCalculateByteLength(type, dimensions, error_message)) {
+  absl::optional<size_t> input_byte_length =
+      ValidateAndCalculateByteLength(type, dimensions, error_message);
+  if (!input_byte_length) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kDataError,
         "Invalid operand descriptor: " + error_message);

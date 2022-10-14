@@ -10,7 +10,6 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_union_arraybufferviewallowshared_mltensor.h"
 #include "third_party/blink/renderer/core/typed_arrays/array_buffer_view_helpers.h"
 #include "third_party/blink/renderer/core/typed_arrays/dom_array_buffer_view.h"
-#include "third_party/blink/renderer/modules/ml/webnn/ml_object.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_vector.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
@@ -21,7 +20,6 @@
 namespace blink {
 
 class MLContext;
-class MLOperator;
 class MLOperand;
 
 typedef std::pair<String, Member<V8UnionArrayBufferViewAllowSharedOrMLTensor>>
@@ -51,9 +49,6 @@ class MLGraph : public ScriptWrappable {
                                   MLNamedOperands named_outputs,
                                   ExceptionState& exception_state) = 0;
 
-  virtual void BuildSyncImpl(MLNamedOperands named_outputs,
-                             ExceptionState& exception_state) = 0;
-
   virtual ScriptPromise ComputeImpl(ScriptState* script_state,
                                     MLNamedArrayInputs inputs,
                                     MLNamedArrayOutputs outputs,
@@ -64,16 +59,6 @@ class MLGraph : public ScriptWrappable {
                                ExceptionState& exception_state) = 0;
 
  protected:
-  struct BuildRequest final : public GarbageCollected<BuildRequest> {
-    explicit BuildRequest(MLNamedOperands named_outputs);
-    void Trace(Visitor*) const;
-
-    MLNamedOperands outputs_;
-    HeapVector<Member<const MLOperand>> inputs_;
-    HeapVector<Member<const MLOperand>> constants_;
-    HeapVector<Member<const MLOperator>> sorted_operators_;
-  };
-
   struct ComputeRequest final : public GarbageCollected<ComputeRequest> {
     ComputeRequest(MLNamedArrayInputs inputs, MLNamedArrayOutputs outputs);
     void Trace(Visitor*) const;
@@ -89,9 +74,7 @@ class MLGraph : public ScriptWrappable {
 
   Member<MLContext> context_;
   // The map of input name and input data length.
-  HashMap<String, size_t> inputs_byte_length_;
-  // The map of output name and output data length.
-  HashMap<String, size_t> outputs_byte_length_;
+  HashMap<String, size_t> input_length_map_;
 };
 
 }  // namespace blink

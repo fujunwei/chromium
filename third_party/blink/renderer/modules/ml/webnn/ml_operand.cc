@@ -111,8 +111,7 @@ MLOperand::MLOperand(MLGraphBuilder* builder,
                      OperandKind kind,
                      const V8MLOperandType::Enum type,
                      Vector<uint32_t> dimensions)
-    : MLObject(builder->GetContext()),
-      builder_(builder),
+    : builder_(builder),
       kind_(kind),
       type_(type),
       dimensions_(std::move(dimensions)) {}
@@ -154,7 +153,7 @@ void MLOperand::Trace(Visitor* visitor) const {
   visitor->Trace(builder_);
   visitor->Trace(array_buffer_view_);
   visitor->Trace(operator_);
-  MLObject::Trace(visitor);
+  ScriptWrappable::Trace(visitor);
 }
 
 }  // namespace blink

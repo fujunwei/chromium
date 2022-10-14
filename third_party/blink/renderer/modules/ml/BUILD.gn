@@ -26,8 +26,6 @@ blink_modules_sources("ml") {
     "webnn/ml_graph.h",
     "webnn/ml_graph_builder.cc",
     "webnn/ml_graph_builder.h",
-    "webnn/ml_object.cc",
-    "webnn/ml_object.h",
     "webnn/ml_operand.cc",
     "webnn/ml_operand.h",
     "webnn/ml_operator.cc",
@@ -38,5 +36,7 @@ blink_modules_sources("ml") {
     "webnn/mojo_context.h",
     "webnn/mojo_graph.cc",
     "webnn/mojo_graph.h",
+    "webnn/mojo_model_info.cc",
+    "webnn/mojo_model_info.h",
   ]
 }

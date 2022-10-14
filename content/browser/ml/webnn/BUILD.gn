@@ -21,8 +21,6 @@ buildflag_header("buildflags") {
 
 source_set("lib") {
   sources = [
-    "fusion_operators.cc",
-    "fusion_operators.h",
     "webnn_service_factory.cc",
     "webnn_service_factory.h",
   ]
