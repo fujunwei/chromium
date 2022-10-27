@@ -52,11 +52,12 @@ using ml::webnn::mojom::Pool2dType;
 
 class ExecutionContext;
 
-class GraphDMLImpl : public ml::webnn::mojom::Graph {
+class GraphDMLImpl : public ml::webnn::mojom::WebnnGraph {
  public:
   ~GraphDMLImpl() override;
-  static void Create(mojo::PendingReceiver<ml::webnn::mojom::Graph> receiver,
-                     scoped_refptr<ExecutionContext> execution_context);
+  static void Create(
+      mojo::PendingReceiver<ml::webnn::mojom::WebnnGraph> receiver,
+      scoped_refptr<ExecutionContext> execution_context);
 
   GraphDMLImpl(const GraphDMLImpl&) = delete;
   GraphDMLImpl& operator=(const GraphDMLImpl&) = delete;
@@ -65,7 +66,7 @@ class GraphDMLImpl : public ml::webnn::mojom::Graph {
   GraphDMLImpl(scoped_refptr<ExecutionContext> execution_context);
 
  private:
-  // ml::webnn::mojom::Graph
+  // ml::webnn::mojom::WebnnGraph
   void AddInput(const std::string&, OperandDescriptorPtr, UINT64 index);
   void AddConstant(OperandDescriptorPtr, UINT64 index);
   void AddClamp(UINT64 input_index,

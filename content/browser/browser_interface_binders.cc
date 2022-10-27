@@ -279,9 +279,9 @@ ml::webnn::mojom::WebnnService* GetWebnnService() {
   return remote->get();
 }
 
-void BindMojoServer(
-    mojo::PendingReceiver<ml::webnn::mojom::MojoServer> receiver) {
-  GetWebnnService()->BindMojoServer(std::move(receiver));
+void BindWebnnContext(
+    mojo::PendingReceiver<ml::webnn::mojom::WebnnContext> receiver) {
+  GetWebnnService()->BindWebnnContext(std::move(receiver));
 }
 #endif
 
@@ -835,9 +835,9 @@ void PopulateFrameBinders(RenderFrameHostImpl* host, mojo::BinderMap* map) {
 
 #if BUILDFLAG(ENABLE_MOJO_WEBNN_IN_UTILITY_PROCESS)
   if (base::FeatureList::IsEnabled(
-          blink::features::kEnableMachineLearningNeuralNetworkApi)) {
-    map->Add<ml::webnn::mojom::MojoServer>(
-        base::BindRepeating(&BindMojoServer));
+          blink::features::kEnableMachineLearningNeuralNetworkService)) {
+    map->Add<ml::webnn::mojom::WebnnContext>(
+        base::BindRepeating(&BindWebnnContext));
   }
 #endif
 

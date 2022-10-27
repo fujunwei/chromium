@@ -17,14 +17,17 @@ blink_modules_sources("webnn") {
     "ml_graph.h",
     "ml_graph_builder.cc",
     "ml_graph_builder.h",
+
+    # MLGraphMojo is platform independent which packages the model information
+    # into a neutral struct type, it will be built and executed with hardware
+    # accelerated OS machine learning API in WebNN Service which run out of
+    # renderer process.
+    "ml_graph_mojo.cc",
+    "ml_graph_mojo.h",
     "ml_operand.cc",
     "ml_operand.h",
     "ml_operator.cc",
     "ml_operator.h",
-    "mojo_client.cc",
-    "mojo_client.h",
-    "mojo_graph.cc",
-    "mojo_graph.h",
     "mojo_model_info.cc",
     "mojo_model_info.h",
   ]

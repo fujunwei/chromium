@@ -23,11 +23,7 @@ namespace blink {
 class MLContextOptions;
 class ScriptPromise;
 class ScriptState;
-class ScriptPromise;
-class MojoClient;
-
-using ml::webnn::mojom::blink::ContextOptionsPtr;
-using ml::webnn::mojom::blink::MojoServer;
+class ScriptPromiseResolver;
 
 // This class represents the "Machine Learning" object "navigator.ml" and will
 // be shared between the Model Loader API and WebNN API.
@@ -47,10 +43,12 @@ class MODULES_EXPORT ML final : public ScriptWrappable {
       ml::model_loader::mojom::blink::MLService::CreateModelLoaderCallback
           callback);
 
-  // Create Webnn mojo context with MojoServer interface.
-  void CreateWebnnMojoContext(ScriptPromiseResolver* resolver,
-                              ContextOptionsPtr options,
-                              MojoServer::CreateContextCallback callback);
+  // Create `WebnnGraph` message pipe with `WebnnContext` mojo interface to
+  // compile and execute computational graph out of renderer process.
+  void CreateWebnnGraph(
+      ScriptPromiseResolver* resolver,
+      ml::webnn::mojom::blink::CreateGraphOptionsPtr options,
+      ml::webnn::mojom::blink::WebnnContext::CreateGraphCallback callback);
 
   void Trace(blink::Visitor*) const override;
 
@@ -60,21 +58,25 @@ class MODULES_EXPORT ML final : public ScriptWrappable {
                               ExceptionState& exception_state);
 
  private:
+  Member<ExecutionContext> execution_context_;
   // Binds the Mojo connection to browser process if needed.
   // Returns false when the execution context is not valid (e.g., the frame is
   // detached) and an exception will be thrown.
   // Otherwise returns true.
   bool BootstrapMojoConnectionIfNeeded(ScriptState* script_state,
                                        ExceptionState& exception_state);
-
-  Member<ExecutionContext> execution_context_;
-
   HeapMojoRemote<ml::model_loader::mojom::blink::MLService> remote_service_;
 
-  // There is only one WebNN service run in server side, the MojoServer mojo
-  // interface represents the object "navigator.ml", the WebNN mojo client is
-  // another end pointer in blink side, the interface is used to create context.
-  Member<MojoClient> webnn_mojo_client_;
+  // There is only one service running out of renderer process to access the
+  // hardware accelerated OS machine learning API. Every `navigator.ml`
+  // object in browser tab has one `WebnnContext` message pipe to create
+  // `WebnnGraph` mojo interface.
+  void EnsureWebnnServiceConnection();
+  // Webnn support multiple types of neural network inference hardware
+  // acceleration such as CPU, GPU and ML specialized accelerator, the context
+  // of webnn in service is used to map different device and represent a state
+  // of graph execution processes.
+  HeapMojoRemote<ml::webnn::mojom::blink::WebnnContext> webnn_context_;
 };
 
 }  // namespace blink

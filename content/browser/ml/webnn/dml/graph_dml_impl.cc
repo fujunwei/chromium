@@ -293,9 +293,9 @@ std::vector<UINT> CalculateStridesForBroadcast(
       DML_OPERATOR_ELEMENT_WISE_IDENTITY, &operator_desc);
 
 // static
-void GraphDMLImpl::Create(mojo::PendingReceiver<Graph> receiver,
+void GraphDMLImpl::Create(mojo::PendingReceiver<WebnnGraph> receiver,
                           scoped_refptr<ExecutionContext> execution_context) {
-  mojo::MakeSelfOwnedReceiver<Graph>(
+  mojo::MakeSelfOwnedReceiver<WebnnGraph>(
       base::WrapUnique(new GraphDMLImpl(execution_context)),
       std::move(receiver));
 }

@@ -19,6 +19,7 @@ namespace blink {
 class MLGraphBuilder;
 class MLOperand;
 class V8TestingScope;
+class ScriptPromise;
 
 // The utility methods for graph builder test.
 MLGraphBuilder* CreateMLGraphBuilder(
@@ -74,6 +75,10 @@ MLOperand* BuildGemm(V8TestingScope& scope,
                      const MLOperand* a,
                      const MLOperand* b,
                      const MLGemmOptions* options = MLGemmOptions::Create());
+
+ScriptPromise BuildSimpleGraph(
+    V8TestingScope& scope,
+    MLContextOptions* context_options = MLContextOptions::Create());
 
 }  // namespace blink
 

@@ -5,33 +5,49 @@
 module ml.webnn.mojom;
 
 import "components/ml/mojom/web_platform_model.mojom";
-import "components/ml/mojom/webnn_context.mojom";
+import "components/ml/mojom/webnn_graph.mojom";
 import "sandbox/policy/mojom/sandbox.mojom";
 
 const sandbox.mojom.Sandbox kWebnnSandbox = sandbox.mojom.Sandbox.kUtility;
 
-[Stable]
-struct ContextOptions {
+// Represents options of creating `WebnnGraph` interface.
+struct CreateGraphOptions {
   // The device to be used (e.g. "auto", "cpu", "gpu" etc.).
-  ml.model_loader.mojom.DevicePreference device_preference@0;
+  ml.model_loader.mojom.DevicePreference device_preference;
   // The power preference indicates preference as related to power consumption.
   ml.model_loader.mojom.PowerPreference power_preference@1;
 };
 
-// The interface is used to factory interfaces in WebNN such as `MLContext`.
-[Stable]
-interface MojoServer {
-  // Called by the renderer to ask the GPU process to create a `MLContext`, a
-  // global state can be initialized when creating context, for example
-  // GPUDevice for GPU backend.
-  CreateContext@0(ContextOptions options) => (pending_remote<Context>? remote);
+enum CreateGraphResult {
+  kOk,
+  kUnknownError,
+  // The input configuration is not supported.
+  kNotSupported,
 };
 
-// Represents the WebNN service, there is only one instance in the GPU process
-// to communicate with renderer process.
+// Represents the `MLContext` object in the WebIDL definition that is a global
+// state of neural network compute workload and execution processes. This
+// interfaces is used to create `WebnnGraph` message pipe for compiling and
+// executing computational graph.
+interface WebnnContext {
+  // Called by the renderer process to create a message pipe for `WebnnGraph`,
+  // it will return `CreatGraphResult::kNotSupported` with `mojo::NullRemote`
+  // on non-supported platforms.
+  CreateGraph(CreateGraphOptions options)
+      => (CreateGraphResult result, pending_remote<WebnnGraph>? remote);
+};
+
+// Represents the WebNN service to inference computational graph. There is only
+// one service running out of renderer process to access the hardware
+// accelerated OS machine learning API such as Direct Machine Learning
+// (DirectML) on Windows, Android Neural Networks API (NNAPI) on ChromeOS and
+// Android, CoreML on macOS platform.
 [ServiceSandbox=kWebnnSandbox]
 interface WebnnService {
-  // The `MojoServer` is one-to-one mapping with `navigator.ml`, and there is
-  // a corresponding remote interface named `MojoClient` in renderer process.
-  BindMojoServer(pending_receiver<MojoServer> receiver);
+  // Bind `WebnnContext` interface for every `navigator.ml` object of browser
+  // tab which is registered in `BrowserInterfaceBroker` with the callback, the
+  // BrowserInterfaceBroker's GetInterface() in renderer process with pending
+  // receiver will find the registered `WebnnContext` interface, the callback
+  // will bind the pending receiver with the implementation in the service.
+  BindWebnnContext(pending_receiver<WebnnContext> receiver);
 };

@@ -347,7 +347,7 @@ enum ComputeResult {
 // Corresponds to the `MLGraph` object in the WebIDL definition. The user can
 // use its `Compute` interface to do inferences.
 [Stable]
-interface Graph {
+interface WebnnGraph {
   // Compile the `MLGraphBuild` state up to the specified output operands into
   // a compiled graph according to the type of `MLContext` that creates it.
   // `result` is the status of building graph.

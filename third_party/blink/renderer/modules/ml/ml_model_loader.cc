@@ -18,7 +18,6 @@ namespace {
 using ml::model_loader::mojom::blink::CreateModelLoaderOptions;
 using ml::model_loader::mojom::blink::CreateModelLoaderResult;
 using ml::model_loader::mojom::blink::DataType;
-using ml::model_loader::mojom::blink::DevicePreference;
 using ml::model_loader::mojom::blink::LoadModelResult;
 using ml::model_loader::mojom::blink::Model;
 using ml::model_loader::mojom::blink::ModelFormat;
@@ -117,18 +116,6 @@ ModelFormat ConvertBlinkModelFormatToMojo(
   }
 }
 
-DevicePreference ConvertBlinkDevicePreferenceToMojo(
-    const V8MLDevicePreference& device_preference_blink) {
-  switch (device_preference_blink.AsEnum()) {
-    case V8MLDevicePreference::Enum::kAuto:
-      return DevicePreference::kAuto;
-    case V8MLDevicePreference::Enum::kCpu:
-      return DevicePreference::kCpu;
-    case V8MLDevicePreference::Enum::kGpu:
-      return DevicePreference::kGpu;
-  }
-}
-
 }  // namespace
 
 MLModelLoader::MLModelLoader(ExecutionContext* execution_context,
@@ -176,8 +163,8 @@ ScriptPromise MLModelLoader::load(ScriptState* script_state,
       options_mojo->num_threads = ml_context_->GetNumThreads();
       options_mojo->model_format =
           ConvertBlinkModelFormatToMojo(ml_context_->GetModelFormat());
-      options_mojo->device_preference = ConvertBlinkDevicePreferenceToMojo(
-          ml_context_->GetDevicePreference());
+      options_mojo->device_preference =
+          ml_context_->GetDevicePreferenceMojoType();
 
       ml_context_->GetML()->CreateModelLoader(
           script_state, exception_state, std::move(options_mojo),

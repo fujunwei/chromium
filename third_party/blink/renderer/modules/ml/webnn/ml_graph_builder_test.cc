@@ -2220,4 +2220,16 @@ TEST_F(MLGraphBuilderTest, BuildAsyncTest) {
   }
 }
 
+// Build a simple MLGraph asynchronously with only one relu operator.
+ScriptPromise BuildSimpleGraph(V8TestingScope& scope,
+                               MLContextOptions* context_options) {
+  auto* builder = CreateMLGraphBuilder(scope, context_options);
+  auto* input = BuildInput(scope, builder, "input", {3, 4, 5},
+                           V8MLOperandType::Enum::kFloat32);
+  auto* output = builder->relu(input, scope.GetExceptionState());
+  EXPECT_NE(output, nullptr);
+  return builder->buildAsync(scope.GetScriptState(), {{"output", output}},
+                             scope.GetExceptionState());
+}
+
 }  // namespace blink

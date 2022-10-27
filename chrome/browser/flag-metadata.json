@@ -2654,8 +2654,8 @@
     "expiry_milestone": 130
   },
   {
-    "name": "enable-machine-learning-neural-network-api",
-    "owners": [ "honglinyu" ],
+    "name": "enable-machine-learning-neural-network-service",
+    "owners": [ "jieweiqian" ],
     "expiry_milestone": 130
   },
   {

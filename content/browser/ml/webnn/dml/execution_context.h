@@ -23,7 +23,8 @@ class AdapterDML;
 
 class ExecutionContext final : public base::RefCounted<ExecutionContext> {
  public:
-  explicit ExecutionContext(scoped_refptr<AdapterDML> adapter);
+  static scoped_refptr<ExecutionContext> GetInstance(
+      scoped_refptr<AdapterDML> adapter);
 
   ExecutionContext(const ExecutionContext&) = delete;
   ExecutionContext& operator=(const ExecutionContext&) = delete;
@@ -57,8 +58,14 @@ class ExecutionContext final : public base::RefCounted<ExecutionContext> {
   ComPtr<gpgmm::d3d12::ResourceAllocator> GetResourceAllocator();
 
  private:
-  friend class base::RefCounted<ExecutionContext>;
+  explicit ExecutionContext(scoped_refptr<AdapterDML> adapter);
   ~ExecutionContext();
+
+  friend class base::RefCounted<ExecutionContext>;
+  template <typename T, typename... Args>
+  friend scoped_refptr<T> base::MakeRefCounted(Args&&... args);
+
+  static ExecutionContext* instance_;
 
   // Device is owned by adapter.
   ComPtr<ID3D12Device> d3d12_device_;

@@ -9,6 +9,23 @@
 
 namespace content::webnn {
 
+ExecutionContext* ExecutionContext::instance_ = nullptr;
+
+// static
+scoped_refptr<ExecutionContext> ExecutionContext::GetInstance(
+    scoped_refptr<AdapterDML> adapter) {
+  if (instance_ == nullptr) {
+    // Create a new instance of ExecutionContext.
+    auto execution_context = base::MakeRefCounted<ExecutionContext>(adapter);
+    execution_context->Initialize();
+    instance_ = execution_context.get();
+    return execution_context;
+  } else {
+    // Add a reference to the existing ExecutionContext instance.
+    return base::WrapRefCounted(instance_);
+  }
+}
+
 ExecutionContext::ExecutionContext(scoped_refptr<AdapterDML> adapter)
     : d3d12_device_(adapter->GetD3D12Device()),
       command_recorder_(adapter, adapter->GetDMLDevice()),

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "third_party/blink/renderer/modules/ml/webnn/mojo_graph.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_mojo.h"
 
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
@@ -19,14 +19,13 @@
 #include "third_party/blink/renderer/platform/wtf/deque.h"
 #include "third_party/blink/renderer/platform/wtf/functional.h"
 
-#include <memory>
-
 namespace blink {
 
 namespace {
 
 using ml::webnn::mojom::blink::BuildResult;
 using ml::webnn::mojom::blink::ComputeResult;
+using ml::webnn::mojom::blink::CreateGraphResult;
 using ml::webnn::mojom::blink::MemoryInfoPtr;
 
 void AddOperation(MojoModelInfo* model_info, const MLOperator* op) {
@@ -70,32 +69,113 @@ void AddOperation(MojoModelInfo* model_info, const MLOperator* op) {
 }  // namespace
 
 // static
-void MojoGraph::ValidateAndBuildAsync(MLContext* context,
-                                      const MLNamedOperands& named_outputs,
-                                      ScriptPromiseResolver* resolver) {
+void MLGraphMojo::ValidateAndBuildAsync(MLContext* context,
+                                        const MLNamedOperands& named_outputs,
+                                        ScriptPromiseResolver* resolver) {
   auto* graph =
-      MakeGarbageCollected<MojoGraph>(resolver->GetScriptState(), context);
+      MakeGarbageCollected<MLGraphMojo>(resolver->GetScriptState(), context);
   graph->BuildAsync(named_outputs, resolver);
 }
 
-MojoGraph::MojoGraph(ScriptState* script_state, MLContext* context)
+MLGraphMojo::MLGraphMojo(ScriptState* script_state, MLContext* context)
     : MLGraph(context), remote_graph_(ExecutionContext::From(script_state)) {}
 
-MojoGraph::~MojoGraph() = default;
+MLGraphMojo::~MLGraphMojo() = default;
 
-void MojoGraph::BuildAsyncImpl(const MLNamedOperands& outputs,
-                               ScriptPromiseResolver* resolver) {
+void MLGraphMojo::Trace(Visitor* visitor) const {
+  visitor->Trace(remote_graph_);
+  MLGraph::Trace(visitor);
+}
+
+void MLGraphMojo::BuildAsyncImpl(const MLNamedOperands& outputs,
+                                 ScriptPromiseResolver* resolver) {
+  auto options = ml::webnn::mojom::blink::CreateGraphOptions::New();
+  options->device_preference = ml_context_->GetDevicePreferenceMojoType();
+  // TODO(crbug.com/1273291): Add power preference for power consumption.
   auto* named_outputs = MakeGarbageCollected<MLNamedOperands>(outputs);
-  ml_context_->CreateWebnnGraph(
-      resolver,
-      WTF::BindOnce(&MojoGraph::OnGraphCreated, WrapPersistent(this),
+  // Create `WebnnGraph` message pipe with `WebnnContext` mojo interface which
+  // is owned by `ML` object of navigator.
+  ml_context_->GetML()->CreateWebnnGraph(
+      resolver, std::move(options),
+      WTF::BindOnce(&MLGraphMojo::OnGraphCreated, WrapPersistent(this),
                     WrapPersistent(named_outputs), WrapPersistent(resolver)));
 }
 
-ScriptPromise MojoGraph::ComputeImpl(ScriptState* script_state,
-                                     MLNamedArrayInputs inputs,
-                                     MLNamedArrayOutputs outputs,
-                                     ExceptionState& exception_state) {
+void MLGraphMojo::OnGraphCreated(
+    const MLNamedOperands* named_output,
+    ScriptPromiseResolver* resolver,
+    CreateGraphResult result,
+    mojo::PendingRemote<ml::webnn::mojom::blink::WebnnGraph> pending_remote) {
+  switch (result) {
+    case CreateGraphResult::kUnknownError: {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kUnknownError, "Internal error."));
+      return;
+    }
+    case CreateGraphResult::kNotSupported: {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kNotSupportedError,
+          "The context can not be supported."));
+      return;
+    }
+    case CreateGraphResult::kOk: {
+      auto* script_state = resolver->GetScriptState();
+      auto* execution_context = ExecutionContext::From(script_state);
+      // Bind the end point of `WebnnGraph` mojo interface in the blink side.
+      remote_graph_.Bind(
+          std::move(pending_remote),
+          execution_context->GetTaskRunner(TaskType::kInternalDefault));
+
+      HeapVector<Member<const MLOperand>> inputs;
+      HeapVector<Member<const MLOperand>> constants;
+      HeapVector<Member<const MLOperator>> sorted_operators;
+      MLGraphBuilder::SortOperators(*named_output, inputs, constants,
+                                    sorted_operators);
+
+      auto* model_info = MakeGarbageCollected<MojoModelInfo>();
+      base::CheckedNumeric<size_t> aligned_offset(0);
+      for (const auto& input : inputs) {
+        model_info->AddInput(input.Get());
+        // Create shared memory for inputs
+        size_t input_byte_length =
+            input_resources_info_.at(input->Name()).byte_length;
+        inputs_byte_offset_.insert(input->Name(), aligned_offset.ValueOrDie());
+        aligned_offset +=
+            Align(input_byte_length, kBufferAlignment).ValueOrDie();
+      }
+      size_t inputs_buffer_length = aligned_offset.ValueOrDie();
+      inputs_shm_region_ =
+          base::ReadOnlySharedMemoryRegion::Create(inputs_buffer_length);
+
+      for (const auto& constant : constants) {
+        model_info->AddConstant(constant.Get());
+      }
+      model_info->FillConstantsWithArrayBuffer();
+
+      for (const auto& op : sorted_operators) {
+        // Add the operation to model
+        AddOperation(model_info, op.Get());
+      }
+
+      for (const auto& [name, operand] : *named_output) {
+        // Add the output operand to model.
+        model_info->AddOutput(std::move(name), operand);
+      }
+
+      remote_graph_->Build(
+          model_info->GetModelInfo(),
+          WTF::BindOnce(&MLGraphMojo::OnGraphBuilt, WrapPersistent(this),
+                        WrapPersistent(resolver)));
+      return;
+    }
+  }
+  return;
+}
+
+ScriptPromise MLGraphMojo::ComputeImpl(ScriptState* script_state,
+                                       MLNamedArrayInputs inputs,
+                                       MLNamedArrayOutputs outputs,
+                                       ExceptionState& exception_state) {
   if (inputs.size() != input_resources_info_.size()) {
     exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
                                       "The number of inputs is invalid");
@@ -129,77 +209,21 @@ ScriptPromise MojoGraph::ComputeImpl(ScriptState* script_state,
                                                        std::move(outputs));
   remote_graph_->Compute(
       std::move(named_inputs),
-      WTF::BindOnce(&MojoGraph::OnGraphComputed, WrapPersistent(this),
+      WTF::BindOnce(&MLGraphMojo::OnGraphComputed, WrapPersistent(this),
                     WrapPersistent(resolver), WrapPersistent(request)));
   return resolver->Promise();
 }
 
-void MojoGraph::ComputeSyncImpl(MLNamedArrayInputs inputs,
-                                MLNamedArrayOutputs outputs,
-                                ExceptionState& exception_state) {
+void MLGraphMojo::ComputeSyncImpl(MLNamedArrayInputs inputs,
+                                  MLNamedArrayOutputs outputs,
+                                  ExceptionState& exception_state) {
   NOTIMPLEMENTED();
   exception_state.ThrowDOMException(DOMExceptionCode::kNotSupportedError,
                                     "Not implemented");
 }
 
-void MojoGraph::Trace(Visitor* visitor) const {
-  visitor->Trace(remote_graph_);
-  MLGraph::Trace(visitor);
-}
-
-void MojoGraph::OnGraphCreated(
-    MLNamedOperands* named_output,
-    ScriptPromiseResolver* resolver,
-    mojo::PendingRemote<ml::webnn::mojom::blink::Graph> pending_remote) {
-  auto* execution_context = ExecutionContext::From(resolver->GetScriptState());
-  remote_graph_.Bind(
-      std::move(pending_remote),
-      execution_context->GetTaskRunner(TaskType::kInternalDefault));
-
-  HeapVector<Member<const MLOperand>> inputs;
-  HeapVector<Member<const MLOperand>> constants;
-  HeapVector<Member<const MLOperator>> sorted_operators;
-  MLGraphBuilder::SortOperators(*named_output, inputs, constants,
-                                sorted_operators);
-
-  auto* model_info = MakeGarbageCollected<MojoModelInfo>();
-  base::CheckedNumeric<size_t> aligned_offset(0);
-  for (const auto& input : inputs) {
-    model_info->AddInput(input.Get());
-    // Create shared memory for inputs
-    size_t input_byte_length =
-        input_resources_info_.at(input->Name()).byte_length;
-    inputs_byte_offset_.insert(input->Name(), aligned_offset.ValueOrDie());
-    aligned_offset += Align(input_byte_length, kBufferAlignment).ValueOrDie();
-  }
-  size_t inputs_buffer_length = aligned_offset.ValueOrDie();
-  inputs_shm_region_ =
-      base::ReadOnlySharedMemoryRegion::Create(inputs_buffer_length);
-
-  for (const auto& constant : constants) {
-    model_info->AddConstant(constant.Get());
-  }
-  model_info->FillConstantsWithArrayBuffer();
-
-  for (const auto& op : sorted_operators) {
-    // Add the operation to model
-    AddOperation(model_info, op.Get());
-  }
-
-  for (const auto& [name, operand] : *named_output) {
-    // Add the output operand to model.
-    model_info->AddOutput(std::move(name), operand);
-  }
-
-  remote_graph_->Build(
-      model_info->GetModelInfo(),
-      WTF::BindOnce(&MojoGraph::OnGraphBuilt, WrapPersistent(this),
-                    WrapPersistent(resolver)));
-  return;
-}
-
-void MojoGraph::OnGraphBuilt(ScriptPromiseResolver* resolver,
-                             BuildResult result) {
+void MLGraphMojo::OnGraphBuilt(ScriptPromiseResolver* resolver,
+                               BuildResult result) {
   switch (result) {
     case BuildResult::kUnknownError: {
       resolver->Reject(MakeGarbageCollected<DOMException>(
@@ -213,10 +237,10 @@ void MojoGraph::OnGraphBuilt(ScriptPromiseResolver* resolver,
   }
 }
 
-void MojoGraph::OnGraphComputed(ScriptPromiseResolver* resolver,
-                                ComputeRequest* request,
-                                ComputeResult result,
-                                NamedResourcesPtr named_outputs) {
+void MLGraphMojo::OnGraphComputed(ScriptPromiseResolver* resolver,
+                                  ComputeRequest* request,
+                                  ComputeResult result,
+                                  NamedResourcesPtr named_outputs) {
   if (result != ComputeResult::kOk) {
     resolver->Reject(MakeGarbageCollected<DOMException>(
         DOMExceptionCode::kOperationError,

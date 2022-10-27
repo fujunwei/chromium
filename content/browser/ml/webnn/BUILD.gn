@@ -13,8 +13,10 @@ buildflag_header("buildflags") {
 
 source_set("lib") {
   sources = [
-    "webnn_service_factory.cc",
-    "webnn_service_factory.h",
+    "webnn_context_impl.cc",
+    "webnn_context_impl.h",
+    "webnn_service.cc",
+    "webnn_service.h",
   ]
 
   if (build_webnn_with_directml) {
@@ -26,8 +28,6 @@ source_set("lib") {
         "dml/command_queue.h",
         "dml/command_recorder.cc",
         "dml/command_recorder.h",
-        "dml/context_dml_impl.cc",
-        "dml/context_dml_impl.h",
         "dml/execution_context.cc",
         "dml/execution_context.h",
         "dml/execution_resources.cc",
@@ -44,15 +44,13 @@ source_set("lib") {
         "dml/graph_node_output.h",
         "dml/graph_tensor_desc.cc",
         "dml/graph_tensor_desc.h",
-        "dml/mojo_server_dml_impl.cc",
-        "dml/mojo_server_dml_impl.h",
         "dml/readback_resource.cc",
         "dml/readback_resource.h",
         "dml/upload_resource.cc",
         "dml/upload_resource.h",
         "dml/utils_dml.h",
-        "dml/webnn_service_dml_impl.cc",
-        "dml/webnn_service_dml_impl.h",
+        "webnn_context_impl_win.cc",
+        "webnn_context_impl_win.h",
       ]
 
       libs = [
@@ -61,13 +59,6 @@ source_set("lib") {
         "directml.lib",
       ]
     }
-  } else {
-    sources += [
-      "mojo_server_impl.cc",
-      "mojo_server_impl.h",
-      "webnn_service_impl.cc",
-      "webnn_service_impl.h",
-    ]
   }
 
   deps = [

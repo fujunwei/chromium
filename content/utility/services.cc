@@ -80,7 +80,7 @@ extern sandbox::TargetServices* g_utility_target_services;
 
 #if BUILDFLAG(ENABLE_MOJO_WEBNN_IN_UTILITY_PROCESS)
 #include "components/ml/mojom/webnn_service.mojom.h"
-#include "content/browser/ml/webnn/dml/webnn_service_dml_impl.h"
+#include "content/browser/ml/webnn/webnn_service.h"
 #endif
 
 #if BUILDFLAG(IS_WIN)
@@ -264,11 +264,7 @@ auto RunShapeDetectionService(
 #if BUILDFLAG(ENABLE_MOJO_WEBNN_IN_UTILITY_PROCESS)
 auto RunWebnnService(
     mojo::PendingReceiver<ml::webnn::mojom::WebnnService> receiver) {
-#if BUILDFLAG(IS_WIN)
-  return std::make_unique<webnn::WebnnServiceDMLImpl>(std::move(receiver));
-#else
-  NOTIMPLEMENTED();
-#endif
+  return std::make_unique<webnn::WebnnService>(std::move(receiver));
 }
 #endif
 

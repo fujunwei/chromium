@@ -8,6 +8,7 @@
 
 #include "base/numerics/checked_math.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
+#include "third_party/blink/public/common/features.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_clamp_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_conv_2d_options.h"
@@ -18,8 +19,8 @@
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
 #include "third_party/blink/renderer/modules/ml/webnn/buildflags.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_mojo.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
-#include "third_party/blink/renderer/modules/ml/webnn/mojo_graph.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_deque.h"
 
@@ -1114,20 +1115,17 @@ ScriptPromise MLGraphBuilder::buildAsync(ScriptState* script_state,
   }
 #endif
 
-  // The Context is GPU device or low power preference, the graph is built by
-  // MojoGraph object.
-  if (GetContext()->GetDevicePreference() == V8MLDevicePreference::Enum::kGpu) {
-    if (ml_context_->IsWebnnMojoContextEnabled()) {
-      MojoGraph::ValidateAndBuildAsync(ml_context_, named_outputs, resolver);
-    } else {
-      resolver->Reject(MakeGarbageCollected<DOMException>(
-          DOMExceptionCode::kNotSupportedError,
-          "The context for mojo must be enable with "
-          "the option \"--enable-features=WebnnMojoContext\" in the command "
-          "line"));
-    }
+  // The runtime enable feature is used to disable the cross process hardware
+  // acceleration by default.
+  if (base::FeatureList::IsEnabled(
+          blink::features::kEnableMachineLearningNeuralNetworkService)) {
+    // Reject unsupported error on unimplemented platform when getting
+    // `WebnnContext` mojo interface with BrowserInterfaceBroker's
+    // GetInterface() method before creating `WebnnGraph` message pipe.
+    MLGraphMojo::ValidateAndBuildAsync(ml_context_, named_outputs, resolver);
     return promise;
   }
+
   resolver->Reject(MakeGarbageCollected<DOMException>(
       DOMExceptionCode::kNotSupportedError, "Not implemented"));
   return promise;

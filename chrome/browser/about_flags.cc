@@ -7903,13 +7903,12 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kCanvas2DLayersDescription, kOsAll,
      SINGLE_VALUE_TYPE(switches::kEnableCanvas2DLayers)},
 
-    {"enable-machine-learning-model-loader-web-platform-api",
-     flag_descriptions::kEnableMachineLearningModelLoaderWebPlatformApiName,
-     flag_descriptions::
-         kEnableMachineLearningModelLoaderWebPlatformApiDescription,
+    {"enable-machine-learning-neural-network-service",
+     flag_descriptions::kEnableMachineLearningNeuralNetworkServiceName,
+     flag_descriptions::kEnableMachineLearningNeuralNetworkServiceDescription,
      kOsAll,
      FEATURE_VALUE_TYPE(
-         features::kEnableMachineLearningModelLoaderWebPlatformApi)},
+         blink::features::kEnableMachineLearningNeuralNetworkService)},
 
     {"confirmation-chip", flag_descriptions::kConfirmationChipName,
      flag_descriptions::kConfirmationChipNameDescription, kOsDesktop,
@@ -7919,13 +7918,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kChipLocationBarIconOverrideName,
      flag_descriptions::kChipLocationBarIconOverrideDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(permissions::features::kChipLocationBarIconOverride)},
-
-    {"enable-machine-learning-neural-network-api",
-     flag_descriptions::kEnableMachineLearningNeuralNetworkApiName,
-     flag_descriptions::kEnableMachineLearningNeuralNetworkApiDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         blink::features::kEnableMachineLearningNeuralNetworkApi)},
 
     {"enable-translate-sub-frames",
      flag_descriptions::kEnableTranslateSubFramesName,

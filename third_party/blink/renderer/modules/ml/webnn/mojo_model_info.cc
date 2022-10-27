@@ -10,8 +10,8 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_operand_descriptor.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_pool_2d_options.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_mojo.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
-#include "third_party/blink/renderer/modules/ml/webnn/mojo_graph.h"
 #include "third_party/blink/renderer/platform/bindings/exception_code.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 
