@@ -4,7 +4,9 @@
 
 #include "content/browser/ml/webnn/webnn_service_factory.h"
 
-#if BUILDFLAG(IS_WIN)
+#include "content/browser/ml/webnn/buildflags.h"
+
+#if BUILDFLAG(ENABLE_MOJO_WEBNN_IN_UTILITY_PROCESS) && BUILDFLAG(IS_WIN)
 #include "content/browser/ml/webnn/dml/webnn_service_dml_impl.h"
 #else
 #include "content/browser/ml/webnn/webnn_service_impl.h"
@@ -14,7 +16,7 @@ namespace content::webnn {
 
 void CreateWebNNService(
     mojo::PendingReceiver<ml::webnn::mojom::WebnnService> pending_receiver) {
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(ENABLE_MOJO_WEBNN_IN_UTILITY_PROCESS) && BUILDFLAG(IS_WIN)
   WebnnServiceDMLImpl::Create(std::move(pending_receiver));
 #else
   WebnnServiceImpl::Create(std::move(pending_receiver));

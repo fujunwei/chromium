@@ -264,16 +264,15 @@ void BindTextDetection(
   GetShapeDetectionService()->BindTextDetection(std::move(receiver));
 }
 
+#if BUILDFLAG(ENABLE_MOJO_WEBNN_IN_UTILITY_PROCESS)
 ml::webnn::mojom::WebnnService* GetWebnnService() {
   static base::NoDestructor<mojo::Remote<ml::webnn::mojom::WebnnService>>
       remote;
   if (!*remote) {
-#if BUILDFLAG(ENABLE_MOJO_WEBNN_IN_UTILITY_PROCESS)
     // Running WebNN Service in Utility process.
     ServiceProcessHost::Launch<ml::webnn::mojom::WebnnService>(
         remote->BindNewPipeAndPassReceiver(),
         ServiceProcessHost::Options().WithDisplayName("WebNN Service").Pass());
-#endif
     remote->reset_on_disconnect();
   }
 
@@ -284,6 +283,7 @@ void BindMojoServer(
     mojo::PendingReceiver<ml::webnn::mojom::MojoServer> receiver) {
   GetWebnnService()->BindMojoServer(std::move(receiver));
 }
+#endif
 
 #if BUILDFLAG(IS_MAC)
 void BindTextInputHost(
@@ -833,11 +833,13 @@ void PopulateFrameBinders(RenderFrameHostImpl* host, mojo::BinderMap* map) {
         base::BindRepeating(&CreateMLService));
   }
 
+#if BUILDFLAG(ENABLE_MOJO_WEBNN_IN_UTILITY_PROCESS)
   if (base::FeatureList::IsEnabled(
           blink::features::kEnableMachineLearningNeuralNetworkApi)) {
     map->Add<ml::webnn::mojom::MojoServer>(
         base::BindRepeating(&BindMojoServer));
   }
+#endif
 
   if (base::FeatureList::IsEnabled(blink::features::kPendingBeaconAPI)) {
     map->Add<blink::mojom::PendingBeaconHost>(base::BindRepeating(
