@@ -69,6 +69,12 @@ class MODULES_EXPORT MLGraph : public ScriptWrappable {
  protected:
   explicit MLGraph(MLContext* context);
 
+  // Return the operators in topological order by searching from the named
+  // output operands. It ensures operator 'j' appears before operator 'i' in the
+  // result, if 'i' depends on 'j'.
+  static HeapVector<Member<const MLOperator>>* GetOperatorsInTopologicalOrder(
+      const MLNamedOperands& named_outputs);
+
   // BuildAsync() should be called right after constructing a concrete
   // MLGraph object. FakeMLGraphBackend::ValidateAndBuildAsync() in
   // ml_graph_builder_test.cc gives an example. BuildAsync() validates the named

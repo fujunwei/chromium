@@ -11,7 +11,10 @@ import("//third_party/protobuf/proto_library.gni")
 
 buildflag_header("buildflags") {
   header = "buildflags.h"
-  flags = [ "BUILD_WEBNN_WITH_XNNPACK=$build_webnn_with_xnnpack" ]
+  flags = [
+    "BUILD_WEBNN_WITH_XNNPACK=$build_webnn_with_xnnpack",
+    "BUILD_WEBNN_ON_CROS=$build_webnn_on_cros",
+  ]
 }
 
 blink_modules_sources("webnn") {
@@ -38,6 +41,15 @@ blink_modules_sources("webnn") {
     ]
 
     deps += [ "//third_party/xnnpack" ]
+  }
+
+  if (build_webnn_on_cros) {
+    sources += [
+      "ml_graph_cros.cc",
+      "ml_graph_cros.h",
+    ]
+
+    deps += [ "//third_party/flatbuffers:flatbuffers" ]
   }
 }
 
