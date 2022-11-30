@@ -54,7 +54,8 @@ class MODULES_EXPORT MLGraphXnnpack final : public MLGraph {
  private:
   // Post the XNNPACK Subgraph and Runtime building to a background thread.
   void BuildAsyncImpl(const MLNamedOperands& named_outputs,
-                      ScriptPromiseResolver* resolver) override;
+                      ScriptPromiseResolver* resolver,
+                      ExceptionState& exception_state) override;
 
   // Build the XNNPACK Subgraph and Runtime off the main thread.
   static void BuildOnBackgroundThread(

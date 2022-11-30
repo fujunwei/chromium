@@ -9,10 +9,30 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_conv_2d_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_pool_2d_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_transpose_options.h"
+#include "third_party/blink/renderer/modules/ml/buildflags.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_test_base.h"
 
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_test_cros.h"
+#endif
+
 namespace blink {
+
+namespace {
+
+const TestParam kGraphTestParam[] = {
+#if BUILDFLAG(BUILD_WEBNN_WITH_XNNPACK)
+    {BackendType::kXnnpack, ExecutionMode::kAsync},
+    {BackendType::kXnnpack, ExecutionMode::kSync},
+#endif
+
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+    {BackendType::kModelLoader, ExecutionMode::kAsync},
+#endif
+};
+
+}  // namespace
 
 class MLGraphTest : public MLGraphTestBase {};
 
@@ -25,7 +45,8 @@ struct ElementWiseBinaryTester {
 
   void Test(MLGraphTest& helper, V8TestingScope& scope) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
+                                         helper.CreateMLContextOptions());
     auto* lhs_operand = BuildInput(builder, "lhs", lhs.dimensions, lhs.type,
                                    scope.GetExceptionState());
     auto* rhs_operand = BuildInput(builder, "rhs", rhs.dimensions, rhs.type,
@@ -52,6 +73,10 @@ struct ElementWiseBinaryTester {
 
 TEST_P(MLGraphTest, ElementWiseBinaryTest) {
   V8TestingScope scope;
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  // Setup binder for MLService
+  ScopedMLServiceBinder scoped_setup_binder(scope);
+#endif
   {
     // Test element-wise add operator for two 1-D tensors.
     // The expected results should be the sum of the values of the two input
@@ -138,8 +163,8 @@ TEST_P(MLGraphTest, ElementWiseBinaryTest) {
   }
   {
     // Test element-wise mul operator for two 4-D tensors.
-    // The expected results should be the prdocut of the values of the two input
-    // tensors, element-wise.
+    // The expected results should be the product of the values of the two
+    // input tensors, element-wise.
     ElementWiseBinaryTester<float>{
         .kind = ElementWiseBinaryKind::kMul,
         .lhs = {.type = V8MLOperandType::Enum::kFloat32,
@@ -205,7 +230,8 @@ struct ReluTester {
 
   void Test(MLGraphTest& helper, V8TestingScope& scope) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
+                                         helper.CreateMLContextOptions());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -230,6 +256,10 @@ struct ReluTester {
 
 TEST_P(MLGraphTest, ReluTest) {
   V8TestingScope scope;
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  // Setup binder for MLService
+  ScopedMLServiceBinder scoped_setup_binder(scope);
+#endif
   {
     // Test relu operator for 1-D tensor.
     // The expected results should be the result of the rectified linear
@@ -275,7 +305,8 @@ struct Resample2dTester {
             V8TestingScope& scope,
             MLResample2dOptions* options = MLResample2dOptions::Create()) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
+                                         helper.CreateMLContextOptions());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -300,6 +331,13 @@ struct Resample2dTester {
 
 TEST_P(MLGraphTest, Resample2dTest) {
   V8TestingScope scope;
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  // Setup binder for MLService
+  ScopedMLServiceBinder scoped_setup_binder(scope);
+  if (GetBackendType() == BackendType::kModelLoader) {
+    GTEST_SKIP();
+  }
+#endif
   {
     // Test resample2d operator with axes = {1, 2}, sizes = {4, 4}.
     auto* options = MLResample2dOptions::Create();
@@ -339,7 +377,8 @@ struct ClampTester {
             V8TestingScope& scope,
             MLClampOptions* options = MLClampOptions::Create()) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
+                                         helper.CreateMLContextOptions());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -364,6 +403,13 @@ struct ClampTester {
 
 TEST_P(MLGraphTest, ClampTest) {
   V8TestingScope scope;
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  // Setup binder for MLService
+  ScopedMLServiceBinder scoped_setup_binder(scope);
+  if (GetBackendType() == BackendType::kModelLoader) {
+    GTEST_SKIP();
+  }
+#endif
   {
     // Test clamp operator with default options that no minimum and maximum
     // values are defined.
@@ -464,7 +510,12 @@ struct Conv2dTester {
 
 TEST_P(MLGraphTest, Conv2dTest) {
   V8TestingScope scope;
-  auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  // Setup binder for MLService
+  ScopedMLServiceBinder scoped_setup_binder(scope);
+#endif
+  auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
+                                       CreateMLContextOptions());
   {
     // Test conv2d operator for nhwc input layout and ohwi filter layout.
     auto* options = MLConv2dOptions::Create();
@@ -484,8 +535,8 @@ TEST_P(MLGraphTest, Conv2dTest) {
         .Test(*this, scope, builder, options);
   }
   {
-    // Test fused conv2d operator for nhwc input layout and ohwi filter layout,
-    // fusing with bias operand and relu activation.
+    // Test fused conv2d operator for nhwc input layout and ohwi filter
+    // layout, fusing with bias operand and relu activation.
     auto* options = MLConv2dOptions::Create();
     options->setInputLayout(V8MLInputOperandLayout::Enum::kNhwc);
     options->setFilterLayout(V8MLConv2dFilterOperandLayout::Enum::kOhwi);
@@ -525,9 +576,9 @@ TEST_P(MLGraphTest, Conv2dTest) {
         .Test(*this, scope, builder, options);
   }
   {
-    // Test fused depthwise conv2d operator by setting groups to input channels,
-    // nhwc input layout, ihwo filter layout, fusing with bias operand and relu
-    // activation.
+    // Test fused depthwise conv2d operator by setting groups to input
+    // channels, nhwc input layout, ihwo filter layout, fusing with bias
+    // operand and relu activation.
     auto* options = MLConv2dOptions::Create();
     options->setInputLayout(V8MLInputOperandLayout::Enum::kNhwc);
     options->setFilterLayout(V8MLConv2dFilterOperandLayout::Enum::kIhwo);
@@ -550,9 +601,9 @@ TEST_P(MLGraphTest, Conv2dTest) {
         .Test(*this, scope, builder, options);
   }
   {
-    // Test fused depthwise conv2d operator by setting groups to input channels,
-    // nhwc input layout, ihwo filter layout, fusing with bias operand and clamp
-    // activation.
+    // Test fused depthwise conv2d operator by setting groups to input
+    // channels, nhwc input layout, ihwo filter layout, fusing with bias
+    // operand and clamp activation.
     auto* options = MLConv2dOptions::Create();
     options->setInputLayout(V8MLInputOperandLayout::Enum::kNhwc);
     options->setFilterLayout(V8MLConv2dFilterOperandLayout::Enum::kIhwo);
@@ -620,7 +671,15 @@ struct GemmTester {
 
 TEST_P(MLGraphTest, GemmTest) {
   V8TestingScope scope;
-  auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  // Setup binder for MLService
+  ScopedMLServiceBinder scoped_setup_binder(scope);
+  if (GetBackendType() == BackendType::kModelLoader) {
+    GTEST_SKIP();
+  }
+#endif
+  auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
+                                       CreateMLContextOptions());
   {
     // Test gemm operator without operand c.
     GemmTester<float>{.a = {.type = V8MLOperandType::Enum::kFloat32,
@@ -672,7 +731,8 @@ struct HardSwishTester {
 
   void Test(MLGraphTest& helper, V8TestingScope& scope) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
+                                         helper.CreateMLContextOptions());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -700,10 +760,17 @@ struct HardSwishTester {
 
 TEST_P(MLGraphTest, HardSwishTest) {
   V8TestingScope scope;
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  // Setup binder for MLService
+  ScopedMLServiceBinder scoped_setup_binder(scope);
+  if (GetBackendType() == BackendType::kModelLoader) {
+    GTEST_SKIP();
+  }
+#endif
   {
     // Test hardSwish operator for 1-D tensor.
-    // The expected results should be the result of the nonlinear function, y =
-    // x * max(0, min(6, (x + 3))) / 6, applied to the input tensor,
+    // The expected results should be the result of the nonlinear function, y
+    // = x * max(0, min(6, (x + 3))) / 6, applied to the input tensor,
     // element-wise.
     HardSwishTester{.input = {.type = V8MLOperandType::Enum::kFloat32,
                               .dimensions = {2},
@@ -746,7 +813,8 @@ struct Pool2dTester {
   void Test(MLGraphTest& helper,
             V8TestingScope& scope,
             MLPool2dOptions* options = MLPool2dOptions::Create()) {
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
+                                         helper.CreateMLContextOptions());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -770,6 +838,10 @@ struct Pool2dTester {
 
 TEST_P(MLGraphTest, Pool2dTest) {
   V8TestingScope scope;
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  // Setup binder for MLService
+  ScopedMLServiceBinder scoped_setup_binder(scope);
+#endif
   {
     // Test averagePool2d operator for nhwc input layout.
     auto* options = MLPool2dOptions::Create();
@@ -813,8 +885,8 @@ TEST_P(MLGraphTest, Pool2dTest) {
   }
 }
 
-// Because reshape Node runs copy operator, ReshapeTester just checks the output
-// against the input. So there is no need to set expected results.
+// Because reshape Node runs copy operator, ReshapeTester just checks the
+// output against the input. So there is no need to set expected results.
 template <typename T>
 struct ReshapeTester {
   OperandInfo<T> input;
@@ -823,7 +895,8 @@ struct ReshapeTester {
 
   void Test(MLGraphTest& helper, V8TestingScope& scope) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
+                                         helper.CreateMLContextOptions());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -849,6 +922,10 @@ struct ReshapeTester {
 
 TEST_P(MLGraphTest, ReshapeTest) {
   V8TestingScope scope;
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  // Setup binder for MLService
+  ScopedMLServiceBinder scoped_setup_binder(scope);
+#endif
   {
     // Test reshaping 2-D tensor to 1-D tensor.
     ReshapeTester<float>{.input = {.type = V8MLOperandType::Enum::kFloat32,
@@ -919,6 +996,13 @@ struct TransposeTester {
 
 TEST_P(MLGraphTest, TransposeTest) {
   V8TestingScope scope;
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  // Setup binder for MLService
+  ScopedMLServiceBinder scoped_setup_binder(scope);
+  if (GetBackendType() == BackendType::kModelLoader) {
+    GTEST_SKIP();
+  }
+#endif
   auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
   {
     // Test transpose operator with default options.
@@ -1003,6 +1087,13 @@ struct ConcatTester {
 
 TEST_P(MLGraphTest, ConcatTest) {
   V8TestingScope scope;
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  // Setup binder for MLService
+  ScopedMLServiceBinder scoped_setup_binder(scope);
+  if (GetBackendType() == BackendType::kModelLoader) {
+    GTEST_SKIP();
+  }
+#endif
   {
     // Test concat operator with one input and axis = 0.
     ConcatTester<float>{.inputs = {{.type = V8MLOperandType::Enum::kFloat32,
@@ -1082,12 +1173,9 @@ TEST_P(MLGraphTest, ConcatTest) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    All,
-    MLGraphTest,
-    testing::Combine(::testing::Values(BackendType::kXnnpack),
-                     ::testing::Values(ExecutionMode::kAsync,
-                                       ExecutionMode::kSync)),
-    TestVarietyToString);
+INSTANTIATE_TEST_SUITE_P(All,
+                         MLGraphTest,
+                         testing::ValuesIn(kGraphTestParam),
+                         TestParamToString);
 
 }  // namespace blink
