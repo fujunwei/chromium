@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -32,7 +32,9 @@ void ML::CreateModelLoader(ScriptState* script_state,
     // `BootstrapMojoConnectionIfNeeded()`.
     return;
   }
+  LOG(ERROR) << "==============before create model loader " << remote_service_.is_bound();
   remote_service_->CreateModelLoader(std::move(options), std::move(callback));
+  LOG(ERROR) << "==============end create model loader";
 }
 
 void ML::Trace(Visitor* visitor) const {

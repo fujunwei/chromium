@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -103,29 +103,8 @@ void OnRemoteModelLoad(ExecutionContext* execution_context,
       auto* model = MakeGarbageCollected<MLModel>(
           execution_context, std::move(pending_remote), std::move(model_info));
       resolver->Resolve(model);
+      LOG(ERROR) << "==============Load model sucessfully";
       return;
-  }
-}
-
-ModelFormat ConvertBlinkModelFormatToMojo(
-    const V8MLModelFormat& model_format_blink) {
-  // Uses `switch` because it can help detect whether the enum cases are all
-  // considered.
-  switch (model_format_blink.AsEnum()) {
-    case V8MLModelFormat::Enum::kTflite:
-      return ModelFormat::kTfLite;
-  }
-}
-
-DevicePreference ConvertBlinkDevicePreferenceToMojo(
-    const V8MLDevicePreference& device_preference_blink) {
-  switch (device_preference_blink.AsEnum()) {
-    case V8MLDevicePreference::Enum::kAuto:
-      return DevicePreference::kAuto;
-    case V8MLDevicePreference::Enum::kCpu:
-      return DevicePreference::kCpu;
-    case V8MLDevicePreference::Enum::kGpu:
-      return DevicePreference::kGpu;
   }
 }
 
@@ -174,24 +153,23 @@ ScriptPromise MLModelLoader::load(ScriptState* script_state,
       auto options_mojo = CreateModelLoaderOptions::New();
 
       options_mojo->num_threads = ml_context_->GetNumThreads();
-      options_mojo->model_format =
-          ConvertBlinkModelFormatToMojo(ml_context_->GetModelFormat());
-      options_mojo->device_preference = ConvertBlinkDevicePreferenceToMojo(
-          ml_context_->GetDevicePreference());
+      options_mojo->model_format = ml_context_->GetModelFormatMojoType();
+      options_mojo->device_preference =
+          ml_context_->GetDevicePreferenceMojoType();
 
       ml_context_->GetML()->CreateModelLoader(
           script_state, exception_state, std::move(options_mojo),
-          WTF::Bind(&MLModelLoader::OnRemoteLoaderCreated, WrapPersistent(this),
-                    WrapPersistent(script_state), WrapPersistent(resolver),
-                    WrapPersistent(buffer)));
+          WTF::Bind(&MLModelLoader::OnRemoteLoaderCreated,
+                        WrapPersistent(this), WrapPersistent(script_state),
+                        WrapPersistent(resolver), WrapPersistent(buffer)));
     } else {
       // Directly use `remote_loader_`.
       remote_loader_->Load(
           base::make_span(static_cast<const uint8_t*>(buffer->Data()),
                           buffer->ByteLength()),
           WTF::Bind(&OnRemoteModelLoad,
-                    WrapPersistent(ExecutionContext::From(script_state)),
-                    WrapPersistent(resolver)));
+                        WrapPersistent(ExecutionContext::From(script_state)),
+                        WrapPersistent(resolver)));
     }
   }
 
@@ -234,7 +212,7 @@ void MLModelLoader::OnRemoteLoaderCreated(
           base::make_span(static_cast<const uint8_t*>(buffer->Data()),
                           buffer->ByteLength()),
           WTF::Bind(&OnRemoteModelLoad, WrapPersistent(execution_context),
-                    WrapPersistent(resolver)));
+                        WrapPersistent(resolver)));
       return;
     }
   }

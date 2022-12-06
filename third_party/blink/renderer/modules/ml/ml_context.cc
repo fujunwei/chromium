@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -25,12 +25,32 @@ V8MLDevicePreference MLContext::GetDevicePreference() const {
   return device_preference_;
 }
 
+DevicePreference MLContext::GetDevicePreferenceMojoType() {
+  switch (device_preference_.AsEnum()) {
+    case V8MLDevicePreference::Enum::kAuto:
+      return DevicePreference::kAuto;
+    case V8MLDevicePreference::Enum::kCpu:
+      return DevicePreference::kCpu;
+    case V8MLDevicePreference::Enum::kGpu:
+      return DevicePreference::kGpu;
+  }
+}
+
 V8MLPowerPreference MLContext::GetPowerPreference() const {
   return power_preference_;
 }
 
 V8MLModelFormat MLContext::GetModelFormat() const {
   return model_format_;
+}
+
+ModelFormat MLContext::GetModelFormatMojoType() {
+  // Uses `switch` because it can help detect whether the enum cases are all
+  // considered.
+  switch (model_format_.AsEnum()) {
+    case V8MLModelFormat::Enum::kTflite:
+      return ModelFormat::kTfLite;
+  }
 }
 
 unsigned int MLContext::GetNumThreads() const {

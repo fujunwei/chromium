@@ -6,4 +6,5 @@
 
 [
   Exposed=Window
-] interface MLOperand {};
+] interface MLGraph {
+};

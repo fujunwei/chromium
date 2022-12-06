@@ -1,10 +1,11 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_ML_WEBNN_ML_GRAPH_BUILDER_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_ML_WEBNN_ML_GRAPH_BUILDER_H_
 
+#include "third_party/blink/renderer/bindings/core/v8/script_promise.h"
 #include "third_party/blink/renderer/core/typed_arrays/array_buffer_view_helpers.h"
 #include "third_party/blink/renderer/core/typed_arrays/dom_array_buffer_view.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operator.h"
@@ -21,9 +22,11 @@ class MLContext;
 class MLClampOptions;
 class MLConv2dOptions;
 class MLGemmOptions;
+class MLGraph;
 class MLPool2dOptions;
 class MLOperand;
 class MLOperandDescriptor;
+class ScriptPromiseResolver;
 
 typedef HeapVector<std::pair<String, Member<MLOperand>>> MLNamedOperands;
 
@@ -41,6 +44,8 @@ class MODULES_EXPORT MLGraphBuilder final : public ScriptWrappable {
   ~MLGraphBuilder() override;
 
   void Trace(Visitor* visitor) const override;
+
+  MLContext* GetContext() const;
 
   // ml_graph_builder.idl
   MLOperand* input(String name,
@@ -87,16 +92,56 @@ class MODULES_EXPORT MLGraphBuilder final : public ScriptWrappable {
                   const MLGemmOptions* options,
                   ExceptionState& exception_state);
 
+  MLOperand* hardSwish(const MLOperand* input, ExceptionState& exception_state);
+  MLOperator* hardSwish(ExceptionState& exception_state);
+
   // Pooling operations
   MLOperand* averagePool2d(const MLOperand* input,
                            const MLPool2dOptions* options,
                            ExceptionState& exception_state);
+  MLOperand* maxPool2d(const MLOperand* input,
+                       const MLPool2dOptions* options,
+                       ExceptionState& exception_state);
+
+  MLOperand* relu(const MLOperand* input, ExceptionState& exception_state);
+  MLOperator* relu(ExceptionState& exception_state);
 
   MLOperand* reshape(const MLOperand* input,
                      const Vector<int32_t>& new_shape,
                      ExceptionState& exception_state);
 
   MLOperand* softmax(const MLOperand* input, ExceptionState& exception_state);
+
+  ScriptPromise buildAsync(ScriptState* script_state,
+                           const MLNamedOperands& named_outputs,
+                           ExceptionState& exception_state);
+
+  // TODO(ningxin.hu@intel.com): Once the web-platform-tests are updated, add
+  // MLGraphBuilder.buildSync() into ml_graph_builder.idl for dedicated worker
+  // as WebNN spec: https://www.w3.org/TR/webnn/#dom-mlgraphbuilder-buildsync
+  MLGraph* buildSync(const MLNamedOperands& named_outputs,
+                     ExceptionState& exception_state);
+
+  // The test cases can override the graph building behavior by implementing
+  // this class and setting its instance by SetBackendForTesting().
+  class BackendForTesting {
+   public:
+    virtual void BuildGraphAsyncImpl(MLContext* context,
+                                     const MLNamedOperands& named_outputs,
+                                     ScriptPromiseResolver* resolver) = 0;
+
+    virtual MLGraph* BuildGraphSyncImpl(MLContext* context,
+                                        const MLNamedOperands& named_outputs,
+                                        ExceptionState& exception_state) = 0;
+  };
+
+  static void SetBackendForTesting(BackendForTesting* backend_for_testing);
+
+  static void SortOperators(
+      const MLNamedOperands& named_outputs,
+      HeapVector<Member<const MLOperand>>& inputs,
+      HeapVector<Member<const MLOperand>>& constants,
+      HeapVector<Member<const MLOperator>>& sorted_operators);
 
  private:
   Member<MLContext> ml_context_;

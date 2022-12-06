@@ -1,10 +1,11 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_ML_ML_CONTEXT_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_ML_ML_CONTEXT_H_
 
+#include "components/ml/mojom/web_platform_model.mojom-blink.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_device_preference.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_model_format.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_power_preference.h"
@@ -14,6 +15,9 @@
 #include "third_party/blink/renderer/platform/heap/visitor.h"
 
 namespace blink {
+
+using ml::model_loader::mojom::blink::DevicePreference;
+using ml::model_loader::mojom::blink::ModelFormat;
 
 class ML;
 
@@ -33,8 +37,10 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
   ~MLContext() override;
 
   V8MLDevicePreference GetDevicePreference() const;
+  DevicePreference GetDevicePreferenceMojoType();
   V8MLPowerPreference GetPowerPreference() const;
   V8MLModelFormat GetModelFormat() const;
+  ModelFormat GetModelFormatMojoType();
   unsigned int GetNumThreads() const;
 
   ML* GetML();
