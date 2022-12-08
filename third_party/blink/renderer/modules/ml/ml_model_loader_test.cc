@@ -207,9 +207,9 @@ class FakeMLModel : public blink_mojom::Model {
     }
 
     return WTF::Bind(&FakeMLModel::OnCreateModel,
-                         // Safe to WTF::Unretained, this method won't be called
-                         // after test finishes.
-                         WTF::Unretained(this));
+                     // Safe to WTF::Unretained, this method won't be called
+                     // after test finishes.
+                     WTF::Unretained(this));
   }
 
   void OnCreateModel(mojo_base::BigBuffer,

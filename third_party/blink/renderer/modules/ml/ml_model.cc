@@ -142,7 +142,7 @@ ScriptPromise MLModel::compute(
   remote_model_->Compute(
       std::move(input_mojo),
       WTF::Bind(&MLModel::OnComputeResult, WrapPersistent(this),
-                    WrapPersistent(script_state), WrapPersistent(resolver)));
+                WrapPersistent(script_state), WrapPersistent(resolver)));
 
   return promise;
 }

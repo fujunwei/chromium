@@ -11,8 +11,11 @@
 //   - https://webmachinelearning.github.io/webnn/#api-mlcontext
 // In the future, this interface may be extended when WebNN is implemented so
 // a dictionary may be insufficient.
+typedef record<DOMString, (ArrayBufferView or ArrayBuffer)> MLNamedArrayBufferViews;
 
 [
   Exposed=Window
 ] interface MLContext {
+  [CallWith=ScriptState, RaisesException]
+      Promise<void> compute(MLGraph graph, MLNamedArrayBufferViews inputs, MLNamedArrayBufferViews outputs);
 };

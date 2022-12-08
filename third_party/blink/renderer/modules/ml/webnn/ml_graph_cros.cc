@@ -193,8 +193,8 @@ void MLGraphCrOS::BuildAsyncImpl(const MLNamedOperands& outputs,
   ml_context_->GetML()->CreateModelLoader(
       script_state, exception_state, std::move(options_mojo),
       WTF::Bind(&MLGraphCrOS::OnRemoteLoaderCreated, WrapPersistent(this),
-                    WrapPersistent(script_state), WrapPersistent(resolver),
-                    WrapPersistent(named_outputs)));
+                WrapPersistent(script_state), WrapPersistent(resolver),
+                WrapPersistent(named_outputs)));
 
   // Test the tf-lite model converted from WebNN Graph
   // std::vector<const uint8_t> buffer =
@@ -258,8 +258,8 @@ void MLGraphCrOS::OnRemoteLoaderCreated(
     const MLNamedOperands* named_outputs,
     CreateModelLoaderResult result,
     mojo::PendingRemote<ModelLoader> pending_remote) {
-      LOG(ERROR) << "==========OnRemoteLoaderCreated";
-      
+  LOG(ERROR) << "==========OnRemoteLoaderCreated";
+
   switch (result) {
     case CreateModelLoaderResult::kUnknownError: {
       resolver->Reject(MakeGarbageCollected<DOMException>(
@@ -273,7 +273,6 @@ void MLGraphCrOS::OnRemoteLoaderCreated(
       return;
     }
     case CreateModelLoaderResult::kOk: {
-      
       LOG(ERROR) << "==========OnRemoteLoaderCreated kOk";
       auto* execution_context = ExecutionContext::From(script_state);
 
@@ -313,7 +312,7 @@ void MLGraphCrOS::OnRemoteLoaderCreated(
         subgraph_outputs.push_back(tf_lite_model->GetTensorIndex(operand));
       }
       // Build the model.
-  tf_lite_model->BuildModel(subgraph_inputs, subgraph_outputs);
+      tf_lite_model->BuildModel(subgraph_inputs, subgraph_outputs);
 
       // std::vector<const uint8_t> buffer =
       //     CreateTfLiteModel(tflite::BuiltinOperator_ADD);
@@ -323,8 +322,8 @@ void MLGraphCrOS::OnRemoteLoaderCreated(
               static_cast<const uint8_t*>(builder.GetBufferPointer()),
               builder.GetSize()),
           WTF::Bind(&MLGraphCrOS::OnRemoteModelLoad, WrapPersistent(this),
-                        WrapPersistent(execution_context),
-                        WrapPersistent(resolver)));
+                    WrapPersistent(execution_context),
+                    WrapPersistent(resolver)));
       return;
     }
   }
@@ -362,8 +361,13 @@ void MLGraphCrOS::OnRemoteModelLoad(ExecutionContext* execution_context,
           execution_context->GetTaskRunner(TaskType::kInternalDefault));
       // Stores the model info.
       input_tensor_name_to_info_ = std::move(tensor_info->input_tensor_info);
+      for (const auto& [name, _] : input_tensor_name_to_info_) {
+        LOG(ERROR) << "======model input name " << name;
+      }
       output_tensor_name_to_info_ = std::move(tensor_info->output_tensor_info);
-
+      for (const auto& [name, _] : output_tensor_name_to_info_) {
+        LOG(ERROR) << "======model input name " << name;
+      }
       resolver->Resolve(this);
 
       LOG(ERROR) << "==============Load model sucessfully";
@@ -381,10 +385,33 @@ MLGraph* MLGraphCrOS::BuildSyncImpl(const MLNamedOperands& named_outputs,
 void MLGraphCrOS::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
                                    const MLNamedArrayBufferViews& outputs,
                                    ScriptPromiseResolver* resolver) {
+  // First verifies the sizes of inputs.
+  if (input_tensor_name_to_info_.size() != inputs.size()) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kDataError,
+        "The number of inputs doesn't match model's expectation."));
+    return;
+  }
+  for (const auto& name_tensor : inputs) {
+    auto iter = input_tensor_name_to_info_.find(name_tensor.first);
+    if (iter == input_tensor_name_to_info_.end()) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kDataError,
+          "There is unknown input: " + name_tensor.first));
+      return;
+    }
+    if (iter->value->byte_size !=
+        name_tensor.second->GetAsArrayBufferView()->byteLength()) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kUnknownError, "Wrong input size."));
+      return;
+    }
+  }
   // Fills the buffer with input tensors.
   HashMap<String, Vector<uint8_t>> input_mojo;
   for (const auto& input : inputs) {
     const auto& [name, array_buffer_or_view] = input;
+    LOG(ERROR) << "========the input name configured by user " << name;
     auto* array_buffer_view =
         array_buffer_or_view->GetAsArrayBufferView().Get();
     wtf_size_t size =
@@ -398,7 +425,7 @@ void MLGraphCrOS::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
   remote_model_->Compute(
       std::move(input_mojo),
       WTF::Bind(&MLGraphCrOS::OnComputeResult, WrapPersistent(this),
-                    WrapPersistent(resolver), WrapPersistent(named_outputs)));
+                WrapPersistent(resolver), WrapPersistent(named_outputs)));
 }
 
 void MLGraphCrOS::OnComputeResult(
@@ -421,23 +448,8 @@ void MLGraphCrOS::OnComputeResult(
     return;
   }
 
-  for (const auto& output : *named_outputs) {
-    const auto& [name, array_buffer_or_view] = output;
-    auto* array_buffer_view =
-        array_buffer_or_view->GetAsArrayBufferView().Get();
-
-    auto iter = outputs.value().find(output.first);
-    if (iter == outputs.value().end()) {
-      resolver->Reject(MakeGarbageCollected<DOMException>(
-          DOMExceptionCode::kOperationError,
-          "Failed to get result for the output."));
-      return;
-    }
-    memcpy(array_buffer_view->BaseAddress(), iter->value.data(),
-           iter->value.size());
-  }
-
   for (const auto& name_tensor : outputs.value()) {
+    LOG(ERROR) << "===========output name from MLService " << name_tensor.key;
     auto iter = output_tensor_name_to_info_.find(name_tensor.key);
     if (iter == output_tensor_name_to_info_.end()) {
       resolver->Reject(MakeGarbageCollected<DOMException>(
@@ -453,6 +465,22 @@ void MLGraphCrOS::OnComputeResult(
               name_tensor.key));
       return;
     }
+  }
+
+  for (const auto& output : *named_outputs) {
+    const auto& [name, array_buffer_or_view] = output;
+    auto* array_buffer_view =
+        array_buffer_or_view->GetAsArrayBufferView().Get();
+
+    auto iter = outputs.value().find(output.first);
+    if (iter == outputs.value().end()) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kOperationError,
+          "Failed to get result for the output " + output.first));
+      return;
+    }
+    memcpy(array_buffer_view->BaseAddress(), iter->value.data(),
+           iter->value.size());
   }
 
   resolver->Resolve();

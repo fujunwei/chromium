@@ -246,10 +246,12 @@ int32_t TFLiteModelInfo::BuildTensor(const MLOperand* operand,
   // intermediate output operand because there is no data buffer associated.
   // TODO: convert TensorType_FLOAT32 from WebNN Spec.
   LOG(ERROR) << "========== BuildTensor buffer_index " << buffer_index;
+  flatbuffers::Offset<flatbuffers::String> description =
+      builder_.CreateString("a");
   tensors_.emplace_back(tflite::CreateTensor(
       builder_,
       builder_.CreateVector<int32_t>(ConvertType(operand->Dimensions())),
-      tflite::TensorType_FLOAT32, buffer_index));
+      tflite::TensorType_FLOAT32, buffer_index, description));
   // The index of buffer is used to identify constant operand,  the index of
   // tensor is used to create `Operator` and `SubGraph`. each operation generate
   // a output operand that will be inserted in a hash map with the MLOperand and

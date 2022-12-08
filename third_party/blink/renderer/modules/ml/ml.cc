@@ -32,7 +32,8 @@ void ML::CreateModelLoader(ScriptState* script_state,
     // `BootstrapMojoConnectionIfNeeded()`.
     return;
   }
-  LOG(ERROR) << "==============before create model loader " << remote_service_.is_bound();
+  LOG(ERROR) << "==============before create model loader "
+             << remote_service_.is_bound();
   remote_service_->CreateModelLoader(std::move(options), std::move(callback));
   LOG(ERROR) << "==============end create model loader";
 }
