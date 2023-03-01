@@ -1,3 +1,5 @@
 include_rules = [
-    "+components/ml/mojom"
+    "+components/ml/mojom",
+    "+services/webnn/public/mojom",
+    "+services/webnn/buildflags.h"
 ]

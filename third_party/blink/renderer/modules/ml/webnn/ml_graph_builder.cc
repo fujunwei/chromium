@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "base/numerics/checked_math.h"
+#include "services/webnn/buildflags.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_clamp_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_conv_2d_options.h"
@@ -28,6 +29,11 @@
 
 #if BUILDFLAG(BUILD_WEBNN_WITH_XNNPACK)
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_xnnpack.h"
+#endif
+
+#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+#include "third_party/blink/public/common/features.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_mojo.h"
 #endif
 
 namespace blink {
@@ -1414,6 +1420,19 @@ ScriptPromise MLGraphBuilder::build(ScriptState* script_state,
   if (ml_context_->GetDevicePreference() == V8MLDevicePreference::Enum::kAuto ||
       ml_context_->GetDevicePreference() == V8MLDevicePreference::Enum::kCpu) {
     MLGraphXnnpack::ValidateAndBuildAsync(ml_context_, named_outputs, resolver);
+    return promise;
+  }
+#endif
+
+#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+  // The runtime enable feature is used to disable the cross process hardware
+  // acceleration by default.
+  if (base::FeatureList::IsEnabled(
+          blink::features::kEnableMachineLearningNeuralNetworkService)) {
+    // Reject unsupported error on unimplemented platform when getting
+    // `WebnnContext` mojo interface with BrowserInterfaceBroker's
+    // GetInterface() method before creating `WebnnGraph` message pipe.
+    MLGraphMojo::ValidateAndBuildAsync(ml_context_, named_outputs, resolver);
     return promise;
   }
 #endif

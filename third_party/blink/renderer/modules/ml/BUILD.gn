@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/buildflag_header.gni")
+import("//services/webnn/buildflags.gni")
 import("//third_party/blink/renderer/modules/ml/webnn/features.gni")
 import("//third_party/blink/renderer/modules/modules.gni")
 
@@ -40,6 +41,8 @@ blink_modules_sources("ml") {
   deps = [
     ":buildflags",
     "//components/ml/mojom:mojom_blink",
+    "//services/webnn:buildflags",
+    "//services/webnn/public/mojom:mojom_blink",
   ]
 
   if (build_webnn_with_xnnpack) {
@@ -49,6 +52,19 @@ blink_modules_sources("ml") {
     ]
 
     deps += [ "//third_party/xnnpack" ]
+  }
+
+  if (build_webnn_with_service) {
+    sources += [
+      # MLGraphMojo is platform independent which packages the model information
+      # into a neutral struct type, it will be built and executed with hardware
+      # accelerated OS machine learning API in WebNN Service which run out of
+      # renderer process.
+      "webnn/ml_graph_mojo.cc",
+      "webnn/ml_graph_mojo.h",
+    ]
+
+    deps += [ "//services/webnn/public/mojom:mojom_blink" ]
   }
 }
 
@@ -66,6 +82,7 @@ source_set("unit_tests") {
 
   deps = [
     "//components/ml/mojom:mojom_blink",
+    "//services/webnn/public/mojom:mojom_blink",
     "//testing/gtest",
     "//third_party/blink/public:test_headers",
     "//third_party/blink/renderer/controller:blink_bindings_test_sources",
@@ -87,5 +104,9 @@ source_set("unit_tests") {
   if (is_chromeos && current_cpu == "x64") {
     sources += [ "webnn/ml_graph_test_tflite.cc" ]
     deps += [ "//third_party/tflite" ]
+  }
+
+  if (build_webnn_with_service) {
+    sources += [ "webnn/ml_graph_mojo_test.cc" ]
   }
 }

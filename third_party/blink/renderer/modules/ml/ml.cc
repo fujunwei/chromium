@@ -21,18 +21,51 @@ using ml::model_loader::mojom::blink::MLService;
 
 ML::ML(ExecutionContext* execution_context)
     : ExecutionContextClient(execution_context),
-      remote_service_(execution_context) {}
+      model_loader_service_(execution_context)
+#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+      ,
+      webnn_context_(execution_context)
+#endif
+{
+}
 
 void ML::CreateModelLoader(ScriptState* script_state,
                            CreateModelLoaderOptionsPtr options,
                            MLService::CreateModelLoaderCallback callback) {
   BootstrapMojoConnectionIfNeeded(script_state);
 
-  remote_service_->CreateModelLoader(std::move(options), std::move(callback));
+  model_loader_service_->CreateModelLoader(std::move(options),
+                                           std::move(callback));
 }
 
+#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+void ML::CreateWebnnGraph(
+    ScriptPromiseResolver* resolver,
+    webnn::mojom::blink::CreateGraphOptionsPtr options,
+    webnn::mojom::blink::WebnnContext::CreateGraphCallback callback) {
+  ScriptState* script_state = resolver->GetScriptState();
+  // We need to do the following check because the execution context of this
+  // navigator may be invalid (e.g. the frame is detached).
+  if (!script_state->ContextIsValid()) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kInvalidStateError,
+        "The execution context is invalid."));
+    return;
+  }
+
+  // Connect WebNN Service if needed.
+  EnsureWebnnServiceConnection();
+
+  // Create `WebnnGraph` message pipe with `WebnnContext` mojo interface.
+  webnn_context_->CreateGraph(std::move(options), std::move(callback));
+}
+#endif
+
 void ML::Trace(Visitor* visitor) const {
-  visitor->Trace(remote_service_);
+  visitor->Trace(model_loader_service_);
+#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+  visitor->Trace(webnn_context_);
+#endif
   ExecutionContextClient::Trace(visitor);
   ScriptWrappable::Trace(visitor);
 }
@@ -87,11 +120,22 @@ void ML::BootstrapMojoConnectionIfNeeded(ScriptState* script_state) {
   // the ScriptState passed in may not be guaranteed to match the execution
   // context associated with this navigator, especially with
   // cross-browsing-context calls.
-  if (!remote_service_.is_bound()) {
+  if (!model_loader_service_.is_bound()) {
     GetExecutionContext()->GetBrowserInterfaceBroker().GetInterface(
-        remote_service_.BindNewPipeAndPassReceiver(
+        model_loader_service_.BindNewPipeAndPassReceiver(
             GetExecutionContext()->GetTaskRunner(TaskType::kInternalDefault)));
   }
 }
+
+#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+void ML::EnsureWebnnServiceConnection() {
+  if (webnn_context_.is_bound()) {
+    return;
+  }
+  GetExecutionContext()->GetBrowserInterfaceBroker().GetInterface(
+      webnn_context_.BindNewPipeAndPassReceiver(
+          GetExecutionContext()->GetTaskRunner(TaskType::kInternalDefault)));
+}
+#endif
 
 }  // namespace blink

@@ -1,0 +1,57 @@
+// Copyright 2023 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+module webnn.mojom;
+
+import "services/webnn/public/mojom/webnn_graph.mojom";
+import "sandbox/policy/mojom/sandbox.mojom";
+
+enum PowerPreference {
+  // Let the user agent select the most suitable behavior.
+  kDefault = 0,
+  // Prioritizes execution speed over power consumption.
+  kHighPerformance = 1,
+  // Prioritizes power consumption over other considerations such as execution
+  // speed.
+  kLowPower = 2,
+};
+
+// Represents options of creating `WebnnGraph` interface.
+struct CreateGraphOptions {
+  // The power preference for power consumption.
+  PowerPreference power_preference;
+};
+
+enum CreateGraphResult {
+  kOk,
+  kUnknownError,
+  // The input configuration is not supported.
+  kNotSupported,
+};
+
+// Represents the `MLContext` object in the WebIDL definition that is a global
+// state of neural network compute workload and execution processes. This
+// interface is used to create `WebnnGraph` message pipe for compiling and
+// executing computational graph.
+interface WebnnContext {
+  // Called by the renderer process to create a message pipe for `WebnnGraph`,
+  // it will return `CreatGraphResult::kNotSupported` with `mojo::NullRemote`
+  // if the configuration of options isn't supported.
+  CreateGraph(CreateGraphOptions options)
+      => (CreateGraphResult result, pending_remote<WebnnGraph>? remote);
+};
+
+// Represents the WebNN service to inference computational graph. There is only
+// one service running out of renderer process to access the hardware
+// accelerated OS machine learning API (e.g. Direct Machine Learning (DirectML)
+// on Windows).
+[ServiceSandbox=sandbox.mojom.Sandbox.kGpu,RequireContext=sandbox.mojom.Context.kBrowser]
+interface WebnnService {
+  // Bind `WebnnContext` interface for every `navigator.ml` object of browser
+  // tab which is registered in `BrowserInterfaceBroker` with a callback, the
+  // BrowserInterfaceBroker's GetInterface() in renderer process will get the
+  // interface and call the callback to bind a pending receiver with the
+  // implementation in the service.
+  BindWebnnContext(pending_receiver<WebnnContext> receiver);
+};

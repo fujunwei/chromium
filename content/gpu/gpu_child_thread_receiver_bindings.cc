@@ -10,6 +10,7 @@
 #include "build/branding_buildflags.h"
 #include "build/chromeos_buildflags.h"
 #include "media/mojo/buildflags.h"
+#include "services/webnn/buildflags.h"
 
 #if !BUILDFLAG(GOOGLE_CHROME_BRANDING) || !BUILDFLAG(IS_CHROMEOS_ASH)
 #include "services/shape_detection/public/mojom/shape_detection_service.mojom.h"  // nogncheck
@@ -19,6 +20,13 @@
 #if BUILDFLAG(ENABLE_MOJO_MEDIA_IN_GPU_PROCESS)
 #include "content/gpu/gpu_service_factory.h"
 #include "media/mojo/mojom/media_service.mojom.h"
+#endif
+
+#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+#include "base/task/single_thread_task_runner.h"
+#include "base/task/thread_pool.h"
+#include "services/webnn/public/mojom/webnn_service.mojom.h"
+#include "services/webnn/webnn_service.h"
 #endif
 
 namespace content {
@@ -49,6 +57,23 @@ void GpuChildThread::BindServiceInterface(
 #if BUILDFLAG(ENABLE_MOJO_MEDIA_IN_GPU_PROCESS)
   if (auto r = receiver.As<media::mojom::MediaService>()) {
     service_factory_->RunMediaService(std::move(r));
+    return;
+  }
+#endif
+
+#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+  if (auto webnn_receiver = receiver.As<webnn::mojom::WebnnService>()) {
+    scoped_refptr<base::SingleThreadTaskRunner> task_runner;
+    task_runner = base::ThreadPool::CreateSingleThreadTaskRunner(
+        {base::TaskPriority::USER_BLOCKING});
+    task_runner->PostTask(
+        FROM_HERE, base::BindOnce(
+                       [](mojo::PendingReceiver<webnn::mojom::WebnnService>
+                              webnn_receiver) {
+                         static base::NoDestructor<webnn::WebnnService> service{
+                             std::move(webnn_receiver)};
+                       },
+                       std::move(webnn_receiver)));
     return;
   }
 #endif

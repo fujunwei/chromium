@@ -106,6 +106,7 @@
 #include "services/shape_detection/public/mojom/facedetection_provider.mojom.h"
 #include "services/shape_detection/public/mojom/shape_detection_service.mojom.h"
 #include "services/shape_detection/public/mojom/textdetection.mojom.h"
+#include "services/webnn/buildflags.h"
 #include "storage/browser/quota/quota_internals.mojom.h"
 #include "storage/browser/quota/quota_manager.h"
 #include "storage/browser/quota/quota_manager_proxy.h"
@@ -216,6 +217,10 @@
 #include "media/mojo/mojom/fuchsia_media.mojom.h"
 #endif
 
+#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+#include "services/webnn/public/mojom/webnn_service.mojom.h"
+#endif
+
 namespace blink {
 class StorageKey;
 }  // namespace blink
@@ -263,6 +268,25 @@ void BindTextDetection(
     mojo::PendingReceiver<shape_detection::mojom::TextDetection> receiver) {
   GetShapeDetectionService()->BindTextDetection(std::move(receiver));
 }
+
+#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+webnn::mojom::WebnnService* GetWebnnService() {
+  static base::NoDestructor<mojo::Remote<webnn::mojom::WebnnService>> remote;
+  if (!*remote) {
+    auto* gpu = GpuProcessHost::Get();
+    if (gpu) {
+      gpu->RunService(remote->BindNewPipeAndPassReceiver());
+    }
+  }
+
+  return remote->get();
+}
+
+void BindWebnnContext(
+    mojo::PendingReceiver<webnn::mojom::WebnnContext> receiver) {
+  GetWebnnService()->BindWebnnContext(std::move(receiver));
+}
+#endif
 
 #if BUILDFLAG(IS_MAC)
 void BindTextInputHost(
@@ -879,6 +903,14 @@ void PopulateFrameBinders(RenderFrameHostImpl* host, mojo::BinderMap* map) {
     map->Add<ml::model_loader::mojom::MLService>(
         base::BindRepeating(&CreateMLService));
   }
+
+#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+  if (base::FeatureList::IsEnabled(
+          blink::features::kEnableMachineLearningNeuralNetworkService)) {
+    map->Add<webnn::mojom::WebnnContext>(
+        base::BindRepeating(&BindWebnnContext));
+  }
+#endif
 
   if (base::FeatureList::IsEnabled(blink::features::kPendingBeaconAPI)) {
     map->Add<blink::mojom::PendingBeaconHost>(base::BindRepeating(
