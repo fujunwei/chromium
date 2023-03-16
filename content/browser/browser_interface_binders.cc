@@ -271,6 +271,7 @@ void BindTextDetection(
 
 #if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
 webnn::mojom::WebnnService* GetWebnnService() {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   static base::NoDestructor<mojo::Remote<webnn::mojom::WebnnService>> remote;
   if (!*remote) {
     auto* gpu = GpuProcessHost::Get();
@@ -282,9 +283,9 @@ webnn::mojom::WebnnService* GetWebnnService() {
   return remote->get();
 }
 
-void BindWebnnContext(
-    mojo::PendingReceiver<webnn::mojom::WebnnContext> receiver) {
-  GetWebnnService()->BindWebnnContext(std::move(receiver));
+void BindWebnnContextProvider(
+    mojo::PendingReceiver<webnn::mojom::WebnnContextProvider> receiver) {
+  GetWebnnService()->BindWebnnContextProvider(std::move(receiver));
 }
 #endif
 
@@ -907,8 +908,8 @@ void PopulateFrameBinders(RenderFrameHostImpl* host, mojo::BinderMap* map) {
 #if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
   if (base::FeatureList::IsEnabled(
           blink::features::kEnableMachineLearningNeuralNetworkService)) {
-    map->Add<webnn::mojom::WebnnContext>(
-        base::BindRepeating(&BindWebnnContext));
+    map->Add<webnn::mojom::WebnnContextProvider>(
+        base::BindRepeating(&BindWebnnContextProvider));
   }
 #endif
 

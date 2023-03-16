@@ -40,15 +40,33 @@ class FakeWebnnGraph : public blink_mojom::WebnnGraph {
 
 class FakeWebnnContext : public blink_mojom::WebnnContext {
  public:
-  FakeWebnnContext() : receiver_(this) {}
+  FakeWebnnContext() = default;
   ~FakeWebnnContext() override = default;
+
+ private:
+  // Override methods from webnn::mojom::WebnnContext.
+  void CreateGraph(CreateGraphCallback callback) override {
+    mojo::PendingRemote<blink_mojom::WebnnGraph> blink_remote;
+    // The receiver bind to FakeWebnnGraph.
+    mojo::MakeSelfOwnedReceiver<blink_mojom::WebnnGraph>(
+        std::make_unique<FakeWebnnGraph>(),
+        blink_remote.InitWithNewPipeAndPassReceiver());
+
+    std::move(callback).Run(std::move(blink_remote));
+  }
+};
+
+class FakeWebnnContextProvider : public blink_mojom::WebnnContextProvider {
+ public:
+  FakeWebnnContextProvider() : receiver_(this) {}
+  ~FakeWebnnContextProvider() override = default;
 
   void BindRequest(mojo::ScopedMessagePipeHandle handle) {
     DCHECK(!receiver_.is_bound());
-    receiver_.Bind(
-        mojo::PendingReceiver<blink_mojom::WebnnContext>(std::move(handle)));
+    receiver_.Bind(mojo::PendingReceiver<blink_mojom::WebnnContextProvider>(
+        std::move(handle)));
     receiver_.set_disconnect_handler(WTF::BindOnce(
-        &FakeWebnnContext::OnConnectionError, WTF::Unretained(this)));
+        &FakeWebnnContextProvider::OnConnectionError, WTF::Unretained(this)));
   }
 
   bool IsBound() const { return receiver_.is_bound(); }
@@ -56,43 +74,47 @@ class FakeWebnnContext : public blink_mojom::WebnnContext {
   void OnConnectionError() { receiver_.reset(); }
 
  private:
-  // Override methods from webnn::mojom::WebnnContext.
-  void CreateGraph(blink_mojom::CreateGraphOptionsPtr options,
-                   CreateGraphCallback callback) override {
-    mojo::PendingRemote<blink_mojom::WebnnGraph> blink_remote;
-    // The receiver bind to FakeWebnnGraph.
-    mojo::MakeSelfOwnedReceiver<blink_mojom::WebnnGraph>(
-        std::make_unique<FakeWebnnGraph>(),
+  // Override methods from webnn::mojom::WebnnContextProvider.
+  void CreateWebnnContext(blink_mojom::CreateContextOptionsPtr options,
+                          CreateWebnnContextCallback callback) override {
+    mojo::PendingRemote<blink_mojom::WebnnContext> blink_remote;
+    // The receiver bind to FakeWebnnContext.
+    mojo::MakeSelfOwnedReceiver<blink_mojom::WebnnContext>(
+        std::make_unique<FakeWebnnContext>(),
         blink_remote.InitWithNewPipeAndPassReceiver());
 
-    std::move(callback).Run(blink_mojom::CreateGraphResult::kOk,
+    std::move(callback).Run(blink_mojom::CreateContextResult::kOk,
                             std::move(blink_remote));
   }
 
-  mojo::Receiver<blink_mojom::WebnnContext> receiver_;
+  mojo::Receiver<blink_mojom::WebnnContextProvider> receiver_;
 };
 
 class ScopedWebnnServiceBinder {
  public:
   explicit ScopedWebnnServiceBinder(V8TestingScope& scope)
-      : fake_webnn_context_(std::make_unique<FakeWebnnContext>()),
+      : fake_webnn_context_provider_(
+            std::make_unique<FakeWebnnContextProvider>()),
         interface_broker_(
             scope.GetExecutionContext()->GetBrowserInterfaceBroker()) {
     interface_broker_.SetBinderForTesting(
-        blink_mojom::WebnnContext::Name_,
-        WTF::BindRepeating(&FakeWebnnContext::BindRequest,
-                           WTF::Unretained(fake_webnn_context_.get())));
+        blink_mojom::WebnnContextProvider::Name_,
+        WTF::BindRepeating(
+            &FakeWebnnContextProvider::BindRequest,
+            WTF::Unretained(fake_webnn_context_provider_.get())));
   }
 
   ~ScopedWebnnServiceBinder() {
-    interface_broker_.SetBinderForTesting(blink_mojom::WebnnContext::Name_,
-                                          base::NullCallback());
+    interface_broker_.SetBinderForTesting(
+        blink_mojom::WebnnContextProvider::Name_, base::NullCallback());
   }
 
-  bool IsWebnnContextBound() const { return fake_webnn_context_->IsBound(); }
+  bool IsWebnnContextBound() const {
+    return fake_webnn_context_provider_->IsBound();
+  }
 
  private:
-  std::unique_ptr<FakeWebnnContext> fake_webnn_context_;
+  std::unique_ptr<FakeWebnnContextProvider> fake_webnn_context_provider_;
   const BrowserInterfaceBrokerProxy& interface_broker_;
 };
 

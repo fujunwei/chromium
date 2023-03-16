@@ -4,10 +4,9 @@
 
 module webnn.mojom;
 
-// Represents the `MLGraph` object in the WebIDL definition. This interface
-// hosts in GPU process for GPU context and called by renderer process to
-// compile and execute computational graph with accessing the hardware
-// accelerated OS machine learning API.
+// WebnnGraph runs in the GPU process and is called by the renderer process to
+// compile and execute a computational graph. Graph building and execution is
+// performed by calling hardware accelerated OS machine learning APIs.
 interface WebnnGraph {
   // TODO(crbug.com/1273291): Add `Build` and `Compute` method to compile and
   // execute computational graph with system framework.

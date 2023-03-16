@@ -55,7 +55,6 @@ class MODULES_EXPORT MLGraphMojo final : public MLGraph {
   // non-supported input configuration.
   void OnGraphCreated(const MLNamedOperands*,
                       ScriptPromiseResolver*,
-                      webnn::mojom::blink::CreateGraphResult result,
                       mojo::PendingRemote<webnn::mojom::blink::WebnnGraph>);
 
   // The `WebnnGraph` mojo interface is used to build and execute graph in the

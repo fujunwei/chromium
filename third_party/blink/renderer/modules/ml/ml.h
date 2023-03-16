@@ -47,12 +47,13 @@ class MODULES_EXPORT ML final : public ScriptWrappable,
           callback);
 
 #if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
-  // Create `WebnnGraph` message pipe with `WebnnContext` mojo interface to
-  // compile and execute computational graph out of renderer process.
-  void CreateWebnnGraph(
+  // Create `WebnnContext` message pipe with `WebnnContextProvider` mojo
+  // interface.
+  void CreateWebnnContext(
       ScriptPromiseResolver* resolver,
-      webnn::mojom::blink::CreateGraphOptionsPtr options,
-      webnn::mojom::blink::WebnnContext::CreateGraphCallback callback);
+      webnn::mojom::blink::CreateContextOptionsPtr options,
+      webnn::mojom::blink::WebnnContextProvider::CreateWebnnContextCallback
+          callback);
 #endif
 
   void Trace(blink::Visitor*) const override;
@@ -76,15 +77,16 @@ class MODULES_EXPORT ML final : public ScriptWrappable,
 #if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
   // There is only one service running out of renderer process to access the
   // hardware accelerated OS machine learning API. Every `navigator.ml`
-  // object in browser tab has one `WebnnContext` message pipe to create
-  // `WebnnGraph` mojo interface.
+  // object has one `WebnnContextProvider` message pipe to create `WebnnContext`
+  // mojo interface.
   void EnsureWebnnServiceConnection();
 
   // Webnn support multiple types of neural network inference hardware
   // acceleration such as CPU, GPU and ML specialized accelerator, the context
   // of webnn in service is used to map different device and represent a state
   // of graph execution processes.
-  HeapMojoRemote<webnn::mojom::blink::WebnnContext> webnn_context_;
+  HeapMojoRemote<webnn::mojom::blink::WebnnContextProvider>
+      webnn_context_provider_;
 #endif
 };
 

@@ -17,13 +17,13 @@ enum PowerPreference {
   kLowPower = 2,
 };
 
-// Represents options of creating `WebnnGraph` interface.
-struct CreateGraphOptions {
+// Represents options of creating `WebnnContext` interface.
+struct CreateContextOptions {
   // The power preference for power consumption.
   PowerPreference power_preference;
 };
 
-enum CreateGraphResult {
+enum CreateContextResult {
   kOk,
   kUnknownError,
   // The input configuration is not supported.
@@ -32,26 +32,30 @@ enum CreateGraphResult {
 
 // Represents the `MLContext` object in the WebIDL definition that is a global
 // state of neural network compute workload and execution processes. This
-// interface is used to create `WebnnGraph` message pipe for compiling and
-// executing computational graph.
+// interface runs in the GPU process and is called from the renderer process.
 interface WebnnContext {
-  // Called by the renderer process to create a message pipe for `WebnnGraph`,
-  // it will return `CreatGraphResult::kNotSupported` with `mojo::NullRemote`
-  // if the configuration of options isn't supported.
-  CreateGraph(CreateGraphOptions options)
-      => (CreateGraphResult result, pending_remote<WebnnGraph>? remote);
+  // Called by the renderer process to create `WebnnGraph` message pipe for
+  // compiling and executing computational graph
+  CreateGraph() => (pending_remote<WebnnGraph>? remote);
 };
 
-// Represents the WebNN service to inference computational graph. There is only
-// one service running out of renderer process to access the hardware
-// accelerated OS machine learning API (e.g. Direct Machine Learning (DirectML)
-// on Windows).
+// This interface runs in the GPU process and is called from the renderer
+// process to create `WebnnContext` interface.
+interface WebnnContextProvider {
+  // Called by the renderer process to create a message pipe for `MLContext`,
+  // the `CreatContextResult::kNotSupported` with `mojo::NullRemote` will be
+  // thrown if the configuration of options isn't supported.
+  CreateWebnnContext(CreateContextOptions options)
+      => (CreateContextResult result, pending_remote<WebnnContext>? remote);
+};
+
+// Represents the WebNN service to infer computational graph. There is only
+// one service running in GPU process to access the hardware accelerated OS
+// machine learning API (e.g. Direct Machine Learning (DirectML) on Windows).
 [ServiceSandbox=sandbox.mojom.Sandbox.kGpu,RequireContext=sandbox.mojom.Context.kBrowser]
 interface WebnnService {
-  // Bind `WebnnContext` interface for every `navigator.ml` object of browser
-  // tab which is registered in `BrowserInterfaceBroker` with a callback, the
-  // BrowserInterfaceBroker's GetInterface() in renderer process will get the
-  // interface and call the callback to bind a pending receiver with the
-  // implementation in the service.
-  BindWebnnContext(pending_receiver<WebnnContext> receiver);
+  // Bind `WebnnContextProvider` interface for every `navigator.ml` object which
+  // is called by the renderer with `BrowserInterfaceBroker's GetInterface()`
+  // method to create a `WebnnContext` interface.
+  BindWebnnContextProvider(pending_receiver<WebnnContextProvider> receiver);
 };

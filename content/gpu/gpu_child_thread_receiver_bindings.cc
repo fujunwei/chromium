@@ -63,9 +63,8 @@ void GpuChildThread::BindServiceInterface(
 
 #if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
   if (auto webnn_receiver = receiver.As<webnn::mojom::WebnnService>()) {
-    scoped_refptr<base::SingleThreadTaskRunner> task_runner;
-    task_runner = base::ThreadPool::CreateSingleThreadTaskRunner(
-        {base::TaskPriority::USER_BLOCKING});
+    scoped_refptr<base::SingleThreadTaskRunner> task_runner =
+        base::SingleThreadTaskRunner::GetCurrentDefault();
     task_runner->PostTask(
         FROM_HERE, base::BindOnce(
                        [](mojo::PendingReceiver<webnn::mojom::WebnnService>

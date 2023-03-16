@@ -19,8 +19,8 @@ class WebnnService : public mojom::WebnnService {
   WebnnService(const WebnnService&) = delete;
   WebnnService& operator=(const WebnnService&) = delete;
 
-  void BindWebnnContext(
-      mojo::PendingReceiver<mojom::WebnnContext> receiver) override;
+  void BindWebnnContextProvider(
+      mojo::PendingReceiver<mojom::WebnnContextProvider> receiver) override;
 
  private:
   mojo::Receiver<mojom::WebnnService> receiver_;

@@ -13,8 +13,14 @@ buildflag_header("buildflags") {
 source_set("webnn") {
   if (build_webnn_with_service) {
     sources = [
-      "webnn_context_impl.cc",
-      "webnn_context_impl.h",
+      "webnn_context_impl_win.cc",
+      "webnn_context_impl_win.h",
+      "webnn_context_provider_impl_win.cc",
+      "webnn_context_provider_impl_win.h",
+      "webnn_context_provider_impl.cc",
+      "webnn_context_provider_impl.h",
+      "webnn_graph_impl_win.cc",
+      "webnn_graph_impl_win.h",
       "webnn_service.cc",
       "webnn_service.h",
     ]
@@ -31,7 +37,7 @@ source_set("webnn") {
 source_set("tests") {
   testonly = true
   if (build_webnn_with_service) {
-    sources = [ "webnn_context_impl_unittest.cc" ]
+    sources = [ "webnn_context_impl_win_unittest.cc" ]
 
     deps = [
       ":webnn",
