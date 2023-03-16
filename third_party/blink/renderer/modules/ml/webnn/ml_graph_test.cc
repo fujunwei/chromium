@@ -21,7 +21,7 @@ namespace blink {
 
 namespace {
 
-const TestParam kGraphTestParam[] = {
+const TestVariety kGraphTestVariety[] = {
 #if BUILDFLAG(BUILD_WEBNN_WITH_XNNPACK)
     {BackendType::kXnnpack, ExecutionMode::kAsync},
     {BackendType::kXnnpack, ExecutionMode::kSync},
@@ -45,8 +45,7 @@ struct ElementWiseBinaryTester {
 
   void Test(MLGraphTest& helper, V8TestingScope& scope) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
-                                         helper.CreateMLContextOptions());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
     auto* lhs_operand = BuildInput(builder, "lhs", lhs.dimensions, lhs.type,
                                    scope.GetExceptionState());
     auto* rhs_operand = BuildInput(builder, "rhs", rhs.dimensions, rhs.type,
@@ -230,8 +229,7 @@ struct ReluTester {
 
   void Test(MLGraphTest& helper, V8TestingScope& scope) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
-                                         helper.CreateMLContextOptions());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -305,8 +303,7 @@ struct Resample2dTester {
             V8TestingScope& scope,
             MLResample2dOptions* options = MLResample2dOptions::Create()) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
-                                         helper.CreateMLContextOptions());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -377,8 +374,7 @@ struct ClampTester {
             V8TestingScope& scope,
             MLClampOptions* options = MLClampOptions::Create()) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
-                                         helper.CreateMLContextOptions());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -514,8 +510,7 @@ TEST_P(MLGraphTest, Conv2dTest) {
   // Setup binder for MLService
   ScopedMLServiceBinder scoped_setup_binder(scope);
 #endif
-  auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
-                                       CreateMLContextOptions());
+  auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
   {
     // Test conv2d operator for nhwc input layout and ohwi filter layout.
     auto* options = MLConv2dOptions::Create();
@@ -678,8 +673,7 @@ TEST_P(MLGraphTest, GemmTest) {
     GTEST_SKIP();
   }
 #endif
-  auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
-                                       CreateMLContextOptions());
+  auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
   {
     // Test gemm operator without operand c.
     GemmTester<float>{.a = {.type = V8MLOperandType::Enum::kFloat32,
@@ -731,8 +725,7 @@ struct HardSwishTester {
 
   void Test(MLGraphTest& helper, V8TestingScope& scope) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
-                                         helper.CreateMLContextOptions());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -813,8 +806,7 @@ struct Pool2dTester {
   void Test(MLGraphTest& helper,
             V8TestingScope& scope,
             MLPool2dOptions* options = MLPool2dOptions::Create()) {
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
-                                         helper.CreateMLContextOptions());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -895,8 +887,7 @@ struct ReshapeTester {
 
   void Test(MLGraphTest& helper, V8TestingScope& scope) {
     // Build the graph.
-    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(),
-                                         helper.CreateMLContextOptions());
+    auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext());
     auto* input_operand = BuildInput(builder, "input", input.dimensions,
                                      input.type, scope.GetExceptionState());
     auto* output_operand =
@@ -1175,7 +1166,7 @@ TEST_P(MLGraphTest, ConcatTest) {
 
 INSTANTIATE_TEST_SUITE_P(All,
                          MLGraphTest,
-                         testing::ValuesIn(kGraphTestParam),
-                         TestParamToString);
+                         testing::ValuesIn(kGraphTestVariety),
+                         TestVarietyToString);
 
 }  // namespace blink

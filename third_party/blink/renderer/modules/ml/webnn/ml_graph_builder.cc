@@ -1337,8 +1337,8 @@ MLOperand* MLGraphBuilder::transpose(const MLOperand* input,
                                      ExceptionState& exception_state) {
   // According to WebNN spec:
   // https://www.w3.org/TR/webnn/#api-mlgraphbuilder-transpose,
-  // When permutation is not specified, it’s set to [N-1, ..., 0], where N is the
-  // rank of the input tensor.
+  // When permutation is not specified, it’s set to [N-1, ..., 0], where N is
+  // the rank of the input tensor.
   auto input_rank = input->Dimensions().size();
   Vector<uint32_t> default_permutation(input_rank);
   for (wtf_size_t i = 0; i < input_rank - 1; i++) {
@@ -1423,7 +1423,10 @@ ScriptPromise MLGraphBuilder::build(ScriptState* script_state,
 #endif
 
 #if BUILDFLAG(BUILD_WEBNN_ON_CROS)
-  if (ml_context_->GetDevicePreference() == V8MLDevicePreference::Enum::kGpu) {
+  // Build WebNN graph on ChromeOS with ModelLoader mojom interface which suport
+  // not only CPU at current stage, but also NPU in the future.
+  if (ml_context_->GetDevicePreference() == V8MLDevicePreference::Enum::kAuto ||
+      ml_context_->GetDevicePreference() == V8MLDevicePreference::Enum::kCpu) {
     MLGraphCrOS::ValidateAndBuildAsync(ml_context_, named_outputs, resolver);
     return promise;
   }

@@ -300,6 +300,9 @@ bool TfLiteConverter::SerializeOperations(
     case MLOperator::OperatorKind::kTranspose:
       NOTIMPLEMENTED();
       break;
+    case MLOperator::OperatorKind::kLeakyRelu:
+      NOTIMPLEMENTED();
+      break;
   }
   // The offset is allowed to be 0 to indicate a null object.
   if (offset.IsNull()) {

@@ -24,15 +24,16 @@ enum ExecutionMode { kAsync, kSync };
 // The backends share the unit tests in the MLGraphTest.
 enum BackendType { kFake, kXnnpack, kModelLoader };
 
-struct TestParam {
+struct TestVariety {
   BackendType backend_type;
   ExecutionMode execution_mode;
 };
 
-std::string TestParamToString(const ::testing::TestParamInfo<TestParam>& info);
+std::string TestVarietyToString(
+    const ::testing::TestParamInfo<TestVariety>& info);
 
 class MLGraphTestBase : public ::testing::Test,
-                        public ::testing::WithParamInterface<TestParam> {
+                        public ::testing::WithParamInterface<TestVariety> {
  public:
   // BuildResult is returned by Build() method. Only one member of BuildResult
   // is valid. If the graph building is successful, graph points to the MLGraph
@@ -63,7 +64,6 @@ class MLGraphTestBase : public ::testing::Test,
   ExecutionMode GetExecutionMode();
   // The backend type for testing MLGraphTest (e.g. Xnnpack, ModelLoader).
   BackendType GetBackendType();
-  MLContextOptions* CreateMLContextOptions();
 };
 
 template <typename T>

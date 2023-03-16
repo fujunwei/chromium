@@ -1188,8 +1188,7 @@ const Vector<xnn_external_value>& MLGraphXnnpack::GetXnnExternalValuesTesting()
 }
 
 void MLGraphXnnpack::BuildAsyncImpl(const MLNamedOperands& named_outputs,
-                                    ScriptPromiseResolver* resolver,
-                                    ExceptionState& exception_state) {
+                                    ScriptPromiseResolver* resolver) {
   // TODO(crbug.com/1273291): Revisit whether the topological sorting should run
   // in the worker thread.
   auto* toposorted_operators = GetOperatorsInTopologicalOrder(named_outputs);

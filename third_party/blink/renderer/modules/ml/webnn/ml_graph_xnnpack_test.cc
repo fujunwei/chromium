@@ -893,14 +893,14 @@ TEST_P(MLGraphXnnpackTest, SigmoidTest) {
   }
 }
 
-const TestParam kXnnpackGraphTestParam[] = {
+const TestVariety kXnnpackGraphTestVariety[] = {
     {BackendType::kXnnpack, ExecutionMode::kAsync},
     {BackendType::kXnnpack, ExecutionMode::kSync},
 };
 
 INSTANTIATE_TEST_SUITE_P(All,
                          MLGraphXnnpackTest,
-                         testing::ValuesIn(kXnnpackGraphTestParam),
-                         TestParamToString);
+                         testing::ValuesIn(kXnnpackGraphTestVariety),
+                         TestVarietyToString);
 
 }  // namespace blink

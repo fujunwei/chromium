@@ -3119,14 +3119,14 @@ TEST_P(FakeMLGraphTest, ComputeTest) {
   }
 }
 
-const TestParam kFakeGraphTestParam[] = {
+const TestVariety kFakeGraphTestVariety[] = {
     {BackendType::kFake, ExecutionMode::kAsync},
     {BackendType::kFake, ExecutionMode::kSync},
 };
 
 INSTANTIATE_TEST_SUITE_P(All,
                          FakeMLGraphTest,
-                         testing::ValuesIn(kFakeGraphTestParam),
-                         TestParamToString);
+                         testing::ValuesIn(kFakeGraphTestVariety),
+                         TestVarietyToString);
 
 }  // namespace blink

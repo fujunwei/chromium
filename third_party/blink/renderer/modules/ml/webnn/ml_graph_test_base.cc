@@ -18,7 +18,8 @@ MLGraph* ToMLGraph(V8TestingScope* scope, ScriptValue value) {
       scope->GetIsolate(), value.V8Value(), scope->GetExceptionState());
 }
 
-std::string TestParamToString(const ::testing::TestParamInfo<TestParam>& info) {
+std::string TestVarietyToString(
+    const ::testing::TestParamInfo<TestVariety>& info) {
   BackendType backend_type = info.param.backend_type;
   ExecutionMode execution_mode = info.param.execution_mode;
   std::string name;
@@ -54,22 +55,6 @@ BackendType MLGraphTestBase::GetBackendType() {
 
 ExecutionMode MLGraphTestBase::GetExecutionMode() {
   return GetParam().execution_mode;
-}
-
-MLContextOptions* MLGraphTestBase::CreateMLContextOptions() {
-  V8MLDevicePreference::Enum device;
-  switch (GetBackendType()) {
-    case BackendType::kFake:
-    case BackendType::kXnnpack:
-      device = V8MLDevicePreference::Enum::kCpu;
-      break;
-    case BackendType::kModelLoader:
-      device = V8MLDevicePreference::Enum::kGpu;
-      break;
-  }
-  auto* context_options = MLContextOptions::Create();
-  context_options->setDevicePreference(device);
-  return context_options;
 }
 
 MLGraphTestBase::BuildResult MLGraphTestBase::BuildGraph(
