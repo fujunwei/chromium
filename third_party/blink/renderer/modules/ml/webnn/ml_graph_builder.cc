@@ -559,7 +559,7 @@ MLOperand* MLGraphBuilder::concat(const HeapVector<Member<MLOperand>>& inputs,
                                   ExceptionState& exception_state) {
   auto* concat =
       MakeGarbageCollected<MLOperator>(this, MLOperator::OperatorKind::kConcat);
-  if (inputs.empty()) {
+  if (inputs.IsEmpty()) {
     exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
                                       "The inputs should not be empty.");
     return nullptr;

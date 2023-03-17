@@ -48,7 +48,6 @@ int32_t GetOperatorOutputIndex(const MLOperator* op,
 
 Vector<int32_t> ConvertDimensions(const Vector<uint32_t>& dimensions) {
   Vector<int32_t> new_dims;
-  new_dims.reserve(dimensions.size());
   for (auto dim : dimensions) {
     new_dims.push_back(base::checked_cast<int32_t>(dim));
   }
@@ -237,7 +236,7 @@ bool TfLiteConverter::SerializeTensor(const MLOperand* operand,
       builder_,
       builder_.CreateVector<int32_t>(ConvertDimensions(operand->Dimensions())),
       BlinkOperandTypeToTFLite(operand->Type()), buffer_index,
-      name.empty() ? 0 : builder_.CreateString(name.Utf8()));
+      name.IsEmpty() ? 0 : builder_.CreateString(name.Utf8()));
   if (offset.IsNull()) {
     // Value is allowed to be 0 to indicate a null object (see e.g. AddOffset).
     return false;

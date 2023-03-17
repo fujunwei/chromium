@@ -45,7 +45,7 @@ TfLiteConverter* BuildTFLiteModel(const MLNamedOperands& named_outputs) {
   // 1, Build `tflite::Tensor` for its input and output operands if needed.
   // 2, Build `tflite::Operator` with the tensor index of inputs and outputs
   // operand.
-  for (const auto current_operator : *toposorted_operators) {
+  for (const auto& current_operator : *toposorted_operators) {
     for (const auto& operand : current_operator->Inputs()) {
       if (operand_tensor_index_map.Contains(operand.Get())) {
         // The tensor is already built for this operand, skip it.
@@ -166,7 +166,7 @@ void MLGraphCrOS::BuildAsyncImpl(const MLNamedOperands& outputs,
   // converted in FlatBuffer.
   ml_context_->GetML()->CreateModelLoader(
       script_state, exception_state, std::move(options_mojo),
-      WTF::BindOnce(&MLGraphCrOS::OnRemoteLoaderCreated, WrapPersistent(this),
+      WTF::Bind(&MLGraphCrOS::OnRemoteLoaderCreated, WrapPersistent(this),
                     WrapPersistent(script_state), WrapPersistent(resolver),
                     WrapPersistent(named_outputs)));
 #endif
@@ -211,7 +211,7 @@ void MLGraphCrOS::OnRemoteLoaderCreated(
           base::make_span(
               static_cast<const uint8_t*>(builder.GetBufferPointer()),
               builder.GetSize()),
-          WTF::BindOnce(&MLGraphCrOS::OnRemoteModelLoad, WrapPersistent(this),
+          WTF::Bind(&MLGraphCrOS::OnRemoteModelLoad, WrapPersistent(this),
                         WrapPersistent(execution_context),
                         WrapPersistent(resolver)));
       return;
@@ -297,7 +297,7 @@ void MLGraphCrOS::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
   }
   remote_model_->Compute(
       std::move(input_mojo),
-      WTF::BindOnce(
+      WTF::Bind(
           &MLGraphCrOS::OnComputeResult, WrapPersistent(this),
           WrapPersistent(resolver),
           WrapPersistent(MakeGarbageCollected<MLNamedArrayBufferViews>(inputs)),

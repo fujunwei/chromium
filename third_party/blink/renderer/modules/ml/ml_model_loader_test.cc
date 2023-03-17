@@ -111,14 +111,14 @@ class FakeMLModelLoader : public blink_mojom::ModelLoader {
   }
 
   FakeMLService::CreateModelLoaderFn CreateFromThis() {
-    return WTF::BindOnce(
+    return WTF::Bind(
         &FakeMLModelLoader::OnCreateModelLoader,
         // Safe to WTF::Unretained, method won't be called after test finishes.
         WTF::Unretained(this));
   }
 
   FakeMLService::CreateModelLoaderFn CreateForUnsupportedContext() {
-    return WTF::BindOnce(
+    return WTF::Bind(
         [](blink_mojom::CreateModelLoaderOptionsPtr,
            blink_mojom::MLService::CreateModelLoaderCallback callback) {
           std::move(callback).Run(
@@ -206,7 +206,7 @@ class FakeMLModel : public blink_mojom::Model {
       info_->output_tensor_info.insert(WTF::String(name), tensor.ToMojom());
     }
 
-    return WTF::BindOnce(&FakeMLModel::OnCreateModel,
+    return WTF::Bind(&FakeMLModel::OnCreateModel,
                          // Safe to WTF::Unretained, this method won't be called
                          // after test finishes.
                          WTF::Unretained(this));
@@ -226,7 +226,7 @@ class FakeMLModel : public blink_mojom::Model {
     for (const auto& [name, data] : output) {
       ml_output.Set(WTF::String(name), data);
     }
-    compute_ = WTF::BindOnce(
+    compute_ = WTF::Bind(
         [](WTF::HashMap<WTF::String, WTF::Vector<uint8_t>> output,
            const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>&,
            blink_mojom::Model::ComputeCallback callback) {
@@ -237,7 +237,7 @@ class FakeMLModel : public blink_mojom::Model {
   }
 
   void SetComputeFailure(const blink_mojom::ComputeResult result) {
-    compute_ = WTF::BindOnce(
+    compute_ = WTF::Bind(
         [](const blink_mojom::ComputeResult result,
            const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>&,
            blink_mojom::Model::ComputeCallback callback) {

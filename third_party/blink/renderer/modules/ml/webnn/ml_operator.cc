@@ -90,8 +90,8 @@ const HeapVector<Member<const MLOperand>>& MLOperator::Outputs() const {
 void MLOperator::Connect(HeapVector<Member<const MLOperand>> inputs,
                          HeapVector<Member<const MLOperand>> outputs) {
   DCHECK(!is_connected_);
-  DCHECK(!inputs.empty());
-  DCHECK(!outputs.empty());
+  DCHECK(!inputs.IsEmpty());
+  DCHECK(!outputs.IsEmpty());
   inputs_ = std::move(inputs);
   outputs_ = std::move(outputs);
   is_connected_ = true;

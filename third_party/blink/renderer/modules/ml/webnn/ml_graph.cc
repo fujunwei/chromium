@@ -284,7 +284,7 @@ bool MLGraph::ValidateAndInitializeResourcesInfo(
   DCHECK(!resources_info_initialized_);
 
   // The outputs should not be empty.
-  if (named_outputs.empty()) {
+  if (named_outputs.IsEmpty()) {
     error_message = "At least one output needs to be provided.";
     return false;
   }
