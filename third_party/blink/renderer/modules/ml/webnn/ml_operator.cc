@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -8,6 +8,50 @@
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
 
 namespace blink {
+
+// static
+String MLOperator::OperatorKindToString(MLOperator::OperatorKind kind) {
+  switch (kind) {
+    case MLOperator::OperatorKind::kClamp:
+      return "clamp";
+    case MLOperator::OperatorKind::kConcat:
+      return "concat";
+    case MLOperator::OperatorKind::kConv2d:
+      return "conv2d";
+    case MLOperator::OperatorKind::kAdd:
+      return "add";
+    case MLOperator::OperatorKind::kSub:
+      return "sub";
+    case MLOperator::OperatorKind::kMul:
+      return "mul";
+    case MLOperator::OperatorKind::kDiv:
+      return "div";
+    case MLOperator::OperatorKind::kMax:
+      return "max";
+    case MLOperator::OperatorKind::kMin:
+      return "min";
+    case MLOperator::OperatorKind::kGemm:
+      return "gemm";
+    case MLOperator::OperatorKind::kHardSwish:
+      return "hardSwish";
+    case MLOperator::OperatorKind::kAveragePool2d:
+      return "averagePool2d";
+    case MLOperator::OperatorKind::kMaxPool2d:
+      return "maxPool2d";
+    case MLOperator::OperatorKind::kRelu:
+      return "relu";
+    case MLOperator::OperatorKind::kReshape:
+      return "reshape";
+    case MLOperator::OperatorKind::kResample2d:
+      return "resample2d";
+    case MLOperator::OperatorKind::kSoftmax:
+      return "softmax";
+    case MLOperator::OperatorKind::kSigmoid:
+      return "sigmoid";
+    case MLOperator::OperatorKind::kTranspose:
+      return "transpose";
+  }
+}
 
 MLOperator::MLOperator(MLGraphBuilder* builder,
                        OperatorKind kind,
@@ -21,7 +65,6 @@ void MLOperator::Trace(Visitor* visitor) const {
   visitor->Trace(options_);
   visitor->Trace(inputs_);
   visitor->Trace(outputs_);
-  ScriptWrappable::Trace(visitor);
 }
 
 MLOperator::OperatorKind MLOperator::Kind() const {
@@ -47,8 +90,8 @@ const HeapVector<Member<const MLOperand>>& MLOperator::Outputs() const {
 void MLOperator::Connect(HeapVector<Member<const MLOperand>> inputs,
                          HeapVector<Member<const MLOperand>> outputs) {
   DCHECK(!is_connected_);
-  DCHECK(!inputs.IsEmpty());
-  DCHECK(!outputs.IsEmpty());
+  DCHECK(!inputs.empty());
+  DCHECK(!outputs.empty());
   inputs_ = std::move(inputs);
   outputs_ = std::move(outputs);
   is_connected_ = true;

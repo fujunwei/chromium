@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -13,15 +13,15 @@ enum MLConv2dFilterOperandLayout { "oihw", "hwio", "ohwi", "ihwo" };
 enum MLAutoPad { "explicit", "same-upper", "same-lower" };
 
 dictionary MLConv2dOptions {
-  sequence<long> padding;
-  sequence<long> strides;
-  sequence<long> dilations;
+  sequence<[EnforceRange] unsigned long> padding;
+  sequence<[EnforceRange] unsigned long> strides;
+  sequence<[EnforceRange] unsigned long> dilations;
   MLAutoPad autoPad = "explicit";
-  long groups = 1;
+  [EnforceRange] unsigned long groups = 1;
   MLInputOperandLayout inputLayout = "nchw";
   MLConv2dFilterOperandLayout filterLayout = "oihw";
   MLOperand bias;
-  MLOperator activation;
+  MLActivation activation;
 };
 
 dictionary MLGemmOptions {
@@ -38,14 +38,14 @@ enum MLRoundingType {
 };
 
 dictionary MLPool2dOptions {
-  sequence<long> windowDimensions;
-  sequence<long> padding;
-  sequence<long> strides;
-  sequence<long> dilations;
+  sequence<[EnforceRange] unsigned long> windowDimensions;
+  sequence<[EnforceRange] unsigned long> padding;
+  sequence<[EnforceRange] unsigned long> strides;
+  sequence<[EnforceRange] unsigned long> dilations;
   MLAutoPad autoPad = "explicit";
   MLInputOperandLayout layout = "nchw";
   MLRoundingType roundingType = "floor";
-  sequence<long> outputSizes;
+  sequence<[EnforceRange] unsigned long> outputSizes;
 };
 
 dictionary MLClampOptions {
@@ -53,9 +53,21 @@ dictionary MLClampOptions {
   float maxValue;
 };
 
+enum MLInterpolationMode {"nearest-neighbor", "linear" };
+
+dictionary MLResample2dOptions {
+  MLInterpolationMode mode = "nearest-neighbor";
+  sequence<float> scales;
+  sequence<[EnforceRange] unsigned long> sizes;
+  sequence<long> axes;
+};
+
+dictionary MLTransposeOptions{
+  sequence<long> permutation;
+};
+
 [
-  RuntimeEnabled=MachineLearningNeuralNetwork,
-  Exposed=Window
+  Exposed=(Window, DedicatedWorker)
 ] interface MLGraphBuilder {
   constructor(MLContext context);
 
@@ -64,7 +76,9 @@ dictionary MLClampOptions {
   [RaisesException] MLOperand constant(MLOperandDescriptor desc, MLBufferView bufferView);
 
   [RaisesException] MLOperand clamp(MLOperand input, optional MLClampOptions options = {});
-  [RaisesException] MLOperator clamp(optional MLClampOptions options = {});
+  [RaisesException] MLActivation clamp(optional MLClampOptions options = {});
+
+  [RaisesException] MLOperand concat(sequence<MLOperand> inputs, long axis);
 
   [RaisesException] MLOperand conv2d(MLOperand input, MLOperand filter, optional MLConv2dOptions options = {});
 
@@ -78,10 +92,27 @@ dictionary MLClampOptions {
 
   [RaisesException] MLOperand gemm(MLOperand a, MLOperand b, optional MLGemmOptions options = {});
 
+  [RaisesException] MLOperand hardSwish(MLOperand x);
+  [RaisesException] MLActivation hardSwish();
+
   // Pooling operations
   [RaisesException] MLOperand averagePool2d(MLOperand input, optional MLPool2dOptions options = {});
+  [RaisesException] MLOperand maxPool2d(MLOperand input, optional MLPool2dOptions options = {});
 
-  [RaisesException] MLOperand reshape(MLOperand input, sequence<long> newShape);
+  [RaisesException] MLOperand relu(MLOperand input);
+  [RaisesException] MLActivation relu();
+
+  [RaisesException] MLOperand reshape(MLOperand input, sequence<[EnforceRange] unsigned long?> newShape);
+
+  [RaisesException] MLOperand resample2d(MLOperand input, optional MLResample2dOptions options = {});
+
+  [RaisesException] MLOperand sigmoid(MLOperand input);
+  [RaisesException] MLActivation sigmoid();
+
+  [RaisesException] MLOperand transpose(MLOperand input, optional MLTransposeOptions options = {});
 
   [RaisesException] MLOperand softmax(MLOperand input);
+
+  [CallWith=ScriptState, RaisesException] Promise<MLGraph> build(MLNamedOperands outputs);
+  [RaisesException, Exposed=DedicatedWorker] MLGraph buildSync(MLNamedOperands outputs);
 };

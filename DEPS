@@ -492,6 +492,7 @@ vars = {
 
   # GN CIPD package version.
   'gn_version': 'git_revision:fff29c1b3f9703ea449f720fe70fa73575ef24e5',
+  'ninja_version': 'version:2@1.11.1.chromium.6',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
@@ -1574,6 +1575,15 @@ deps = {
   'src/third_party/netty4/src': {
       'url': Var('chromium_git') + '/external/netty4.git' + '@' + 'cc4420b13bb4eeea5b1cf4f93b2755644cd3b120',
       'condition': 'checkout_android',
+  },
+  'src/third_party/ninja': {
+    'packages': [
+      {
+        'package': 'infra/3pp/tools/ninja/${{platform}}',
+        'version': Var('ninja_version'),
+      }
+    ],
+    'dep_type': 'cipd',
   },
 
   'src/third_party/objenesis': {
