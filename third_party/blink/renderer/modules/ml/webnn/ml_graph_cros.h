@@ -49,6 +49,13 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
       ml::model_loader::mojom::blink::LoadModelResult result,
       mojo::PendingRemote<ml::model_loader::mojom::blink::Model> pending_remote,
       ml::model_loader::mojom::blink::ModelInfoPtr model_info);
+  // The callback of computing tflite model.
+  void OnComputeResult(
+      ScriptPromiseResolver* resolver,
+      const MLNamedArrayBufferViews* named_inputs,
+      const MLNamedArrayBufferViews* named_outputs,
+      ml::model_loader::mojom::blink::ComputeResult result,
+      const absl::optional<HashMap<String, Vector<uint8_t>>>& outputs);
 
   // Load a WebNN graph in `MLService` with `ModelLoader` message pipe, the
   // operations of WebNN need to be converted into a TF-Lite model in

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_test_cros.h"
+
 #include "components/ml/mojom/ml_service.mojom-blink.h"
 #include "components/ml/mojom/web_platform_model.mojom-blink.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
@@ -22,7 +24,6 @@
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder_test.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder_utils.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_cros.h"
-#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_test_base.h"
 #include "third_party/blink/renderer/platform/testing/unit_test_helpers.h"
 #include "third_party/flatbuffers/src/include/flatbuffers/flatbuffers.h"
 #include "third_party/tflite/src/tensorflow/lite/kernels/builtin_op_kernels.h"
@@ -66,10 +67,58 @@ blink_mojom::TensorInfoPtr ConvertToMojom(const TfLiteTensor* tensor) {
 class TfLiteOpResolver : public tflite::MutableOpResolver {
  public:
   TfLiteOpResolver() {
+    AddBuiltin(tflite::BuiltinOperator_RELU,
+               tflite::ops::builtin::Register_RELU(), /* min_version = */ 1,
+               /* max_version = */ 2);
     AddBuiltin(tflite::BuiltinOperator_ADD,
                tflite::ops::builtin::Register_ADD(),
                /* min_version = */ 1,
                /* max_version = */ 2);
+    AddBuiltin(tflite::BuiltinOperator_SUB,
+               tflite::ops::builtin::Register_SUB(),
+               /* min_version = */ 1,
+               /* max_version = */ 3);
+    AddBuiltin(tflite::BuiltinOperator_MUL,
+               tflite::ops::builtin::Register_MUL(),
+               /* min_version = */ 1,
+               /* max_version = */ 4);
+    AddBuiltin(tflite::BuiltinOperator_DIV,
+               tflite::ops::builtin::Register_DIV(),
+               /* min_version */ 1,
+               /* max_version */ 2);
+    AddBuiltin(tflite::BuiltinOperator_MAXIMUM,
+               tflite::ops::builtin::Register_MAXIMUM(),
+               /* min_version = */ 1,
+               /* max_version = */ 4);
+    AddBuiltin(tflite::BuiltinOperator_MINIMUM,
+               tflite::ops::builtin::Register_MINIMUM(),
+               /* min_version = */ 1,
+               /* max_version = */ 4);
+    AddBuiltin(tflite::BuiltinOperator_SOFTMAX,
+               tflite::ops::builtin::Register_SOFTMAX(),
+               /* min_version = */ 1,
+               /* max_version = */ 3);
+    AddBuiltin(tflite::BuiltinOperator_RESHAPE,
+               tflite::ops::builtin::Register_RESHAPE());
+
+    AddBuiltin(tflite::BuiltinOperator_AVERAGE_POOL_2D,
+               tflite::ops::builtin::Register_AVERAGE_POOL_2D(),
+               /* min_version */ 1,
+               /* max_version */ 3);
+    AddBuiltin(tflite::BuiltinOperator_MAX_POOL_2D,
+               tflite::ops::builtin::Register_MAX_POOL_2D(),
+               /* min_version */ 1,
+               /* max_version */ 3);
+    AddBuiltin(tflite::BuiltinOperator_L2_POOL_2D,
+               tflite::ops::builtin::Register_L2_POOL_2D());
+    AddBuiltin(tflite::BuiltinOperator_CONV_2D,
+               tflite::ops::builtin::Register_CONV_2D(),
+               /* min_version = */ 1,
+               /* max_version = */ 4);
+    AddBuiltin(tflite::BuiltinOperator_DEPTHWISE_CONV_2D,
+               tflite::ops::builtin::Register_DEPTHWISE_CONV_2D(),
+               /* min_version = */ 1,
+               /* max_version = */ 5);
   }
 };
 
@@ -172,20 +221,20 @@ class FakeWebNNModel : public blink_mojom::Model {
   mojo_base::BigBuffer buffer_;
 };
 
-class MLGraphTestCrOS : public MLGraphTestBase {
- public:
-  ScopedSetMLServiceBinder SetUpMLService(V8TestingScope& scope) {
-    service_.SetCreateModelLoader(loader_.CreateFromThis());
-    loader_.SetLoad(model_.CreateFromThis());
+MLGraphTestCrOS::MLGraphTestCrOS()
+    : service_(std::make_unique<FakeMLService>()),
+      loader_(std::make_unique<FakeMLModelLoader>()),
+      model_(std::make_unique<FakeWebNNModel>()) {}
 
-    return ScopedSetMLServiceBinder(&service_, scope);
-  }
+MLGraphTestCrOS::~MLGraphTestCrOS() = default;
 
- private:
-  FakeMLService service_;
-  FakeMLModelLoader loader_;
-  FakeWebNNModel model_;
-};
+ScopedSetMLServiceBinder MLGraphTestCrOS::SetUpMLService(
+    V8TestingScope& scope) {
+  service_->SetCreateModelLoader(loader_->CreateFromThis());
+  loader_->SetLoad(model_->CreateFromThis());
+
+  return ScopedSetMLServiceBinder(service_.get(), scope);
+}
 
 template <typename T>
 struct ElementWiseAddTester {
@@ -351,11 +400,13 @@ TEST_P(MLGraphTestCrOS, BuildGraphWithTfliteModel) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    All,
-    MLGraphTestCrOS,
-    testing::Combine(::testing::Values(BackendType::kModelLoader),
-                     ::testing::Values(ExecutionMode::kAsync)),
-    TestVarietyToString);
+const TestVariety kGraphTestModelLoaderVariety[] = {
+    {BackendType::kModelLoader, ExecutionMode::kAsync},
+};
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         MLGraphTestCrOS,
+                         testing::ValuesIn(kGraphTestModelLoaderVariety),
+                         TestVarietyToString);
 
 }  // namespace blink
