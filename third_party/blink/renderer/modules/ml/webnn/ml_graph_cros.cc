@@ -168,7 +168,7 @@ void MLGraphCrOS::BuildAsyncImpl(const MLNamedOperands& outputs,
   // converted in FlatBuffer.
   ml_context_->GetML()->CreateModelLoader(
       script_state, exception_state, std::move(options_mojo),
-      WTF::Bind(&MLGraphCrOS::OnRemoteLoaderCreated, WrapPersistent(this),
+      WTF::BindOnce(&MLGraphCrOS::OnRemoteLoaderCreated, WrapPersistent(this),
                     WrapPersistent(script_state), WrapPersistent(resolver),
                     WrapPersistent(named_outputs)));
 // #endif
@@ -213,7 +213,7 @@ void MLGraphCrOS::OnRemoteLoaderCreated(
           base::make_span(
               static_cast<const uint8_t*>(builder.GetBufferPointer()),
               builder.GetSize()),
-          WTF::Bind(&MLGraphCrOS::OnRemoteModelLoad, WrapPersistent(this),
+          WTF::BindOnce(&MLGraphCrOS::OnRemoteModelLoad, WrapPersistent(this),
                         WrapPersistent(execution_context),
                         WrapPersistent(resolver)));
       return;
@@ -299,7 +299,7 @@ void MLGraphCrOS::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
   }
   remote_model_->Compute(
       std::move(input_mojo),
-      WTF::Bind(
+      WTF::BindOnce(
           &MLGraphCrOS::OnComputeResult, WrapPersistent(this),
           WrapPersistent(resolver),
           WrapPersistent(MakeGarbageCollected<MLNamedArrayBufferViews>(inputs)),

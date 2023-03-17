@@ -236,7 +236,7 @@ bool TfLiteConverter::SerializeTensor(const MLOperand* operand,
       builder_,
       builder_.CreateVector<int32_t>(ConvertDimensions(operand->Dimensions())),
       BlinkOperandTypeToTFLite(operand->Type()), buffer_index,
-      name.IsEmpty() ? 0 : builder_.CreateString(name.Utf8()));
+      name.empty() ? 0 : builder_.CreateString(name.Utf8()));
   if (offset.IsNull()) {
     // Value is allowed to be 0 to indicate a null object (see e.g. AddOffset).
     return false;

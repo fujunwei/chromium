@@ -95,7 +95,7 @@ DOMArrayBufferView* TransferArrayBufferView(
   ArrayBufferContents target_contents;
   // The following `DOMArrayBuffer::Transfer()` call would fail if the
   // detach key of the ArrayBuffer is not `undefined`.
-  if (!source_view->buffer()->Transfer(isolate, target_contents)) {
+  if (!source_view->buffer()->Transfer(isolate, target_contents, exception_state)) {
     return nullptr;
   }
 
@@ -283,7 +283,7 @@ bool MLGraph::ValidateAndInitializeResourcesInfo(
   DCHECK(!resources_info_initialized_);
 
   // The outputs should not be empty.
-  if (named_outputs.IsEmpty()) {
+  if (named_outputs.empty()) {
     error_message = "At least one output needs to be provided.";
     return false;
   }
