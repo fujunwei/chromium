@@ -14,8 +14,6 @@
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
-#include "third_party/flatbuffers/src/include/flatbuffers/flatbuffers.h"
-#include "third_party/tflite/src/tensorflow/lite/schema/schema_generated.h"
 
 namespace blink {
 
@@ -24,89 +22,6 @@ namespace {
 using ml::model_loader::mojom::blink::CreateModelLoaderOptions;
 using ml::model_loader::mojom::blink::DevicePreference;
 using ml::model_loader::mojom::blink::ModelFormat;
-
-// The version number of the Schema. Ideally all changes will be backward
-// compatible. If that ever changes, we must ensure that version is the first
-// entry in the new tflite root so that we can see that version is not 1.
-#define TFLITE_SCHEMA_VERSION (3)
-
-// Build the tflite model mapping with WebNN graph in the following topology:
-//       [input] [constant]
-//           \   /
-//            add
-//             |
-//          [output]
-flatbuffers::FlatBufferBuilder BuildTfLiteModelForTesting() {
-  // Tflite model parameters information.
-  const char* kModelDescription = "ElementWise binary model for testing";
-  const tflite::TensorType type = tflite::TensorType_FLOAT32;
-  const Vector<int32_t> dimensions = {2};
-  const Vector<float> weights = {3.0, 4.0};
-
-  flatbuffers::FlatBufferBuilder builder;
-  // It is required that the first entry in the buffers of model is always an
-  // empty buffer. This is so that the default buffer index of zero in Tensor
-  // will always refer to a valid empty buffer.
-  Vector<flatbuffers::Offset<tflite::Buffer>> buffers = {
-      tflite::CreateBuffer(builder, builder.CreateVector({})),
-  };
-  // Create tflite |Buffer| for constant tensor.
-  buffers.push_back(tflite::CreateBuffer(
-      builder,
-      builder.CreateVector(reinterpret_cast<const uint8_t*>(weights.data()),
-                           sizeof(float) * weights.size())));
-
-  // A list of all tflite |Tensor| used in this model.
-  Vector<flatbuffers::Offset<tflite::Tensor>> tensors;
-  // Create tflite |Tensor| for constant tensor.
-  uint32_t lhs_buffer_index = 0;
-  tensors.emplace_back(tflite::CreateTensor(
-      builder, builder.CreateVector<int32_t>(dimensions), type,
-      lhs_buffer_index, builder.CreateString("input")));
-  // Create tflite |Tensor| for input tensor.
-  uint32_t rhs_buffer_index = 1;
-  tensors.emplace_back(
-      tflite::CreateTensor(builder, builder.CreateVector<int32_t>(dimensions),
-                           type, rhs_buffer_index));
-  // Create tflite |Tensor| for output tensor.
-  uint32_t output_buffer_index = 0;
-  tensors.emplace_back(tflite::CreateTensor(
-      builder, builder.CreateVector<int32_t>(dimensions), type,
-      output_buffer_index, builder.CreateString("output")));
-
-  // A list of all tflite |Operator| used in this model.
-  Vector<flatbuffers::Offset<tflite::Operator>> operators;
-  int32_t lhs_tensor_index = 0, rhs_tensor_index = 1, output_tensor_index = 2;
-  Vector<int32_t> op_inputs = {lhs_tensor_index, rhs_tensor_index};
-  Vector<int32_t> op_outputs = {output_tensor_index};
-  operators.emplace_back(tflite::CreateOperator(
-      builder, 0, builder.CreateVector<int32_t>(op_inputs),
-      builder.CreateVector<int32_t>(op_outputs)));
-
-  // Create subgraph in the model.
-  Vector<int32_t> subgraph_inputs = {lhs_tensor_index};
-  Vector<int32_t> subgraph_outputs = {output_tensor_index};
-  flatbuffers::Offset<tflite::SubGraph> subgraph = tflite::CreateSubGraph(
-      builder, builder.CreateVector(tensors.data(), tensors.size()),
-      builder.CreateVector<int32_t>(subgraph_inputs),
-      builder.CreateVector<int32_t>(subgraph_outputs),
-      builder.CreateVector(operators.data(), operators.size()));
-
-  flatbuffers::Offset<flatbuffers::String> description =
-      builder.CreateString(kModelDescription);
-
-  Vector<flatbuffers::Offset<tflite::OperatorCode>> operator_codes = {
-      {tflite::CreateOperatorCode(builder, tflite::BuiltinOperator_ADD)}};
-  flatbuffers::Offset<tflite::Model> model_buffer = tflite::CreateModel(
-      builder, TFLITE_SCHEMA_VERSION,
-      builder.CreateVector(operator_codes.data(), operator_codes.size()),
-      builder.CreateVector(&subgraph, 1), description,
-      builder.CreateVector(buffers.data(), buffers.size()));
-
-  tflite::FinishModelBuffer(builder, model_buffer);
-
-  return builder;
-}
 
 }  // namespace
 
@@ -180,11 +95,10 @@ void MLGraphCrOS::OnRemoteLoaderCreated(
           std::move(pending_remote),
           execution_context->GetTaskRunner(TaskType::kInternalDefault));
 
-      auto builder = BuildTfLiteModelForTesting();
+      // TODO(crbug.com/1273291): Convert WebNN graph to tflite model instead of
+      // the empty buffer.
       remote_loader_->Load(
-          base::make_span(
-              static_cast<const uint8_t*>(builder.GetBufferPointer()),
-              builder.GetSize()),
+          std::vector<uint8_t>(),
           WTF::BindOnce(&MLGraphCrOS::OnRemoteModelLoad, WrapPersistent(this),
                         WrapPersistent(execution_context),
                         WrapPersistent(resolver)));

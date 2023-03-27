@@ -3,20 +3,14 @@
 // found in the LICENSE file.
 
 #include "third_party/blink/renderer/modules/ml/ml_model_loader.h"
-#include "components/ml/mojom/ml_service.mojom-blink.h"
-#include "components/ml/mojom/web_platform_model.mojom-blink.h"
-#include "mojo/public/cpp/bindings/pending_remote.h"
-#include "mojo/public/cpp/bindings/receiver.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/renderer/bindings/core/v8/idl_types.h"
 #include "third_party/blink/renderer/bindings/core/v8/native_value_traits_impl.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_tester.h"
-#include "third_party/blink/renderer/bindings/core/v8/v8_binding_for_testing.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_dom_exception.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_data_type.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_model.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_power_preference.h"
-#include "third_party/blink/renderer/bindings/modules/v8/v8_ml_tensor.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_tensor_info.h"
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/core/typed_arrays/dom_array_buffer.h"
@@ -25,6 +19,7 @@
 #include "third_party/blink/renderer/modules/ml/ml.h"
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
 #include "third_party/blink/renderer/modules/ml/ml_model.h"
+#include "third_party/blink/renderer/modules/ml/ml_model_loader_test.h"
 #include "third_party/blink/renderer/platform/bindings/exception_code.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/wtf/functional.h"
@@ -32,227 +27,166 @@
 
 namespace blink {
 
-namespace blink_mojom = ml::model_loader::mojom::blink;
+void FakeMLService::CreateModelLoader(
+    blink_mojom::CreateModelLoaderOptionsPtr opts,
+    CreateModelLoaderCallback callback) {
+  std::move(create_model_loader_).Run(std::move(opts), std::move(callback));
+}
 
-namespace {
-// A fake MLService that intercepts Blink's browser interface request to the
-// ml.model_loader.MLService interface.
-class FakeMLService : public blink_mojom::MLService {
- public:
-  FakeMLService() = default;
-  FakeMLService(const FakeMLService&) = delete;
-  FakeMLService(FakeMLService&&) = delete;
-  ~FakeMLService() override = default;
+void FakeMLService::SetCreateModelLoader(CreateModelLoaderFn fn) {
+  create_model_loader_ = std::move(fn);
+}
 
-  using CreateModelLoaderFn = base::OnceCallback<void(
-      blink_mojom::CreateModelLoaderOptionsPtr,
-      blink_mojom::MLService::CreateModelLoaderCallback)>;
+void FakeMLService::BindFakeService(mojo::ScopedMessagePipeHandle pipe) {
+  receiver_.reset();
+  receiver_.Bind(
+      mojo::PendingReceiver<blink_mojom::MLService>(std::move(pipe)));
+}
 
-  void CreateModelLoader(blink_mojom::CreateModelLoaderOptionsPtr opts,
-                         CreateModelLoaderCallback callback) override {
-    std::move(create_model_loader_).Run(std::move(opts), std::move(callback));
-  }
+ScopedSetMLServiceBinder::ScopedSetMLServiceBinder(FakeMLService* ml_service,
+                                                   const V8TestingScope& scope)
+    : interface_broker_(
+          scope.GetExecutionContext()->GetBrowserInterfaceBroker()) {
+  interface_broker_.SetBinderForTesting(
+      blink_mojom::MLService::Name_,
+      WTF::BindRepeating(&FakeMLService::BindFakeService,
+                         // Safe to WTF::Unretained, we unregister the
+                         // binder when the test finishes.
+                         WTF::Unretained(ml_service)));
+}
 
-  void SetCreateModelLoader(CreateModelLoaderFn fn) {
-    create_model_loader_ = std::move(fn);
-  }
-
-  void BindFakeService(mojo::ScopedMessagePipeHandle pipe) {
-    receiver_.reset();
-    receiver_.Bind(
-        mojo::PendingReceiver<blink_mojom::MLService>(std::move(pipe)));
-  }
-
- private:
-  CreateModelLoaderFn create_model_loader_;
-  mojo::Receiver<blink_mojom::MLService> receiver_{this};
-};
-
-class ScopedSetMLServiceBinder {
- public:
-  ScopedSetMLServiceBinder(FakeMLService* ml_service,
-                           const V8TestingScope& scope)
-      : interface_broker_(
-            scope.GetExecutionContext()->GetBrowserInterfaceBroker()) {
-    interface_broker_.SetBinderForTesting(
-        blink_mojom::MLService::Name_,
-        WTF::BindRepeating(&FakeMLService::BindFakeService,
-                           // Safe to WTF::Unretained, we unregister the
-                           // binder when the test finishes.
-                           WTF::Unretained(ml_service)));
-  }
-
-  ~ScopedSetMLServiceBinder() {
-    interface_broker_.SetBinderForTesting(blink_mojom::MLService::Name_,
-                                          base::NullCallback());
-  }
-
- private:
-  const BrowserInterfaceBrokerProxy& interface_broker_;
-};
+ScopedSetMLServiceBinder::~ScopedSetMLServiceBinder() {
+  interface_broker_.SetBinderForTesting(blink_mojom::MLService::Name_,
+                                        base::NullCallback());
+}
 
 // A fake MLModelLoader Mojo interface implementation that backs a Blink
 // MLModelLoader object.
-class FakeMLModelLoader : public blink_mojom::ModelLoader {
- public:
-  FakeMLModelLoader() = default;
-  FakeMLModelLoader(const FakeMLModelLoader&) = delete;
-  FakeMLModelLoader(FakeMLModelLoader&&) = delete;
-  ~FakeMLModelLoader() override = default;
+void FakeMLModelLoader::SetLoad(LoadFn fn) {
+  load_ = std::move(fn);
+}
 
-  using LoadFn =
-      base::OnceCallback<void(mojo_base::BigBuffer,
-                              blink_mojom::ModelLoader::LoadCallback)>;
-  void SetLoad(LoadFn fn) { load_ = std::move(fn); }
+void FakeMLModelLoader::Load(mojo_base::BigBuffer buf,
+                             blink_mojom::ModelLoader::LoadCallback callback) {
+  std::move(load_).Run(std::move(buf), std::move(callback));
+}
 
-  void Load(mojo_base::BigBuffer buf,
-            blink_mojom::ModelLoader::LoadCallback callback) override {
-    std::move(load_).Run(std::move(buf), std::move(callback));
-  }
+FakeMLService::CreateModelLoaderFn FakeMLModelLoader::CreateFromThis() {
+  return WTF::BindOnce(
+      &FakeMLModelLoader::OnCreateModelLoader,
+      // Safe to WTF::Unretained, method won't be called after test finishes.
+      WTF::Unretained(this));
+}
 
-  FakeMLService::CreateModelLoaderFn CreateFromThis() {
-    return WTF::BindOnce(
-        &FakeMLModelLoader::OnCreateModelLoader,
-        // Safe to WTF::Unretained, method won't be called after test finishes.
-        WTF::Unretained(this));
-  }
+FakeMLService::CreateModelLoaderFn
+FakeMLModelLoader::CreateForUnsupportedContext() {
+  return WTF::BindOnce(
+      [](blink_mojom::CreateModelLoaderOptionsPtr,
+         blink_mojom::MLService::CreateModelLoaderCallback callback) {
+        std::move(callback).Run(
+            blink_mojom::CreateModelLoaderResult::kNotSupported,
+            mojo::NullRemote());
+      });
+}
 
-  FakeMLService::CreateModelLoaderFn CreateForUnsupportedContext() {
-    return WTF::BindOnce(
-        [](blink_mojom::CreateModelLoaderOptionsPtr,
-           blink_mojom::MLService::CreateModelLoaderCallback callback) {
-          std::move(callback).Run(
-              blink_mojom::CreateModelLoaderResult::kNotSupported,
-              mojo::NullRemote());
-        });
-  }
+void FakeMLModelLoader::OnCreateModelLoader(
+    blink_mojom::CreateModelLoaderOptionsPtr,
+    blink_mojom::MLService::CreateModelLoaderCallback callback) {
+  receiver_.reset();
+  std::move(callback).Run(blink_mojom::CreateModelLoaderResult::kOk,
+                          receiver_.BindNewPipeAndPassRemote());
+}
 
-  void OnCreateModelLoader(
-      blink_mojom::CreateModelLoaderOptionsPtr,
-      blink_mojom::MLService::CreateModelLoaderCallback callback) {
-    receiver_.reset();
-    std::move(callback).Run(blink_mojom::CreateModelLoaderResult::kOk,
-                            receiver_.BindNewPipeAndPassRemote());
-  }
+blink_mojom::TensorInfoPtr TensorInfo::ToMojom() const {
+  auto ret = blink_mojom::TensorInfo::New();
+  ret->byte_size = byte_size;
+  ret->data_type = data_type;
+  ret->dimensions = dimensions;
+  return ret;
+}
 
- private:
-  LoadFn load_;
-  mojo::Receiver<blink_mojom::ModelLoader> receiver_{this};
-};
+MLTensor* TensorInfo::ToMLTensor() const {
+  auto* ret = MakeGarbageCollected<MLTensor>();
 
-// Helper struct to create faked MLTensors.
-struct TensorInfo {
-  uint32_t byte_size;
-  blink_mojom::DataType data_type;
-  WTF::Vector<uint32_t> dimensions;
+  // Intentionally create from `byte_size` and ignore `dimensions`.
+  //
+  // The test needs to verify safe-guarding logic when `byte_size` doesn't
+  // match with `data_type` and `dimensions`.
+  auto* array_buffer = DOMArrayBuffer::Create(
+      /*number_of_elements*/ byte_size, /*element_size*/ 1u);
+  auto* data_view = DOMDataView::Create(array_buffer, 0, byte_size);
 
-  blink_mojom::TensorInfoPtr ToMojom() const {
-    auto ret = blink_mojom::TensorInfo::New();
-    ret->byte_size = byte_size;
-    ret->data_type = data_type;
-    ret->dimensions = dimensions;
-    return ret;
-  }
+  ret->setData(NotShared<DOMArrayBufferView>(data_view));
+  ret->setDimensions(dimensions);
 
-  MLTensor* ToMLTensor() const {
-    auto* ret = MakeGarbageCollected<MLTensor>();
-
-    // Intentionally create from `byte_size` and ignore `dimensions`.
-    //
-    // The test needs to verify safe-guarding logic when `byte_size` doesn't
-    // match with `data_type` and `dimensions`.
-    auto* array_buffer = DOMArrayBuffer::Create(
-        /*number_of_elements*/ byte_size, /*element_size*/ 1u);
-    auto* data_view = DOMDataView::Create(array_buffer, 0, byte_size);
-
-    ret->setData(NotShared<DOMArrayBufferView>(data_view));
-    ret->setDimensions(dimensions);
-
-    return ret;
-  }
-};
+  return ret;
+}
 
 Vector<uint8_t> CreateByteVector(uint32_t size) {
   return Vector<uint8_t>(size);
 }
 
-// A fake MLModel Mojo interface implementation that backs a Blink MLModel
-// object.
-class FakeMLModel : public blink_mojom::Model {
- public:
-  FakeMLModel() = default;
-  FakeMLModel(const FakeMLModel&) = delete;
-  FakeMLModel(FakeMLModel&&) = delete;
-  ~FakeMLModel() override = default;
+void FakeMLModel::Compute(
+    const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>& input,
+    blink_mojom::Model::ComputeCallback callback) {
+  std::move(compute_).Run(input, std::move(callback));
+}
 
-  using ComputeFn = base::OnceCallback<void(
-      const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>&,
-      blink_mojom::Model::ComputeCallback callback)>;
+FakeMLModelLoader::LoadFn FakeMLModel::CreateFromInfo(
+    const std::map<std::string, TensorInfo>& inputs,
+    const std::map<std::string, TensorInfo>& outputs) {
+  info_ = blink_mojom::ModelInfo::New();
 
-  void Compute(const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>& input,
-               blink_mojom::Model::ComputeCallback callback) override {
-    std::move(compute_).Run(input, std::move(callback));
+  for (const auto& [name, tensor] : inputs) {
+    info_->input_tensor_info.insert(WTF::String(name), tensor.ToMojom());
+  }
+  for (const auto& [name, tensor] : outputs) {
+    info_->output_tensor_info.insert(WTF::String(name), tensor.ToMojom());
   }
 
-  FakeMLModelLoader::LoadFn CreateFromInfo(
-      const std::map<std::string, TensorInfo>& inputs,
-      const std::map<std::string, TensorInfo>& outputs) {
-    info_ = blink_mojom::ModelInfo::New();
+  return WTF::BindOnce(&FakeMLModel::OnCreateModel,
+                       // Safe to WTF::Unretained, this method won't be called
+                       // after test finishes.
+                       WTF::Unretained(this));
+}
 
-    for (const auto& [name, tensor] : inputs) {
-      info_->input_tensor_info.insert(WTF::String(name), tensor.ToMojom());
-    }
-    for (const auto& [name, tensor] : outputs) {
-      info_->output_tensor_info.insert(WTF::String(name), tensor.ToMojom());
-    }
+void FakeMLModel::OnCreateModel(
+    mojo_base::BigBuffer,
+    blink_mojom::ModelLoader::LoadCallback callback) {
+  receiver_.reset();
+  std::move(callback).Run(blink_mojom::LoadModelResult::kOk,
+                          receiver_.BindNewPipeAndPassRemote(), info_->Clone());
+}
 
-    return WTF::BindOnce(&FakeMLModel::OnCreateModel,
-                         // Safe to WTF::Unretained, this method won't be called
-                         // after test finishes.
-                         WTF::Unretained(this));
+void FakeMLModel::SetModelInfo(blink_mojom::ModelInfoPtr info) {
+  info_ = std::move(info);
+}
+
+void FakeMLModel::SetComputeResult(
+    const std::map<std::string, WTF::Vector<uint8_t>>& output) {
+  WTF::HashMap<WTF::String, WTF::Vector<uint8_t>> ml_output;
+  for (const auto& [name, data] : output) {
+    ml_output.Set(WTF::String(name), data);
   }
+  compute_ = WTF::BindOnce(
+      [](WTF::HashMap<WTF::String, WTF::Vector<uint8_t>> output,
+         const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>&,
+         blink_mojom::Model::ComputeCallback callback) {
+        std::move(callback).Run(blink_mojom::ComputeResult::kOk,
+                                std::move(output));
+      },
+      ml_output);
+}
 
-  void OnCreateModel(mojo_base::BigBuffer,
-                     blink_mojom::ModelLoader::LoadCallback callback) {
-    receiver_.reset();
-    std::move(callback).Run(blink_mojom::LoadModelResult::kOk,
-                            receiver_.BindNewPipeAndPassRemote(),
-                            info_->Clone());
-  }
-
-  void SetComputeResult(
-      const std::map<std::string, WTF::Vector<uint8_t>>& output) {
-    WTF::HashMap<WTF::String, WTF::Vector<uint8_t>> ml_output;
-    for (const auto& [name, data] : output) {
-      ml_output.Set(WTF::String(name), data);
-    }
-    compute_ = WTF::BindOnce(
-        [](WTF::HashMap<WTF::String, WTF::Vector<uint8_t>> output,
-           const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>&,
-           blink_mojom::Model::ComputeCallback callback) {
-          std::move(callback).Run(blink_mojom::ComputeResult::kOk,
-                                  std::move(output));
-        },
-        ml_output);
-  }
-
-  void SetComputeFailure(const blink_mojom::ComputeResult result) {
-    compute_ = WTF::BindOnce(
-        [](const blink_mojom::ComputeResult result,
-           const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>&,
-           blink_mojom::Model::ComputeCallback callback) {
-          std::move(callback).Run(result, {});
-        },
-        result);
-  }
-
- private:
-  blink_mojom::ModelInfoPtr info_;
-  ComputeFn compute_;
-
-  mojo::Receiver<blink_mojom::Model> receiver_{this};
-};
-}  // namespace
+void FakeMLModel::SetComputeFailure(const blink_mojom::ComputeResult result) {
+  compute_ = WTF::BindOnce(
+      [](const blink_mojom::ComputeResult result,
+         const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>&,
+         blink_mojom::Model::ComputeCallback callback) {
+        std::move(callback).Run(result, {});
+      },
+      result);
+}
 
 class MLModelLoaderTest : public testing::Test {
  public:

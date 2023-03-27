@@ -1473,7 +1473,7 @@ ScriptPromise MLGraphBuilder::build(ScriptState* script_state,
 
 #if BUILDFLAG(BUILD_WEBNN_ON_CROS)
   // Build WebNN graph on ChromeOS with ModelLoader mojom interface which
-  // support not only CPU at current stage, but also NPU in the future.
+  // supports not only CPU at current stage, but also NPU in the future.
   if (ml_context_->GetDevicePreference() == V8MLDevicePreference::Enum::kAuto ||
       ml_context_->GetDevicePreference() == V8MLDevicePreference::Enum::kCpu) {
     MLGraphCrOS::ValidateAndBuildAsync(ml_context_, named_outputs, resolver);

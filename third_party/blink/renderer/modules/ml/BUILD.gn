@@ -71,6 +71,7 @@ source_set("unit_tests") {
   testonly = true
   sources = [
     "ml_model_loader_test.cc",
+    "ml_model_loader_test.h",
     "webnn/ml_graph_builder_test.cc",
     "webnn/ml_graph_builder_test.h",
     "webnn/ml_graph_builder_utils.cc",
@@ -100,10 +101,7 @@ source_set("unit_tests") {
   }
 
   if (is_chromeos && current_cpu == "x64") {
-    sources += [
-      "webnn/ml_graph_test_cros.cc",
-      "webnn/ml_graph_test_cros.h",
-    ]
+    sources += [ "webnn/ml_graph_test_cros.cc" ]
     deps += [ "//third_party/tflite" ]
   }
 }

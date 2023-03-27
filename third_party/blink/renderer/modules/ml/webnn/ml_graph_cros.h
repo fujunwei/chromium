@@ -40,7 +40,6 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
   // method instead, and the declaration must be public to be called by
   // MakeGarbageCollected.
   MLGraphCrOS(ExecutionContext* execution_context, MLContext* context);
-
   ~MLGraphCrOS() override;
 
   void Trace(Visitor* visitor) const override;
@@ -70,16 +69,16 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
   void BuildAsyncImpl(const MLNamedOperands& named_outputs,
                       ScriptPromiseResolver* resolver) override;
 
-  // TODO(crbug.com/1273291): Support sync build.
+  // Load the converted model with synchronous call of `ModelLoader` interface.
   MLGraph* BuildSyncImpl(const MLNamedOperands& named_outputs,
                          ExceptionState& exception_state) override;
 
-  // TODO(crbug.com/1273291): Support async compute.
+  // Compute the converted model with asynchronous call of `Model` interface.
   void ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
                         const MLNamedArrayBufferViews& outputs,
                         ScriptPromiseResolver* resolver) override;
 
-  // TODO(crbug.com/1273291): Support sync compute.
+  // Compute the converted model with synchronous call of `Model` interface.
   void ComputeSyncImpl(const MLNamedArrayBufferViews& inputs,
                        const MLNamedArrayBufferViews& outputs,
                        ExceptionState& exception_state) override;
