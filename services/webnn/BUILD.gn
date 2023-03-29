@@ -15,10 +15,10 @@ source_set("webnn") {
     sources = [
       "webnn_context_impl_win.cc",
       "webnn_context_impl_win.h",
-      "webnn_context_provider_impl_win.cc",
-      "webnn_context_provider_impl_win.h",
       "webnn_context_provider_impl.cc",
       "webnn_context_provider_impl.h",
+      "webnn_context_provider_impl_win.cc",
+      "webnn_context_provider_impl_win.h",
       "webnn_graph_impl_win.cc",
       "webnn_graph_impl_win.h",
       "webnn_service.cc",

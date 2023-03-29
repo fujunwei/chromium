@@ -5,6 +5,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_ML_ML_CONTEXT_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_ML_ML_CONTEXT_H_
 
+#include "services/webnn/buildflags.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_device_preference.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_model_format.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_power_preference.h"
@@ -13,7 +14,6 @@
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
 #include "third_party/blink/renderer/platform/heap/visitor.h"
-#include "services/webnn/buildflags.h"
 
 #if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
 #include "services/webnn/public/mojom/webnn_graph.mojom-blink.h"
@@ -63,8 +63,8 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
 
   bool IsWebnnContextBound() const { return webnn_context_.is_bound(); }
   void CreateWebnnGraph(
-    ScriptPromiseResolver* resolver,
-    webnn::mojom::blink::WebnnContext::CreateGraphCallback callback);
+      ScriptPromiseResolver* resolver,
+      webnn::mojom::blink::WebnnContext::CreateGraphCallback callback);
 
  private:
   V8MLDevicePreference device_preference_;

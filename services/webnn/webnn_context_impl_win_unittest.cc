@@ -32,12 +32,14 @@ TEST_F(WebnnContextImplWinTest, CreateWebnnGraphTest) {
   mojo::Remote<mojom::WebnnContextProvider> provider_remote;
   mojo::Remote<mojom::WebnnContext> webnn_context_remote;
 
-  WebnnContextProviderImplWin::Create(provider_remote.BindNewPipeAndPassReceiver());
+  WebnnContextProviderImplWin::Create(
+      provider_remote.BindNewPipeAndPassReceiver());
 
   bool is_callback_called = false;
   base::RunLoop run_loop_create_context;
   auto options = mojom::CreateContextOptions::New();
-  provider_remote->CreateWebnnContext(std::move(options),
+  provider_remote->CreateWebnnContext(
+      std::move(options),
       base::BindLambdaForTesting(
           [&](mojom::CreateContextResult result,
               mojo::PendingRemote<mojom::WebnnContext> remote) {

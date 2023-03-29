@@ -5,8 +5,8 @@
 #include "services/webnn/webnn_service.h"
 
 #include "base/no_destructor.h"
-#include "services/webnn/webnn_context_provider_impl.h"
 #include "build/buildflag.h"
+#include "services/webnn/webnn_context_provider_impl.h"
 
 #if BUILDFLAG(IS_WIN)
 #include "services/webnn/webnn_context_provider_impl_win.h"
