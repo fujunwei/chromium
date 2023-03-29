@@ -21,10 +21,10 @@ using ml::model_loader::mojom::blink::Model;
 using ml::model_loader::mojom::blink::ModelInfoPtr;
 using ml::model_loader::mojom::blink::TensorInfoPtr;
 
-enum WebnnLoadModelResult { kOk, kError };
-
 // Map the MLGraph's input or output name to the TensorInfoPtr.
 using TensorInfoMap = HashMap<String, TensorInfoPtr>;
+
+enum WebnnLoadModelResult { kOk, kError };
 
 class ScriptPromiseResolver;
 

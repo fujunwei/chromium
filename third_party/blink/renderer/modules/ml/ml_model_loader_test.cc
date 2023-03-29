@@ -19,7 +19,7 @@
 #include "third_party/blink/renderer/modules/ml/ml.h"
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
 #include "third_party/blink/renderer/modules/ml/ml_model.h"
-#include "third_party/blink/renderer/modules/ml/ml_model_loader_test.h"
+#include "third_party/blink/renderer/modules/ml/ml_model_loader_test_util.h"
 #include "third_party/blink/renderer/platform/bindings/exception_code.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/wtf/functional.h"
