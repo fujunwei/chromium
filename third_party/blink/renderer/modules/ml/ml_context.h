@@ -9,13 +9,23 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_model_format.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_power_preference.h"
 #include "third_party/blink/renderer/core/inspector/console_message.h"
+#include "third_party/blink/renderer/modules/ml/buildflags.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph.h"
 #include "third_party/blink/renderer/modules/modules_export.h"
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
 #include "third_party/blink/renderer/platform/heap/visitor.h"
 
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+#include "components/ml/mojom/web_platform_model.mojom-blink.h"
+#include "third_party/blink/renderer/platform/mojo/heap_mojo_remote.h"
+#endif
+
 namespace blink {
+
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+using ml::model_loader::mojom::blink::ModelLoader;
+#endif
 
 class ML;
 
@@ -41,6 +51,9 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
   void LogConsoleWarning(const String& message);
 
   ML* GetML();
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  HeapMojoRemote<ModelLoader>& GetModelLoaderRemote();
+#endif
 
   void Trace(Visitor* visitor) const override;
 
@@ -63,6 +76,9 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
   unsigned int num_threads_;
 
   Member<ML> ml_;
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  HeapMojoRemote<ModelLoader> remote_loader_;
+#endif
 };
 
 }  // namespace blink

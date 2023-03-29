@@ -19,8 +19,9 @@ using ml::model_loader::mojom::blink::CreateModelLoaderResult;
 using ml::model_loader::mojom::blink::LoadModelResult;
 using ml::model_loader::mojom::blink::Model;
 using ml::model_loader::mojom::blink::ModelInfoPtr;
-using ml::model_loader::mojom::blink::ModelLoader;
 using ml::model_loader::mojom::blink::TensorInfoPtr;
+
+enum WebnnLoadModelResult { kOk, kError };
 
 // Map the MLGraph's input or output name to the TensorInfoPtr.
 using TensorInfoMap = HashMap<String, TensorInfoPtr>;
@@ -48,18 +49,11 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
   const TensorInfoMap& GetOutputTensorInfoMapForTesting() const;
 
  private:
-  // The callback of creating `ModelLoader` mojo interface, it will return
-  // `kNotSupported` if the input configuration is not supported.
-  void OnRemoteLoaderCreated(ScriptState* script_state,
-                             ScriptPromiseResolver* resolver,
-                             const MLNamedOperands* named_outputs,
-                             CreateModelLoaderResult result,
-                             mojo::PendingRemote<ModelLoader> pending_remote);
   // The callback of loading tflite model, it will bind the `Model` pending
   // remote if it's successful.
   void OnRemoteModelLoad(ExecutionContext* execution_context,
                          ScriptPromiseResolver* resolver,
-                         LoadModelResult result,
+                         WebnnLoadModelResult result,
                          mojo::PendingRemote<Model> pending_remote,
                          ModelInfoPtr model_info);
 
@@ -83,7 +77,6 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
                        const MLNamedArrayBufferViews& outputs,
                        ExceptionState& exception_state) override;
 
-  HeapMojoRemote<ml::model_loader::mojom::blink::ModelLoader> remote_loader_;
   HeapMojoRemote<ml::model_loader::mojom::blink::Model> remote_model_;
   TensorInfoMap input_tensor_name_to_info_;
   TensorInfoMap output_tensor_name_to_info_;

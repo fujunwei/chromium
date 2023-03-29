@@ -20,7 +20,13 @@ MLContext::MLContext(const V8MLDevicePreference device_preference,
       power_preference_(power_preference),
       model_format_(model_format),
       num_threads_(num_threads),
-      ml_(ml) {}
+      ml_(ml)
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+      ,
+      remote_loader_(ml->GetExecutionContext())
+#endif
+{
+}
 
 MLContext::~MLContext() = default;
 
@@ -54,8 +60,17 @@ ML* MLContext::GetML() {
   return ml_.Get();
 }
 
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+HeapMojoRemote<ModelLoader>& MLContext::GetModelLoaderRemote() {
+  return remote_loader_;
+}
+#endif
+
 void MLContext::Trace(Visitor* visitor) const {
   visitor->Trace(ml_);
+#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
+  visitor->Trace(remote_loader_);
+#endif
 
   ScriptWrappable::Trace(visitor);
 }

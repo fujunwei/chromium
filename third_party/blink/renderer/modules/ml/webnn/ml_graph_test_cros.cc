@@ -145,18 +145,18 @@ class TFLiteOpResolver : public tflite::MutableOpResolver {
 
 class TFLiteRuntime {
  public:
-  explicit TFLiteRuntime(mojo_base::BigBuffer buffer)
-      : buffer_(std::move(buffer)) {}
+  TFLiteRuntime() = default;
   TFLiteRuntime(const TFLiteRuntime&) = delete;
   TFLiteRuntime(TFLiteRuntime&&) = delete;
   ~TFLiteRuntime() = default;
 
-  TfLiteStatus Load(blink_mojom::ModelInfoPtr& info) {
-    bool empty_buffer = buffer_.size() == 0 ? true : false;
+  TfLiteStatus Load(mojo_base::BigBuffer& buffer,
+                    blink_mojom::ModelInfoPtr& info) {
+    bool empty_buffer = buffer.size() == 0 ? true : false;
     auto flat_buffer_for_testing = empty_buffer ? BuildTfLiteModelForTesting()
                                                 : flatbuffers::DetachedBuffer();
     const tflite::Model* model = tflite::GetModel(
-        empty_buffer ? flat_buffer_for_testing.data() : buffer_.data());
+        empty_buffer ? flat_buffer_for_testing.data() : buffer.data());
     EXPECT_NE(model, nullptr);
     TFLiteOpResolver op_resolver;
     EXPECT_EQ(tflite::InterpreterBuilder(model, op_resolver)(&interpreter_),
@@ -179,7 +179,6 @@ class TFLiteRuntime {
   }
 
  private:
-  mojo_base::BigBuffer buffer_;
   std::unique_ptr<tflite::Interpreter> interpreter_;
 };
 
@@ -200,10 +199,9 @@ class FakeMLModelWithTfLite : public FakeMLModel {
  private:
   void OnCreateModel(mojo_base::BigBuffer buffer,
                      blink_mojom::ModelLoader::LoadCallback callback) {
-    std::unique_ptr<TFLiteRuntime> runtime =
-        std::make_unique<TFLiteRuntime>(std::move(buffer));
+    std::unique_ptr<TFLiteRuntime> runtime = std::make_unique<TFLiteRuntime>();
     blink_mojom::ModelInfoPtr info = blink_mojom::ModelInfo::New();
-    EXPECT_EQ(runtime->Load(info), kTfLiteOk);
+    EXPECT_EQ(runtime->Load(buffer, info), kTfLiteOk);
     FakeMLModel::SetModelInfo(std::move(info));
     FakeMLModel::OnCreateModel(std::move(buffer), std::move(callback));
   }
