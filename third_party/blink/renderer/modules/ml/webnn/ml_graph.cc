@@ -95,8 +95,7 @@ DOMArrayBufferView* TransferArrayBufferView(
   ArrayBufferContents target_contents;
   // The following `DOMArrayBuffer::Transfer()` call would fail if the
   // detach key of the ArrayBuffer is not `undefined`.
-  if (!source_view->buffer()->Transfer(isolate, target_contents,
-                                       exception_state)) {
+  if (!source_view->buffer()->Transfer(isolate, target_contents)) {
     return nullptr;
   }
 

@@ -557,6 +557,10 @@ MLOperand* MLGraphBuilder::constant(const MLOperandDescriptor* desc,
 MLOperand* MLGraphBuilder::concat(const HeapVector<Member<MLOperand>>& inputs,
                                   int32_t axis,
                                   ExceptionState& exception_state) {
+  exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
+                                      "Not implemented.");
+  return nullptr;
+#ifdef TESTING
   auto* concat =
       MakeGarbageCollected<MLOperator>(this, MLOperator::OperatorKind::kConcat);
   if (inputs.IsEmpty()) {
@@ -644,6 +648,7 @@ MLOperand* MLGraphBuilder::concat(const HeapVector<Member<MLOperand>>& inputs,
   }
   concat->Connect((HeapVector<Member<const MLOperand>>)inputs, {output});
   return output;
+#endif
 }
 
 MLOperand* MLGraphBuilder::clamp(const MLOperand* input,
@@ -1372,7 +1377,8 @@ ScriptPromise MLGraphBuilder::build(ScriptState* script_state,
 #endif
 
 #if BUILDFLAG(BUILD_WEBNN_ON_CROS)
-  if (ml_context_->GetDevicePreference() == V8MLDevicePreference::Enum::kGpu) {
+  if (ml_context_->GetDevicePreference() == V8MLDevicePreference::Enum::kAuto ||
+      ml_context_->GetDevicePreference() == V8MLDevicePreference::Enum::kCpu) {
     MLGraphCrOS::ValidateAndBuildAsync(ml_context_, named_outputs, resolver,
                                        exception_state);
     return promise;

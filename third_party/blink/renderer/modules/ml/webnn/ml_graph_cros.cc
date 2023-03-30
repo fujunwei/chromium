@@ -138,6 +138,7 @@ void MLGraphCrOS::Trace(Visitor* visitor) const {
 void MLGraphCrOS::BuildAsyncImpl(const MLNamedOperands& outputs,
                                  ScriptPromiseResolver* resolver,
                                  ExceptionState& exception_state) {
+#ifdef TESTING 
   // Test the tf-lite model converted from WebNN Graph
  TfLiteConverter* tf_lite_model = BuildTFLiteModel(outputs);
  auto& builder = tf_lite_model->GetFlatBufferBuilder();
@@ -151,7 +152,8 @@ void MLGraphCrOS::BuildAsyncImpl(const MLNamedOperands& outputs,
                       builder.GetBufferPointer() + builder.GetSize());
   file.close();
   LOG(ERROR) << "==========Write model to the file";
-#ifdef TESTING 
+#endif
+// #ifdef TESTING 
   auto options_mojo = CreateModelLoaderOptions::New();
   options_mojo->num_threads = ml_context_->GetNumThreads();
   // Hardcode the preference of creating ModelLoader mojo interface because
@@ -169,7 +171,7 @@ void MLGraphCrOS::BuildAsyncImpl(const MLNamedOperands& outputs,
       WTF::Bind(&MLGraphCrOS::OnRemoteLoaderCreated, WrapPersistent(this),
                     WrapPersistent(script_state), WrapPersistent(resolver),
                     WrapPersistent(named_outputs)));
-#endif
+// #endif
 }
 
 void MLGraphCrOS::OnRemoteLoaderCreated(
