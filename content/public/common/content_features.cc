@@ -336,6 +336,13 @@ BASE_FEATURE(kEnableMachineLearningModelLoaderWebPlatformApi,
              "EnableMachineLearningModelLoaderWebPlatformApi",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables the Web Machine Learning Neural Network Service to access hardware
+// acceleration out of renderer process. Explainer:
+// https://github.com/webmachinelearning/webnn/blob/main/explainer.md
+BASE_FEATURE(kEnableMachineLearningNeuralNetworkService,
+             "EnableMachineLearningNeuralNetworkService",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables support for the PPB_VideoDecoder(Dev) API. If this feature is
 // false (and the command-line override is not set in the renderer), the API
 // will appear as unsupported if asked for by a plugin.

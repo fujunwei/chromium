@@ -17,6 +17,8 @@ namespace blink {
 class MLContext;
 class ScriptPromiseResolver;
 
+// The `Mojo` in the class name means this graph is backed by a service running
+// outside of Blink.
 class MODULES_EXPORT MLGraphMojo final : public MLGraph {
  public:
   // Create and build an MLGraphMojo object. Resolve the promise with

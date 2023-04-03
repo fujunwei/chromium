@@ -2759,11 +2759,6 @@
     "expiry_milestone": 130
   },
   {
-    "name": "enable-machine-learning-neural-network-service",
-    "owners": [ "jieweiqian" ],
-    "expiry_milestone": 130
-  },
-  {
     "name": "enable-managed-configuration-web-api",
     "owners": [ "apotapchuk" ],
     "expiry_milestone": 92

@@ -7627,13 +7627,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          features::kEnableMachineLearningModelLoaderWebPlatformApi)},
 
-    {"enable-machine-learning-neural-network-service",
-     flag_descriptions::kEnableMachineLearningNeuralNetworkServiceName,
-     flag_descriptions::kEnableMachineLearningNeuralNetworkServiceDescription,
-     kOsAll,
-     FEATURE_VALUE_TYPE(
-         blink::features::kEnableMachineLearningNeuralNetworkService)},
-
     {"confirmation-chip", flag_descriptions::kConfirmationChipName,
      flag_descriptions::kConfirmationChipNameDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(permissions::features::kConfirmationChip)},

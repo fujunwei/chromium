@@ -1468,7 +1468,7 @@ BASE_FEATURE(kThreadedPreloadScanner,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEnableMachineLearningNeuralNetworkService,
-             "EnableMachineLearningNeuralNetworkService",
+             "MachineLearningNeuralNetworkService",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kFileSystemUrlNavigation,
