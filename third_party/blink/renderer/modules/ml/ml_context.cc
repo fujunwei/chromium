@@ -7,6 +7,7 @@
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/modules/ml/ml.h"
+#include "third_party/blink/renderer/modules/ml/ml_model_loader.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 
 namespace blink {
@@ -20,13 +21,7 @@ MLContext::MLContext(const V8MLDevicePreference device_preference,
       power_preference_(power_preference),
       model_format_(model_format),
       num_threads_(num_threads),
-      ml_(ml)
-#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
-      ,
-      remote_loader_(ml->GetExecutionContext())
-#endif
-{
-}
+      ml_(ml) {}
 
 MLContext::~MLContext() = default;
 
@@ -60,17 +55,17 @@ ML* MLContext::GetML() {
   return ml_.Get();
 }
 
-#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
-HeapMojoRemote<ModelLoader>& MLContext::GetModelLoaderRemote() {
-  return remote_loader_;
+MLModelLoader* MLContext::GetModelLoaderForWebNN(ScriptState* script_state) {
+  if (!ml_model_loader_) {
+    ExecutionContext* execution_context = ExecutionContext::From(script_state);
+    return MakeGarbageCollected<MLModelLoader>(execution_context, this);
+  }
+  return ml_model_loader_;
 }
-#endif
 
 void MLContext::Trace(Visitor* visitor) const {
   visitor->Trace(ml_);
-#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
-  visitor->Trace(remote_loader_);
-#endif
+  visitor->Trace(ml_model_loader_);
 
   ScriptWrappable::Trace(visitor);
 }

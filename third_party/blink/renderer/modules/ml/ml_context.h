@@ -16,18 +16,10 @@
 #include "third_party/blink/renderer/platform/heap/member.h"
 #include "third_party/blink/renderer/platform/heap/visitor.h"
 
-#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
-#include "components/ml/mojom/web_platform_model.mojom-blink.h"
-#include "third_party/blink/renderer/platform/mojo/heap_mojo_remote.h"
-#endif
-
 namespace blink {
 
-#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
-using ml::model_loader::mojom::blink::ModelLoader;
-#endif
-
 class ML;
+class MLModelLoader;
 
 class MODULES_EXPORT MLContext final : public ScriptWrappable {
   DEFINE_WRAPPERTYPEINFO();
@@ -51,9 +43,9 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
   void LogConsoleWarning(const String& message);
 
   ML* GetML();
-#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
-  HeapMojoRemote<ModelLoader>& GetModelLoaderRemote();
-#endif
+  // This method returns a MLModelLoader that's used and shared by WebNN APIs
+  // invoked on this MLContext.
+  MLModelLoader* GetModelLoaderForWebNN(ScriptState* script_state);
 
   void Trace(Visitor* visitor) const override;
 
@@ -76,9 +68,8 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
   unsigned int num_threads_;
 
   Member<ML> ml_;
-#if BUILDFLAG(BUILD_WEBNN_ON_CROS)
-  HeapMojoRemote<ModelLoader> remote_loader_;
-#endif
+  // The MLModelLoader is used by WebNN when building a computational graph.
+  Member<MLModelLoader> ml_model_loader_;
 };
 
 }  // namespace blink

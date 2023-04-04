@@ -32,7 +32,6 @@ class FakeMLService : public blink_mojom::MLService {
   void BindFakeService(mojo::ScopedMessagePipeHandle pipe);
 
  private:
- private:
   // Override methods from ml::blink_mojom::MLService.
   void CreateModelLoader(blink_mojom::CreateModelLoaderOptionsPtr opts,
                          CreateModelLoaderCallback callback) override;

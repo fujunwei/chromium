@@ -24,8 +24,6 @@ using ml::model_loader::mojom::blink::TensorInfoPtr;
 // Map the MLGraph's input or output name to the TensorInfoPtr.
 using TensorInfoMap = HashMap<String, TensorInfoPtr>;
 
-enum WebnnLoadModelResult { kOk, kError };
-
 class ScriptPromiseResolver;
 
 class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
@@ -53,7 +51,7 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
   // remote if it's successful.
   void OnRemoteModelLoad(ExecutionContext* execution_context,
                          ScriptPromiseResolver* resolver,
-                         WebnnLoadModelResult result,
+                         LoadModelResult result,
                          mojo::PendingRemote<Model> pending_remote,
                          ModelInfoPtr model_info);
 

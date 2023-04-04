@@ -17,6 +17,10 @@
 
 namespace blink {
 
+using ml::model_loader::mojom::blink::LoadModelResult;
+using ml::model_loader::mojom::blink::Model;
+using ml::model_loader::mojom::blink::ModelInfoPtr;
+
 class DOMArrayBuffer;
 class ExceptionState;
 class ExecutionContext;
@@ -47,11 +51,25 @@ class MODULES_EXPORT MLModelLoader final : public ScriptWrappable {
 
   void Trace(Visitor* visitor) const override;
 
+  // The callback of loading model is used to bind the pending remote of `Model`
+  // interface if the model is loaded successfully.
+  using ModelLoadedCallback =
+      base::OnceCallback<void(LoadModelResult result,
+                              mojo::PendingRemote<Model> pending_remote,
+                              ModelInfoPtr model_info)>;
+  // The `buffer` doesn't outlive the backing store before calling the
+  // `ModelLoadedCallback`.
+  void Load(ScriptState* script_state,
+            base::span<const uint8_t> buffer,
+            ScriptPromiseResolver* resolver,
+            ModelLoadedCallback callback);
+
  private:
   void OnRemoteLoaderCreated(
       ScriptState* script_state,
       ScriptPromiseResolver* resolver,
-      DOMArrayBuffer* buffer,
+      base::span<const uint8_t> buffer,
+      ModelLoadedCallback callback,
       ml::model_loader::mojom::blink::CreateModelLoaderResult result,
       mojo::PendingRemote<ml::model_loader::mojom::blink::ModelLoader>
           pending_remote);
