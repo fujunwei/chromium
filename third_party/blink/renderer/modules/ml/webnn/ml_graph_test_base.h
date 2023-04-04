@@ -22,7 +22,7 @@ class V8TestingScope;
 // The utility methods for graph test.
 enum ExecutionMode { kAsync, kSync };
 // The backends share the unit tests in the MLGraphTest.
-enum BackendType { kFake, kXnnpack };
+enum BackendType { kFake, kXnnpack, kModelLoader };
 
 using TestVariety = std::tuple<BackendType, ExecutionMode>;
 
@@ -57,9 +57,11 @@ class MLGraphTestBase : public ::testing::Test,
                              MLNamedArrayBufferViews& inputs,
                              MLNamedArrayBufferViews& outputs);
 
- private:
   // The execution mode for testing build and compute graph (e.g. async, sync.).
   ExecutionMode GetExecutionMode();
+  // The backend type for testing MLGraphTest (e.g. Xnnpack, ModelLoader).
+  BackendType GetBackendType();
+  MLContextOptions* CreateMLContextOptions();
 };
 
 template <typename T>

@@ -28,7 +28,6 @@ class MODULES_EXPORT MLOperator final : public GarbageCollected<MLOperator> {
     kSub,
     kMul,
     kDiv,
-    kLeakyRelu,
     kMax,
     kMin,
     kGemm,

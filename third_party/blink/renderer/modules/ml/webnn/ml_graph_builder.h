@@ -26,7 +26,6 @@ class MLClampOptions;
 class MLConv2dOptions;
 class MLGemmOptions;
 class MLGraph;
-class MLLeakyReluOptions;
 class MLPool2dOptions;
 class MLResample2dOptions;
 class MLTransposeOptions;
@@ -85,7 +84,7 @@ class MODULES_EXPORT MLGraphBuilder final : public ScriptWrappable {
                       ExceptionState& exception_state);
 
   MLOperand* concat(const HeapVector<Member<MLOperand>>& inputs,
-                    const uint32_t axis,
+                    int32_t axis,
                     ExceptionState& exception_state);
 
   MLOperand* conv2d(const MLOperand* input,
@@ -120,12 +119,6 @@ class MODULES_EXPORT MLGraphBuilder final : public ScriptWrappable {
 
   MLOperand* hardSwish(const MLOperand* input, ExceptionState& exception_state);
   MLActivation* hardSwish(ExceptionState& exception_state);
-
-  MLOperand* leakyRelu(const MLOperand* input,
-                       const MLLeakyReluOptions* options,
-                       ExceptionState& exception_state);
-  MLActivation* leakyRelu(const MLLeakyReluOptions* options,
-                          ExceptionState& exception_state);
 
   // Pooling operations
   MLOperand* averagePool2d(const MLOperand* input,
@@ -168,7 +161,8 @@ class MODULES_EXPORT MLGraphBuilder final : public ScriptWrappable {
    public:
     virtual void BuildGraphAsyncImpl(MLContext* context,
                                      const MLNamedOperands& named_outputs,
-                                     ScriptPromiseResolver* resolver) = 0;
+                                     ScriptPromiseResolver* resolver,
+                                     ExceptionState& exception_state) = 0;
 
     virtual MLGraph* BuildGraphSyncImpl(MLContext* context,
                                         const MLNamedOperands& named_outputs,

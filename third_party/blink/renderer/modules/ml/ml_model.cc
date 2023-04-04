@@ -103,8 +103,7 @@ ScriptPromise MLModel::compute(
     return ScriptPromise();
   }
 
-  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
-      script_state, exception_state.GetContext());
+  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
   ScriptPromise promise = resolver->Promise();
 
   // First verifies the sizes of inputs.
@@ -142,7 +141,7 @@ ScriptPromise MLModel::compute(
 
   remote_model_->Compute(
       std::move(input_mojo),
-      WTF::BindOnce(&MLModel::OnComputeResult, WrapPersistent(this),
+      WTF::Bind(&MLModel::OnComputeResult, WrapPersistent(this),
                     WrapPersistent(script_state), WrapPersistent(resolver)));
 
   return promise;

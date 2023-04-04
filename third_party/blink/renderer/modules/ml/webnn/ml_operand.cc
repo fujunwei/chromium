@@ -33,7 +33,7 @@ size_t GetBytesPerElement(V8MLOperandType::Enum operand_type) {
 absl::optional<size_t> ValidateAndCalculateElementsNumber(
     const Vector<uint32_t>& dimensions,
     String& error_message) {
-  if (dimensions.empty()) {
+  if (dimensions.IsEmpty()) {
     error_message = "The dimensions is empty.";
     return absl::nullopt;
   }
@@ -99,7 +99,7 @@ MLOperand* MLOperand::ValidateAndCreateInput(MLGraphBuilder* builder,
                                              Vector<uint32_t> dimensions,
                                              String name,
                                              String& error_message) {
-  if (name.empty()) {
+  if (name.IsEmpty()) {
     error_message = "The name is empty.";
     return nullptr;
   }

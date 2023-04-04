@@ -10,9 +10,7 @@
 
 [
   Exposed=Window,
-  SecureContext,
-  ImplementedAs=NavigatorML,
-  RuntimeEnabled=MachineLearningCommon
+  ImplementedAs=NavigatorML
 ] partial interface Navigator {
   [SameObject] readonly attribute ML ml;
 };

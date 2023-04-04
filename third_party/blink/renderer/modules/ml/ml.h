@@ -36,6 +36,7 @@ class MODULES_EXPORT ML final : public ScriptWrappable,
 
   void CreateModelLoader(
       ScriptState* script_state,
+      ExceptionState& exception_state,
       ml::model_loader::mojom::blink::CreateModelLoaderOptionsPtr options,
       ml::model_loader::mojom::blink::MLService::CreateModelLoaderCallback
           callback);
@@ -52,9 +53,11 @@ class MODULES_EXPORT ML final : public ScriptWrappable,
 
  private:
   // Binds the Mojo connection to browser process if needed.
-  // Caller is responsible to ensure `script_state` has a valid
-  // `ExecutionContext`.
-  void BootstrapMojoConnectionIfNeeded(ScriptState* script_state);
+  // Returns false when the execution context is not valid (e.g., the frame is
+  // detached) and an exception will be thrown.
+  // Otherwise returns true.
+  bool BootstrapMojoConnectionIfNeeded(ScriptState* script_state,
+                                       ExceptionState& exception_state);
 
   HeapMojoRemote<ml::model_loader::mojom::blink::MLService> remote_service_;
 };

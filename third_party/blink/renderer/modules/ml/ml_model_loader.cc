@@ -159,8 +159,7 @@ ScriptPromise MLModelLoader::load(ScriptState* script_state,
     return ScriptPromise();
   }
 
-  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
-      script_state, exception_state.GetContext());
+  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
   ScriptPromise promise = resolver->Promise();
 
   if (ml_context_->GetML() == nullptr) {
@@ -181,8 +180,8 @@ ScriptPromise MLModelLoader::load(ScriptState* script_state,
           ml_context_->GetDevicePreference());
 
       ml_context_->GetML()->CreateModelLoader(
-          script_state, std::move(options_mojo),
-          WTF::BindOnce(&MLModelLoader::OnRemoteLoaderCreated,
+          script_state, exception_state, std::move(options_mojo),
+          WTF::Bind(&MLModelLoader::OnRemoteLoaderCreated,
                         WrapPersistent(this), WrapPersistent(script_state),
                         WrapPersistent(resolver), WrapPersistent(buffer)));
     } else {
@@ -190,7 +189,7 @@ ScriptPromise MLModelLoader::load(ScriptState* script_state,
       remote_loader_->Load(
           base::make_span(static_cast<const uint8_t*>(buffer->Data()),
                           buffer->ByteLength()),
-          WTF::BindOnce(&OnRemoteModelLoad,
+          WTF::Bind(&OnRemoteModelLoad,
                         WrapPersistent(ExecutionContext::From(script_state)),
                         WrapPersistent(resolver)));
     }
@@ -234,7 +233,7 @@ void MLModelLoader::OnRemoteLoaderCreated(
       remote_loader_->Load(
           base::make_span(static_cast<const uint8_t*>(buffer->Data()),
                           buffer->ByteLength()),
-          WTF::BindOnce(&OnRemoteModelLoad, WrapPersistent(execution_context),
+          WTF::Bind(&OnRemoteModelLoad, WrapPersistent(execution_context),
                         WrapPersistent(resolver)));
       return;
     }

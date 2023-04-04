@@ -32,10 +32,6 @@ dictionary MLGemmOptions {
   boolean bTranspose = false;
 };
 
-dictionary MLLeakyReluOptions {
-  float alpha = 0.01;
-};
-
 enum MLRoundingType {
   "floor",
   "ceil"
@@ -63,15 +59,14 @@ dictionary MLResample2dOptions {
   MLInterpolationMode mode = "nearest-neighbor";
   sequence<float> scales;
   sequence<[EnforceRange] unsigned long> sizes;
-  sequence<[EnforceRange] unsigned long> axes;
+  sequence<long> axes;
 };
 
 dictionary MLTransposeOptions{
-  sequence<[EnforceRange] unsigned long> permutation;
+  sequence<long> permutation;
 };
 
 [
-  RuntimeEnabled=MachineLearningNeuralNetwork,
   Exposed=(Window, DedicatedWorker)
 ] interface MLGraphBuilder {
   constructor(MLContext context);
@@ -83,7 +78,7 @@ dictionary MLTransposeOptions{
   [RaisesException] MLOperand clamp(MLOperand input, optional MLClampOptions options = {});
   [RaisesException] MLActivation clamp(optional MLClampOptions options = {});
 
-  [RaisesException] MLOperand concat(sequence<MLOperand> inputs, [EnforceRange] unsigned long axis);
+  [RaisesException] MLOperand concat(sequence<MLOperand> inputs, long axis);
 
   [RaisesException] MLOperand conv2d(MLOperand input, MLOperand filter, optional MLConv2dOptions options = {});
 
@@ -99,9 +94,6 @@ dictionary MLTransposeOptions{
 
   [RaisesException] MLOperand hardSwish(MLOperand x);
   [RaisesException] MLActivation hardSwish();
-
-  [RaisesException] MLOperand leakyRelu(MLOperand x, optional MLLeakyReluOptions options = {});
-  [RaisesException] MLActivation leakyRelu(optional MLLeakyReluOptions options = {});
 
   // Pooling operations
   [RaisesException] MLOperand averagePool2d(MLOperand input, optional MLPool2dOptions options = {});

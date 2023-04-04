@@ -46,7 +46,7 @@ HeapVector<Member<const MLOperator>>* GetOperatorsInTopologicalOrder(
       for (const auto& operand : current_operator->Inputs()) {
         if (operand->Kind() == MLOperand::OperandKind::kOutput) {
           const auto* dependent_operator = operand->Operator();
-          CHECK(dependent_operator);
+          DCHECK(dependent_operator);
           if (!visited_operators.Contains(dependent_operator)) {
             // As there is an dependent operator is not visited, skip visiting
             // this operator and push the dependent operator into the to-visit

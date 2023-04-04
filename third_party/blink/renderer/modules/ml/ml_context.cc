@@ -61,8 +61,7 @@ ScriptPromise MLContext::compute(ScriptState* script_state,
     return ScriptPromise();
   }
 
-  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(
-      script_state, exception_state.GetContext());
+  auto* resolver = MakeGarbageCollected<ScriptPromiseResolver>(script_state);
   auto promise = resolver->Promise();
 
   if (graph->Context() != this) {

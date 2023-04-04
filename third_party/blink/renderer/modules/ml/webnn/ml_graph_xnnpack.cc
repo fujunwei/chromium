@@ -21,7 +21,6 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_gemm_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_pool_2d_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_resample_2d_options.h"
-#include "third_party/blink/renderer/bindings/modules/v8/v8_ml_transpose_options.h"
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/modules/ml/ml.h"
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
@@ -917,7 +916,7 @@ xnn_status DefineXnnNodeForResample2d(
     return xnn_status_unsupported_parameter;
   }
 
-  const Vector<uint32_t> default_axes({2, 3});
+  const Vector<int32_t> default_axes({2, 3});
   // XNNPACK resize bilinear node only supports axes = {1, 2}.
   // TODO(crbug.com/1273291): Support axes = {2, 3} by transposing the
   // input tensor.
@@ -937,117 +936,6 @@ xnn_status DefineXnnNodeForResample2d(
   const uint32_t flags = 0;
   XNN_CHECK_STATUS_AND_SET_ERROR_MESSAGE(xnn_define_static_resize_bilinear_2d(
       subgraph, output_height, output_width, input_id, output_id, flags));
-  return xnn_status_success;
-}
-
-xnn_status DefineXnnNodeForTranspose(
-    xnn_subgraph_t subgraph,
-    const MLOperator* transpose,
-    const OperandValueIdMap& operand_value_id_map,
-    String& error_message) {
-  const uint32_t input_id =
-      GetOperatorInputValueId(transpose, operand_value_id_map);
-  const uint32_t output_id =
-      GetOperatorOutputValueId(transpose, operand_value_id_map);
-  const MLTransposeOptions* options =
-      static_cast<const MLTransposeOptions*>(transpose->Options());
-
-  const auto* input = transpose->Inputs()[0].Get();
-  CHECK(input);
-  const auto input_rank = input->Dimensions().size();
-  // According to WebNN spec:
-  // https://www.w3.org/TR/webnn/#api-mlgraphbuilder-transpose,
-  // When permutation is not specified, it’s set to [N-1, ..., 0], where N is
-  // the rank of the input tensor.
-  Vector<uint32_t> default_permutation(input_rank);
-  for (wtf_size_t i = 0; i < input_rank - 1; i++) {
-    default_permutation[i] = input_rank - 1 - i;
-  }
-  const Vector<uint32_t> permutation =
-      options->getPermutationOr(std::move(default_permutation));
-
-  // The current WebNN spec defines the value of permutation as signed
-  // integer: https://www.w3.org/TR/webnn/#dom-mltransposeoptions-permutation
-  // And an issue has been filed to track it:
-  // https://github.com/webmachinelearning/webnn/issues/317
-  Vector<size_t> xnn_permutation(input_rank);
-  base::ranges::transform(permutation, xnn_permutation.begin(), [](uint32_t p) {
-    return base::checked_cast<size_t>(p);
-  });
-  const uint32_t flags = 0;
-  // XNNPACK will memcpy the content of `xnn_permutation` vector to its internal
-  // structure, so it is safe to release `xnn_permutation` vector after this
-  // call. Please refer to the implementation at:
-  // https://source.chromium.org/chromium/chromium/src/+/main:third_party/xnnpack/src/src/subgraph/static-transpose.c;l=267
-  XNN_CHECK_STATUS_AND_SET_ERROR_MESSAGE(xnn_define_static_transpose(
-      subgraph, xnn_permutation.size(), xnn_permutation.data(), input_id,
-      output_id, flags));
-  return xnn_status_success;
-}
-
-// Helper to find the concat axis by comparing the first input shape and output
-// shape which is already calculated by `MLGraphBuilder::concat()`.
-absl::optional<uint32_t> GetConcatAxis(const MLOperator* concat) {
-  // The output tensor should has the same shape size with all the input tensors
-  const auto& output_dims = concat->Outputs()[0]->Dimensions();
-  for (const auto& input : concat->Inputs()) {
-    CHECK_EQ(input->Dimensions().size(), output_dims.size());
-  }
-  const auto& input_dims = concat->Inputs()[0]->Dimensions();
-  for (wtf_size_t i = 0; i < input_dims.size(); ++i) {
-    if (input_dims[i] != output_dims[i]) {
-      return i;
-    }
-  }
-  return absl::nullopt;
-}
-
-xnn_status DefineXnnNodeForConcat(xnn_subgraph_t subgraph,
-                                  const MLOperator* concat,
-                                  const OperandValueIdMap& operand_value_id_map,
-                                  String& error_message) {
-  const auto inputs_size = concat->Inputs().size();
-  Vector<uint32_t> input_ids(inputs_size);
-  for (uint32_t i = 0; i < inputs_size; ++i) {
-    input_ids[i] = GetOperatorInputValueId(concat, operand_value_id_map, i);
-  }
-  const uint32_t output_id =
-      GetOperatorOutputValueId(concat, operand_value_id_map);
-  const uint32_t flags = 0;
-  if (inputs_size == 1u) {
-    // Use XNNPACK copy operator to supoprt single input.
-    XNN_CHECK_STATUS_AND_SET_ERROR_MESSAGE(
-        xnn_define_copy(subgraph, input_ids[0], output_id, flags));
-    return xnn_status_success;
-  }
-  absl::optional<uint32_t> axis = GetConcatAxis(concat);
-  if (!axis) {
-    error_message = "Can not find the concat axis.";
-    return xnn_status_unsupported_parameter;
-  }
-  switch (inputs_size) {
-    case 2u:
-      XNN_CHECK_STATUS_AND_SET_ERROR_MESSAGE(
-          xnn_define_concatenate2(subgraph, axis.value(), input_ids[0],
-                                  input_ids[1], output_id, flags));
-      break;
-    case 3u:
-      XNN_CHECK_STATUS_AND_SET_ERROR_MESSAGE(xnn_define_concatenate3(
-          subgraph, axis.value(), input_ids[0], input_ids[1], input_ids[2],
-          output_id, flags));
-      break;
-    case 4u:
-      XNN_CHECK_STATUS_AND_SET_ERROR_MESSAGE(xnn_define_concatenate4(
-          subgraph, axis.value(), input_ids[0], input_ids[1], input_ids[2],
-          input_ids[3], output_id, flags));
-      break;
-    default:
-      // TODO(crbug.com/1273291): Consider decomposing the concat with inputs
-      // size > 4 into multiple XNNPACK Concat Nodes.
-      error_message = "XNNPACK backend doesn't support concat inputs size " +
-                      String::Number(inputs_size);
-      return xnn_status_unsupported_parameter;
-  }
   return xnn_status_success;
 }
 
@@ -1116,16 +1004,6 @@ xnn_status DefineXnnNode(xnn_subgraph_t subgraph,
           subgraph, ml_operator, operand_value_id_map, error_message));
       break;
     }
-    case MLOperator::OperatorKind::kTranspose: {
-      XNN_CHECK_STATUS(DefineXnnNodeForTranspose(
-          subgraph, ml_operator, operand_value_id_map, error_message));
-      break;
-    }
-    case MLOperator::OperatorKind::kConcat: {
-      XNN_CHECK_STATUS(DefineXnnNodeForConcat(
-          subgraph, ml_operator, operand_value_id_map, error_message));
-      break;
-    }
     default: {
       error_message = "The operator (" +
                       MLOperator::OperatorKindToString(ml_operator->Kind()) +
@@ -1141,9 +1019,10 @@ xnn_status DefineXnnNode(xnn_subgraph_t subgraph,
 // static
 void MLGraphXnnpack::ValidateAndBuildAsync(MLContext* context,
                                            const MLNamedOperands& named_outputs,
-                                           ScriptPromiseResolver* resolver) {
+                                           ScriptPromiseResolver* resolver,
+                                           ExceptionState& exception_state) {
   auto* graph = MakeGarbageCollected<MLGraphXnnpack>(context);
-  graph->BuildAsync(named_outputs, resolver);
+  graph->BuildAsync(named_outputs, resolver, exception_state);
 }
 
 // static
@@ -1188,7 +1067,8 @@ const Vector<xnn_external_value>& MLGraphXnnpack::GetXnnExternalValuesTesting()
 }
 
 void MLGraphXnnpack::BuildAsyncImpl(const MLNamedOperands& named_outputs,
-                                    ScriptPromiseResolver* resolver) {
+                                    ScriptPromiseResolver* resolver,
+                                    ExceptionState& exception_state) {
   // TODO(crbug.com/1273291): Revisit whether the topological sorting should run
   // in the worker thread.
   auto* toposorted_operators = GetOperatorsInTopologicalOrder(named_outputs);

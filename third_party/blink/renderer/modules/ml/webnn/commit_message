@@ -1,0 +1,39 @@
+WebNN: prototype WebNN implementation on ChromeOS platform
+
+This prototype demonstrates a design proposal that runs WebNN computational 
+graphs in MLService to access hardware acceleration by using ModelLoader mojom 
+interface. In this approach, the WebNN graph (MLOperators and MLOperands) would 
+be converted into a TF-Lite model in FlatBuffers with TF-Lite schema, in 
+renderer side. The MLGraphBuilder::build() would be implemented by feeding the 
+converted TFLite FlattBuffers to the load() method [1] of ModelLoader mojo 
+interface, The compute() will be implemented by invoking the compute() method 
+[2] of Model mojo interface.
+
+[1] https://source.chromium.org/chromiumos/chromiumos/codesearch/+/main:src/platform2/ml/mojom/web_platform_model.mojom;l=140
+[2] https://source.chromium.org/chromiumos/chromiumos/codesearch/+/main:src/platform2/ml/mojom/web_platform_model.mojom;l=152
+
+Bug: 1273291
+
+---------------------------------------------------------------------
+WebNN: Extract common test cases from MLGraphXnnpackTest for reusing
+
+The prototype [1] demonstrates WebNN implementation on ChromeOS platform. The
+tflite model converted from WebNN graph can be tested in blink unit tests with
+linking tflite runtime [2], so the end to end tests should be extracted in
+common file for Xnnpack and tflite backend.
+
+[1] https://chromium-review.googlesource.com/c/chromium/src/+/4091788
+[2] https://chromium-review.googlesource.com/c/chromium/src/+/4091788/19/third_party/blink/renderer/modules/ml/BUILD.gn#56
+
+Bug: 1273291
+
+---------------------------------------------------------------------
+WebNN: Continue moving generic end2end tests to MLGraphTestBase
+
+The CL [1] has extracted elementwise binary operator into MLGraphTestBase, this
+CL continue doing for relu, clamp, conv2d, gemm, hardswish, pool2d and reshape
+operator.
+
+[1] https://chromium-review.googlesource.com/c/chromium/src/+/4236177
+
+Bug: 1273291

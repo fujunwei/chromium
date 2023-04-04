@@ -5,6 +5,5 @@
 // https://www.w3.org/TR/webnn/#api-mlactivation
 
 [
-  RuntimeEnabled=MachineLearningNeuralNetwork,
   Exposed=(Window, DedicatedWorker)
 ] interface MLActivation {};

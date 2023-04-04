@@ -20,13 +20,11 @@ dictionary MLComputeResult {
 };
 
 [
-  RuntimeEnabled=MachineLearningCommon,
-  SecureContext,
   Exposed=(Window, DedicatedWorker)
 ] interface MLContext {
-  [RuntimeEnabled=MachineLearningNeuralNetwork, CallWith=ScriptState, RaisesException] Promise<MLComputeResult> compute(
+  [CallWith=ScriptState, RaisesException] Promise<MLComputeResult> compute(
       MLGraph graph, MLNamedArrayBufferViews inputs, MLNamedArrayBufferViews outputs);
 
-  [RuntimeEnabled=MachineLearningNeuralNetwork, RaisesException, Exposed=DedicatedWorker]
+  [RaisesException, Exposed=DedicatedWorker]
       void computeSync(MLGraph graph, MLNamedArrayBufferViews inputs, MLNamedArrayBufferViews outputs);
 };

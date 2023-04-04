@@ -33,6 +33,9 @@ std::string TestVarietyToString(
     case BackendType::kXnnpack:
       name += "Xnnpack_";
       break;
+    case BackendType::kModelLoader:
+      name += "ModelLoader_";
+      break;
   }
 
   switch (execution_mode) {
@@ -46,8 +49,28 @@ std::string TestVarietyToString(
   return name;
 }
 
+BackendType MLGraphTestBase::GetBackendType() {
+  return std::get<0>(GetParam());
+}
+
 ExecutionMode MLGraphTestBase::GetExecutionMode() {
   return std::get<1>(GetParam());
+}
+
+MLContextOptions* MLGraphTestBase::CreateMLContextOptions() {
+  V8MLDevicePreference::Enum device;
+  switch (GetBackendType()) {
+    case BackendType::kFake:
+    case BackendType::kXnnpack:
+      device = V8MLDevicePreference::Enum::kCpu;
+      break;
+    case BackendType::kModelLoader:
+      device = V8MLDevicePreference::Enum::kGpu;
+      break;
+  }
+  auto* context_options = MLContextOptions::Create();
+  context_options->setDevicePreference(device);
+  return context_options;
 }
 
 MLGraphTestBase::BuildResult MLGraphTestBase::BuildGraph(

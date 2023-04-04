@@ -4,9 +4,7 @@
 
 [
   Exposed=DedicatedWorker,
-  SecureContext,
-  ImplementedAs=NavigatorML,
-  RuntimeEnabled=MachineLearningCommon
+  ImplementedAs=NavigatorML
 ] partial interface WorkerNavigator {
   [SameObject] readonly attribute ML ml;
 };

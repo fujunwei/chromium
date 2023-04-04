@@ -5,7 +5,6 @@
 // https://www.w3.org/TR/webnn/
 
 [
-  RuntimeEnabled=MachineLearningNeuralNetwork,
   Exposed=(Window, DedicatedWorker)
 ] interface MLGraph {
 };

@@ -95,8 +95,7 @@ DOMArrayBufferView* TransferArrayBufferView(
   ArrayBufferContents target_contents;
   // The following `DOMArrayBuffer::Transfer()` call would fail if the
   // detach key of the ArrayBuffer is not `undefined`.
-  if (!source_view->buffer()->Transfer(isolate, target_contents,
-                                       exception_state)) {
+  if (!source_view->buffer()->Transfer(isolate, target_contents)) {
     return nullptr;
   }
 
@@ -256,14 +255,15 @@ void MLGraph::ComputeSync(const MLNamedArrayBufferViews& inputs,
 }
 
 void MLGraph::BuildAsync(const MLNamedOperands& named_outputs,
-                         ScriptPromiseResolver* resolver) {
+                         ScriptPromiseResolver* resolver,
+                         ExceptionState& exception_state) {
   String error_message;
   if (!ValidateAndInitializeResourcesInfo(named_outputs, error_message)) {
     resolver->Reject(MakeGarbageCollected<DOMException>(
         DOMExceptionCode::kDataError, error_message));
     return;
   }
-  BuildAsyncImpl(named_outputs, resolver);
+  BuildAsyncImpl(named_outputs, resolver, exception_state);
 }
 
 MLGraph* MLGraph::BuildSync(const MLNamedOperands& named_outputs,
@@ -283,7 +283,7 @@ bool MLGraph::ValidateAndInitializeResourcesInfo(
   DCHECK(!resources_info_initialized_);
 
   // The outputs should not be empty.
-  if (named_outputs.empty()) {
+  if (named_outputs.IsEmpty()) {
     error_message = "At least one output needs to be provided.";
     return false;
   }

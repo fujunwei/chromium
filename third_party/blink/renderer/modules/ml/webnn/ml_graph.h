@@ -81,7 +81,8 @@ class MODULES_EXPORT MLGraph : public ScriptWrappable {
   // BuildAsyncImpl() implemented by an MLGraph backend that builds the platform
   // specific graph.
   void BuildAsync(const MLNamedOperands& named_outputs,
-                  ScriptPromiseResolver* resolver);
+                  ScriptPromiseResolver* resolver,
+                  ExceptionState& exception_state);
 
   // An MLGraph backend should implement this method to build and compile a
   // platform specific graph asynchronously. The actual graph construction and
@@ -90,7 +91,8 @@ class MODULES_EXPORT MLGraph : public ScriptWrappable {
   // resolved with a concrete MLGraph object. Otherwise, the resolver should be
   // rejected with a DOMException accordingly.
   virtual void BuildAsyncImpl(const MLNamedOperands& outputs,
-                              ScriptPromiseResolver* resolver) = 0;
+                              ScriptPromiseResolver* resolver,
+                              ExceptionState& exception_state) = 0;
 
   // BuildSync() has the similar function as BuildAsync() and should also be
   // called right after constructing a concrete MLGraph object. The difference

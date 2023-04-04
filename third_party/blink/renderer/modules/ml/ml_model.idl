@@ -12,7 +12,6 @@
 //   https://webmachinelearning.github.io/webnn/
 
 [
-  SecureContext,
   RuntimeEnabled=MachineLearningModelLoader
 ] interface MLModel {
   [CallWith=ScriptState, RaisesException] Promise<record<DOMString, MLTensor>>

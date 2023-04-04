@@ -9,7 +9,6 @@
 //     https://github.com/webmachinelearning/webnn/blob/main/explainer.md
 
 [
-  RuntimeEnabled=MachineLearningCommon,
   Exposed=(Window, DedicatedWorker)
 ] interface ML {
   [CallWith=ScriptState, RaisesException]
