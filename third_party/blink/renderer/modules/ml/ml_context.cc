@@ -20,13 +20,8 @@ MLContext::MLContext(const V8MLDevicePreference device_preference,
       power_preference_(power_preference),
       model_format_(model_format),
       num_threads_(num_threads),
-      ml_(ml)
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
-      ,
-      webnn_context_(ml->GetExecutionContext())
-#endif
-{
-}
+      ml_(ml),
+      webnn_context_(ml->GetExecutionContext()) {}
 
 MLContext::~MLContext() = default;
 
@@ -52,11 +47,14 @@ ML* MLContext::GetML() {
 
 void MLContext::Trace(Visitor* visitor) const {
   visitor->Trace(ml_);
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
   visitor->Trace(webnn_context_);
-#endif
 
   ScriptWrappable::Trace(visitor);
+}
+
+HeapMojoRemote<webnn::mojom::blink::WebnnContext>&
+MLContext::GetRemoteWebnnContext() {
+  return webnn_context_;
 }
 
 ScriptPromise MLContext::compute(ScriptState* script_state,
@@ -97,59 +95,5 @@ void MLContext::computeSync(MLGraph* graph,
   }
   graph->ComputeSync(inputs, outputs, exception_state);
 }
-
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
-void MLContext::CreateWebnnGraph(
-    ScriptPromiseResolver* resolver,
-    webnn::mojom::blink::WebnnContext::CreateGraphCallback callback) {
-  if (!webnn_context_.is_bound()) {
-    // Needs to create `WebnnContext` interface first.
-    auto options = webnn::mojom::blink::CreateContextOptions::New();
-    // TODO(crbug.com/1273291): Set power preference in the context option.
-    ml_->CreateWebnnContext(
-        resolver, std::move(options),
-        WTF::BindOnce(&MLContext::OnWebnnContextCreated, WrapPersistent(this),
-                      WrapPersistent(resolver)));
-    create_graph_callback_ = std::move(callback);
-  } else {
-    // Directly use `webnn_context_` to create `WebnnGraph` message pipe.
-    webnn_context_->CreateGraph(std::move(callback));
-  }
-}
-
-void MLContext::OnWebnnContextCreated(
-    ScriptPromiseResolver* resolver,
-    webnn::mojom::blink::CreateContextResult result,
-    mojo::PendingRemote<webnn::mojom::blink::WebnnContext> pending_remote) {
-  ScriptState* script_state = resolver->GetScriptState();
-  if (!script_state->ContextIsValid()) {
-    resolver->Reject(MakeGarbageCollected<DOMException>(
-        DOMExceptionCode::kInvalidStateError, "Invalid script state."));
-    return;
-  }
-  switch (result) {
-    case webnn::mojom::blink::CreateContextResult::kUnknownError: {
-      resolver->Reject(MakeGarbageCollected<DOMException>(
-          DOMExceptionCode::kUnknownError, "Internal error."));
-      return;
-    }
-    case webnn::mojom::blink::CreateContextResult::kNotSupported: {
-      resolver->Reject(MakeGarbageCollected<DOMException>(
-          DOMExceptionCode::kNotSupportedError,
-          "Input configuration not supported."));
-      return;
-    }
-    case webnn::mojom::blink::CreateContextResult::kOk: {
-      auto* execution_context = ExecutionContext::From(script_state);
-      webnn_context_.Bind(
-          std::move(pending_remote),
-          execution_context->GetTaskRunner(TaskType::kInternalDefault));
-
-      webnn_context_->CreateGraph(std::move(create_graph_callback_));
-      return;
-    }
-  }
-}
-#endif
 
 }  // namespace blink

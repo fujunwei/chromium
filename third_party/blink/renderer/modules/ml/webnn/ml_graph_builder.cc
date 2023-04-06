@@ -7,7 +7,6 @@
 #include <algorithm>
 
 #include "base/numerics/checked_math.h"
-#include "services/webnn/buildflags.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_clamp_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_conv_2d_options.h"
@@ -31,7 +30,7 @@
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_xnnpack.h"
 #endif
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+#if !BUILDFLAG(IS_CHROMEOS)
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_mojo.h"
 #endif
@@ -1424,7 +1423,7 @@ ScriptPromise MLGraphBuilder::build(ScriptState* script_state,
   }
 #endif
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+#if !BUILDFLAG(IS_CHROMEOS)
   // The runtime enable feature is used to disable the cross process hardware
   // acceleration by default.
   if (base::FeatureList::IsEnabled(

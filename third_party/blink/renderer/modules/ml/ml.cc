@@ -21,13 +21,8 @@ using ml::model_loader::mojom::blink::MLService;
 
 ML::ML(ExecutionContext* execution_context)
     : ExecutionContextClient(execution_context),
-      model_loader_service_(execution_context)
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
-      ,
-      webnn_context_provider_(execution_context)
-#endif
-{
-}
+      model_loader_service_(execution_context),
+      webnn_context_provider_(execution_context) {}
 
 void ML::CreateModelLoader(ScriptState* script_state,
                            CreateModelLoaderOptionsPtr options,
@@ -38,22 +33,10 @@ void ML::CreateModelLoader(ScriptState* script_state,
                                            std::move(callback));
 }
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
 void ML::CreateWebnnContext(
-    ScriptPromiseResolver* resolver,
     webnn::mojom::blink::CreateContextOptionsPtr options,
     webnn::mojom::blink::WebnnContextProvider::CreateWebnnContextCallback
         callback) {
-  ScriptState* script_state = resolver->GetScriptState();
-  // We need to do the following check because the execution context of this
-  // navigator may be invalid (e.g. the frame is detached).
-  if (!script_state->ContextIsValid()) {
-    resolver->Reject(MakeGarbageCollected<DOMException>(
-        DOMExceptionCode::kInvalidStateError,
-        "The execution context is invalid."));
-    return;
-  }
-
   // Connect WebNN Service if needed.
   EnsureWebnnServiceConnection();
 
@@ -61,13 +44,10 @@ void ML::CreateWebnnContext(
   webnn_context_provider_->CreateWebnnContext(std::move(options),
                                               std::move(callback));
 }
-#endif
 
 void ML::Trace(Visitor* visitor) const {
   visitor->Trace(model_loader_service_);
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
   visitor->Trace(webnn_context_provider_);
-#endif
   ExecutionContextClient::Trace(visitor);
   ScriptWrappable::Trace(visitor);
 }
@@ -129,7 +109,6 @@ void ML::BootstrapMojoConnectionIfNeeded(ScriptState* script_state) {
   }
 }
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
 void ML::EnsureWebnnServiceConnection() {
   if (webnn_context_provider_.is_bound()) {
     return;
@@ -138,6 +117,5 @@ void ML::EnsureWebnnServiceConnection() {
       webnn_context_provider_.BindNewPipeAndPassReceiver(
           GetExecutionContext()->GetTaskRunner(TaskType::kInternalDefault)));
 }
-#endif
 
 }  // namespace blink

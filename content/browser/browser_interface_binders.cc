@@ -106,7 +106,6 @@
 #include "services/shape_detection/public/mojom/facedetection_provider.mojom.h"
 #include "services/shape_detection/public/mojom/shape_detection_service.mojom.h"
 #include "services/shape_detection/public/mojom/textdetection.mojom.h"
-#include "services/webnn/buildflags.h"
 #include "storage/browser/quota/quota_internals.mojom.h"
 #include "storage/browser/quota/quota_manager.h"
 #include "storage/browser/quota/quota_manager_proxy.h"
@@ -217,7 +216,7 @@
 #include "media/mojo/mojom/fuchsia_media.mojom.h"
 #endif
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+#if !BUILDFLAG(IS_CHROMEOS)
 #include "services/webnn/public/mojom/webnn_service.mojom.h"
 #endif
 
@@ -269,7 +268,7 @@ void BindTextDetection(
   GetShapeDetectionService()->BindTextDetection(std::move(receiver));
 }
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+#if !BUILDFLAG(IS_CHROMEOS)
 webnn::mojom::WebnnService* GetWebnnService() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   static base::NoDestructor<mojo::Remote<webnn::mojom::WebnnService>> remote;
@@ -905,7 +904,7 @@ void PopulateFrameBinders(RenderFrameHostImpl* host, mojo::BinderMap* map) {
         base::BindRepeating(&CreateMLService));
   }
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+#if !BUILDFLAG(IS_CHROMEOS)
   if (base::FeatureList::IsEnabled(
           blink::features::kEnableMachineLearningNeuralNetworkService)) {
     map->Add<webnn::mojom::WebnnContextProvider>(

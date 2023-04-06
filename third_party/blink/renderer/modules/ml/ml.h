@@ -6,7 +6,7 @@
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_ML_ML_H_
 
 #include "components/ml/mojom/ml_service.mojom-blink.h"
-#include "services/webnn/buildflags.h"
+#include "services/webnn/public/mojom/webnn_service.mojom-blink.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise.h"
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
 #include "third_party/blink/renderer/core/execution_context/execution_context_lifecycle_observer.h"
@@ -17,16 +17,11 @@
 #include "third_party/blink/renderer/platform/heap/visitor.h"
 #include "third_party/blink/renderer/platform/mojo/heap_mojo_remote.h"
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
-#include "services/webnn/public/mojom/webnn_service.mojom-blink.h"
-#endif
-
 namespace blink {
 
 class MLContextOptions;
 class ScriptPromise;
 class ScriptState;
-class ScriptPromiseResolver;
 
 // This class represents the "Machine Learning" object "navigator.ml" and will
 // be shared between the Model Loader API and WebNN API.
@@ -46,15 +41,12 @@ class MODULES_EXPORT ML final : public ScriptWrappable,
       ml::model_loader::mojom::blink::MLService::CreateModelLoaderCallback
           callback);
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
   // Create `WebnnContext` message pipe with `WebnnContextProvider` mojo
   // interface.
   void CreateWebnnContext(
-      ScriptPromiseResolver* resolver,
       webnn::mojom::blink::CreateContextOptionsPtr options,
       webnn::mojom::blink::WebnnContextProvider::CreateWebnnContextCallback
           callback);
-#endif
 
   void Trace(blink::Visitor*) const override;
 
@@ -74,7 +66,6 @@ class MODULES_EXPORT ML final : public ScriptWrappable,
   HeapMojoRemote<ml::model_loader::mojom::blink::MLService>
       model_loader_service_;
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
   // There is only one service running out of renderer process to access the
   // hardware accelerated OS machine learning API. Every `navigator.ml`
   // object has one `WebnnContextProvider` message pipe to create `WebnnContext`
@@ -87,7 +78,6 @@ class MODULES_EXPORT ML final : public ScriptWrappable,
   // of graph execution processes.
   HeapMojoRemote<webnn::mojom::blink::WebnnContextProvider>
       webnn_context_provider_;
-#endif
 };
 
 }  // namespace blink

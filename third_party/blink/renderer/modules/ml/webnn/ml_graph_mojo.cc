@@ -37,10 +37,21 @@ void MLGraphMojo::BuildAsyncImpl(const MLNamedOperands& outputs,
   auto* named_outputs = MakeGarbageCollected<MLNamedOperands>(outputs);
   // Create `WebnnGraph` message pipe with `WebnnContext` mojo interface which
   // is owned by `ML` object of navigator.
-  ml_context_->CreateWebnnGraph(
-      resolver,
-      WTF::BindOnce(&MLGraphMojo::OnGraphCreated, WrapPersistent(this),
-                    WrapPersistent(named_outputs), WrapPersistent(resolver)));
+  auto& remote_context = ml_context_->GetRemoteWebnnContext();
+  if (!remote_context.is_bound()) {
+    // Needs to create `WebnnContext` interface first.
+    auto options = webnn::mojom::blink::CreateContextOptions::New();
+    // TODO(crbug.com/1273291): Set power preference in the context option.
+    ml_context_->GetML()->CreateWebnnContext(
+        std::move(options),
+        WTF::BindOnce(&MLGraphMojo::OnWebnnContextCreated, WrapPersistent(this),
+                      WrapPersistent(resolver), WrapPersistent(named_outputs)));
+  } else {
+    // Directly use `WebnnContext` to create `WebnnGraph` message pipe.
+    remote_context->CreateGraph(
+        WTF::BindOnce(&MLGraphMojo::OnWebnnGraphCreated, WrapPersistent(this),
+                      WrapPersistent(resolver), WrapPersistent(named_outputs)));
+  }
 }
 
 MLGraph* MLGraphMojo::BuildSyncImpl(const MLNamedOperands& named_outputs,
@@ -70,9 +81,47 @@ void MLGraphMojo::ComputeSyncImpl(const MLNamedArrayBufferViews& inputs,
                                     "Not implemented");
 }
 
-void MLGraphMojo::OnGraphCreated(
-    const MLNamedOperands* named_output,
+void MLGraphMojo::OnWebnnContextCreated(
     ScriptPromiseResolver* resolver,
+    const MLNamedOperands* named_outputs,
+    webnn::mojom::blink::CreateContextResult result,
+    mojo::PendingRemote<webnn::mojom::blink::WebnnContext> pending_remote) {
+  ScriptState* script_state = resolver->GetScriptState();
+  if (!script_state->ContextIsValid()) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kInvalidStateError, "Invalid script state."));
+    return;
+  }
+  switch (result) {
+    case webnn::mojom::blink::CreateContextResult::kUnknownError: {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kUnknownError, "Internal error."));
+      return;
+    }
+    case webnn::mojom::blink::CreateContextResult::kNotSupported: {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kNotSupportedError,
+          "Input configuration not supported."));
+      return;
+    }
+    case webnn::mojom::blink::CreateContextResult::kOk: {
+      auto& remote_context = ml_context_->GetRemoteWebnnContext();
+      auto* execution_context = ExecutionContext::From(script_state);
+      remote_context.Bind(
+          std::move(pending_remote),
+          execution_context->GetTaskRunner(TaskType::kInternalDefault));
+
+      remote_context->CreateGraph(WTF::BindOnce(
+          &MLGraphMojo::OnWebnnGraphCreated, WrapPersistent(this),
+          WrapPersistent(resolver), WrapPersistent(named_outputs)));
+      return;
+    }
+  }
+}
+
+void MLGraphMojo::OnWebnnGraphCreated(
+    ScriptPromiseResolver* resolver,
+    const MLNamedOperands* named_output,
     mojo::PendingRemote<webnn::mojom::blink::WebnnGraph> pending_remote) {
   auto* script_state = resolver->GetScriptState();
   auto* execution_context = ExecutionContext::From(script_state);

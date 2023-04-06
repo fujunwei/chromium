@@ -65,7 +65,6 @@ target(link_target_type, "gpu_sources") {
     "//media/gpu",
     "//media/mojo:buildflags",
     "//services/webnn",
-    "//services/webnn:buildflags",
     "//services/webnn/public/mojom",
 
     # TODO(jrummell): As //media/gpu/ipc/service is a source_set in a

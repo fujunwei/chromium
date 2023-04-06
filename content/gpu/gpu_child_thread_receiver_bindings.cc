@@ -10,7 +10,6 @@
 #include "build/branding_buildflags.h"
 #include "build/chromeos_buildflags.h"
 #include "media/mojo/buildflags.h"
-#include "services/webnn/buildflags.h"
 
 #if !BUILDFLAG(GOOGLE_CHROME_BRANDING) || !BUILDFLAG(IS_CHROMEOS_ASH)
 #include "services/shape_detection/public/mojom/shape_detection_service.mojom.h"  // nogncheck
@@ -22,7 +21,7 @@
 #include "media/mojo/mojom/media_service.mojom.h"
 #endif
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+#if !BUILDFLAG(IS_CHROMEOS)
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "services/webnn/public/mojom/webnn_service.mojom.h"
@@ -61,7 +60,7 @@ void GpuChildThread::BindServiceInterface(
   }
 #endif
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
+#if !BUILDFLAG(IS_CHROMEOS)
   if (auto webnn_receiver = receiver.As<webnn::mojom::WebnnService>()) {
     scoped_refptr<base::SingleThreadTaskRunner> task_runner =
         base::SingleThreadTaskRunner::GetCurrentDefault();

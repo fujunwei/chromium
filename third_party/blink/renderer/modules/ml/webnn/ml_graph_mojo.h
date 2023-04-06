@@ -52,12 +52,20 @@ class MODULES_EXPORT MLGraphMojo final : public MLGraph {
                        const MLNamedArrayBufferViews& outputs,
                        ExceptionState& exception_state) override;
 
+  // The callback of creating context called from server side.
+  void OnWebnnContextCreated(
+      ScriptPromiseResolver* resolver,
+      const MLNamedOperands* named_outputs,
+      webnn::mojom::blink::CreateContextResult result,
+      mojo::PendingRemote<webnn::mojom::blink::WebnnContext>);
+
   // The callback of creating `WebnnGraph` mojo interface from WebNN Service.
   // Return `CreatGraphResult::kNotSupported` with `mojo::NullRemote` on
   // non-supported input configuration.
-  void OnGraphCreated(const MLNamedOperands*,
-                      ScriptPromiseResolver*,
-                      mojo::PendingRemote<webnn::mojom::blink::WebnnGraph>);
+  void OnWebnnGraphCreated(
+      ScriptPromiseResolver* resolver,
+      const MLNamedOperands* named_outputs,
+      mojo::PendingRemote<webnn::mojom::blink::WebnnGraph>);
 
   // The `WebnnGraph` mojo interface is used to build and execute graph in the
   // WebNN Service.

@@ -5,7 +5,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_ML_ML_CONTEXT_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_ML_ML_CONTEXT_H_
 
-#include "services/webnn/buildflags.h"
+#include "services/webnn/public/mojom/webnn_service.mojom-blink.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_device_preference.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_model_format.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_power_preference.h"
@@ -14,12 +14,7 @@
 #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
 #include "third_party/blink/renderer/platform/heap/visitor.h"
-
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
-#include "services/webnn/public/mojom/webnn_graph.mojom-blink.h"
-#include "services/webnn/public/mojom/webnn_service.mojom-blink.h"
 #include "third_party/blink/renderer/platform/mojo/heap_mojo_remote.h"
-#endif
 
 namespace blink {
 
@@ -49,6 +44,8 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
 
   void Trace(Visitor* visitor) const override;
 
+  HeapMojoRemote<webnn::mojom::blink::WebnnContext>& GetRemoteWebnnContext();
+
   // IDL interface:
   ScriptPromise compute(ScriptState* script_state,
                         MLGraph* graph,
@@ -61,11 +58,6 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
                    const MLNamedArrayBufferViews& outputs,
                    ExceptionState& exception_state);
 
-  bool IsWebnnContextBound() const { return webnn_context_.is_bound(); }
-  void CreateWebnnGraph(
-      ScriptPromiseResolver* resolver,
-      webnn::mojom::blink::WebnnContext::CreateGraphCallback callback);
-
  private:
   V8MLDevicePreference device_preference_;
   V8MLPowerPreference power_preference_;
@@ -74,19 +66,10 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
 
   Member<ML> ml_;
 
-#if BUILDFLAG(BUILD_WEBNN_WITH_SERVICE)
-  // The callback of creating context called from server side.
-  void OnWebnnContextCreated(
-      ScriptPromiseResolver* resolver,
-      webnn::mojom::blink::CreateContextResult result,
-      mojo::PendingRemote<webnn::mojom::blink::WebnnContext>);
-
-  webnn::mojom::blink::WebnnContext::CreateGraphCallback create_graph_callback_;
   // Webnn support multiple types of neural network inference hardware
   // acceleration, the context of webnn in server side is used to map different
   // device and represent a state of graph execution processes.
   HeapMojoRemote<webnn::mojom::blink::WebnnContext> webnn_context_;
-#endif
 };
 
 }  // namespace blink

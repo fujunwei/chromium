@@ -2,49 +2,45 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/buildflag_header.gni")
-import("//services/webnn/buildflags.gni")
-
-buildflag_header("buildflags") {
-  header = "buildflags.h"
-  flags = [ "BUILD_WEBNN_WITH_SERVICE=$build_webnn_with_service" ]
-}
-
 source_set("webnn") {
-  if (build_webnn_with_service) {
-    sources = [
+  sources = [
+    "webnn_context_provider_impl.cc",
+    "webnn_context_provider_impl.h",
+    "webnn_service.cc",
+    "webnn_service.h",
+  ]
+
+  if (is_win) {
+    sources += [
       "webnn_context_impl_win.cc",
       "webnn_context_impl_win.h",
-      "webnn_context_provider_impl.cc",
-      "webnn_context_provider_impl.h",
       "webnn_context_provider_impl_win.cc",
       "webnn_context_provider_impl_win.h",
       "webnn_graph_impl_win.cc",
       "webnn_graph_impl_win.h",
-      "webnn_service.cc",
-      "webnn_service.h",
-    ]
-
-    deps = [
-      "//base",
-      "//mojo/public/cpp/bindings",
-      "//services/webnn:buildflags",
-      "//services/webnn/public/mojom",
     ]
   }
+
+  deps = [
+    "//base",
+    "//mojo/public/cpp/bindings",
+    "//services/webnn/public/mojom",
+  ]
 }
 
 source_set("tests") {
   testonly = true
-  if (build_webnn_with_service) {
+  if (is_win) {
     sources = [ "webnn_context_impl_win_unittest.cc" ]
-
-    deps = [
-      ":webnn",
-      "//base",
-      "//base/test:test_support",
-      "//mojo/public/cpp/test_support:test_utils",
-      "//testing/gtest",
-    ]
   }
+
+  deps = [
+    ":webnn",
+    "//base",
+    "//base/test:test_support",
+    "//mojo/public/cpp/bindings",
+    "//mojo/public/cpp/test_support:test_utils",
+    "//services/webnn/public/mojom",
+    "//testing/gtest",
+  ]
 }

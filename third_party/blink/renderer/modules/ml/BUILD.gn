@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/buildflag_header.gni")
-import("//services/webnn/buildflags.gni")
 import("//third_party/blink/renderer/modules/ml/webnn/features.gni")
 import("//third_party/blink/renderer/modules/modules.gni")
 
@@ -41,7 +40,6 @@ blink_modules_sources("ml") {
   deps = [
     ":buildflags",
     "//components/ml/mojom:mojom_blink",
-    "//services/webnn:buildflags",
     "//services/webnn/public/mojom:mojom_blink",
   ]
 
@@ -54,7 +52,7 @@ blink_modules_sources("ml") {
     deps += [ "//third_party/xnnpack" ]
   }
 
-  if (build_webnn_with_service) {
+  if (!is_chromeos) {
     sources += [
       # MLGraphMojo is platform independent which packages the model information
       # into a neutral struct type, it will be built and executed with hardware
@@ -63,8 +61,6 @@ blink_modules_sources("ml") {
       "webnn/ml_graph_mojo.cc",
       "webnn/ml_graph_mojo.h",
     ]
-
-    deps += [ "//services/webnn/public/mojom:mojom_blink" ]
   }
 }
 
@@ -106,7 +102,7 @@ source_set("unit_tests") {
     deps += [ "//third_party/tflite" ]
   }
 
-  if (build_webnn_with_service) {
+  if (!is_chromeos) {
     sources += [ "webnn/ml_graph_mojo_test.cc" ]
   }
 }
