@@ -23,8 +23,8 @@ class MODULES_EXPORT MLGraphMojo final : public MLGraph {
  public:
   // Create and build an MLGraphMojo object. Resolve the promise with
   // this concrete object if the graph builds successfully out of renderer
-  // process. Launch WebNN service and bind `WebnnContext` mojo interface
-  // to create `WebnnGraph` message pipe if needed.
+  // process. Launch WebNN service and bind `WebNNContext` mojo interface
+  // to create `WebNNGraph` message pipe if needed.
   static void ValidateAndBuildAsync(MLContext* context,
                                     const MLNamedOperands& named_outputs,
                                     ScriptPromiseResolver* resolver);
@@ -35,7 +35,7 @@ class MODULES_EXPORT MLGraphMojo final : public MLGraph {
   void Trace(Visitor* visitor) const override;
 
  private:
-  // Create `WebnnGraph` message pipe with `WebnnContext` mojo interface, then
+  // Create `WebNNGraph` message pipe with `WebNNContext` mojo interface, then
   // build the computational graph with the hardware accelerated OS machine
   // learning API in the WebNN Service.
   void BuildAsyncImpl(const MLNamedOperands& outputs,
@@ -53,23 +53,23 @@ class MODULES_EXPORT MLGraphMojo final : public MLGraph {
                        ExceptionState& exception_state) override;
 
   // The callback of creating context called from server side.
-  void OnWebnnContextCreated(
+  void OnWebNNContextCreated(
       ScriptPromiseResolver* resolver,
       const MLNamedOperands* named_outputs,
       webnn::mojom::blink::CreateContextResult result,
-      mojo::PendingRemote<webnn::mojom::blink::WebnnContext>);
+      mojo::PendingRemote<webnn::mojom::blink::WebNNContext>);
 
-  // The callback of creating `WebnnGraph` mojo interface from WebNN Service.
+  // The callback of creating `WebNNGraph` mojo interface from WebNN Service.
   // Return `CreatGraphResult::kNotSupported` with `mojo::NullRemote` on
   // non-supported input configuration.
-  void OnWebnnGraphCreated(
+  void OnWebNNGraphCreated(
       ScriptPromiseResolver* resolver,
       const MLNamedOperands* named_outputs,
-      mojo::PendingRemote<webnn::mojom::blink::WebnnGraph>);
+      mojo::PendingRemote<webnn::mojom::blink::WebNNGraph>);
 
-  // The `WebnnGraph` mojo interface is used to build and execute graph in the
+  // The `WebNNGraph` mojo interface is used to build and execute graph in the
   // WebNN Service.
-  HeapMojoRemote<webnn::mojom::blink::WebnnGraph> remote_graph_;
+  HeapMojoRemote<webnn::mojom::blink::WebNNGraph> remote_graph_;
 };
 
 }  // namespace blink

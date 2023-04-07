@@ -11,19 +11,19 @@
 
 namespace webnn {
 
-class WebnnService : public mojom::WebnnService {
+class WebNNService : public mojom::WebNNService {
  public:
-  explicit WebnnService(mojo::PendingReceiver<mojom::WebnnService> receiver);
-  ~WebnnService() override;
+  explicit WebNNService(mojo::PendingReceiver<mojom::WebNNService> receiver);
+  ~WebNNService() override;
 
-  WebnnService(const WebnnService&) = delete;
-  WebnnService& operator=(const WebnnService&) = delete;
+  WebNNService(const WebNNService&) = delete;
+  WebNNService& operator=(const WebNNService&) = delete;
 
-  void BindWebnnContextProvider(
-      mojo::PendingReceiver<mojom::WebnnContextProvider> receiver) override;
+  void BindWebNNContextProvider(
+      mojo::PendingReceiver<mojom::WebNNContextProvider> receiver) override;
 
  private:
-  mojo::Receiver<mojom::WebnnService> receiver_;
+  mojo::Receiver<mojom::WebNNService> receiver_;
 };
 
 }  // namespace webnn

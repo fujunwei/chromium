@@ -28,45 +28,45 @@ namespace blink {
 
 namespace blink_mojom = webnn::mojom::blink;
 
-class FakeWebnnGraph : public blink_mojom::WebnnGraph {
+class FakeWebNNGraph : public blink_mojom::WebNNGraph {
  public:
-  FakeWebnnGraph() = default;
-  ~FakeWebnnGraph() override = default;
+  FakeWebNNGraph() = default;
+  ~FakeWebNNGraph() override = default;
 
  private:
-  // Override methods from webnn::mojom::WebnnGraph.
+  // Override methods from webnn::mojom::WebNNGraph.
   // TODO(crbug.com/1273291): Add build and compute methods.
 };
 
-class FakeWebnnContext : public blink_mojom::WebnnContext {
+class FakeWebNNContext : public blink_mojom::WebNNContext {
  public:
-  FakeWebnnContext() = default;
-  ~FakeWebnnContext() override = default;
+  FakeWebNNContext() = default;
+  ~FakeWebNNContext() override = default;
 
  private:
-  // Override methods from webnn::mojom::WebnnContext.
+  // Override methods from webnn::mojom::WebNNContext.
   void CreateGraph(CreateGraphCallback callback) override {
-    mojo::PendingRemote<blink_mojom::WebnnGraph> blink_remote;
-    // The receiver bind to FakeWebnnGraph.
-    mojo::MakeSelfOwnedReceiver<blink_mojom::WebnnGraph>(
-        std::make_unique<FakeWebnnGraph>(),
+    mojo::PendingRemote<blink_mojom::WebNNGraph> blink_remote;
+    // The receiver bind to FakeWebNNGraph.
+    mojo::MakeSelfOwnedReceiver<blink_mojom::WebNNGraph>(
+        std::make_unique<FakeWebNNGraph>(),
         blink_remote.InitWithNewPipeAndPassReceiver());
 
     std::move(callback).Run(std::move(blink_remote));
   }
 };
 
-class FakeWebnnContextProvider : public blink_mojom::WebnnContextProvider {
+class FakeWebNNContextProvider : public blink_mojom::WebNNContextProvider {
  public:
-  FakeWebnnContextProvider() : receiver_(this) {}
-  ~FakeWebnnContextProvider() override = default;
+  FakeWebNNContextProvider() : receiver_(this) {}
+  ~FakeWebNNContextProvider() override = default;
 
   void BindRequest(mojo::ScopedMessagePipeHandle handle) {
     DCHECK(!receiver_.is_bound());
-    receiver_.Bind(mojo::PendingReceiver<blink_mojom::WebnnContextProvider>(
+    receiver_.Bind(mojo::PendingReceiver<blink_mojom::WebNNContextProvider>(
         std::move(handle)));
     receiver_.set_disconnect_handler(WTF::BindOnce(
-        &FakeWebnnContextProvider::OnConnectionError, WTF::Unretained(this)));
+        &FakeWebNNContextProvider::OnConnectionError, WTF::Unretained(this)));
   }
 
   bool IsBound() const { return receiver_.is_bound(); }
@@ -74,47 +74,47 @@ class FakeWebnnContextProvider : public blink_mojom::WebnnContextProvider {
   void OnConnectionError() { receiver_.reset(); }
 
  private:
-  // Override methods from webnn::mojom::WebnnContextProvider.
-  void CreateWebnnContext(blink_mojom::CreateContextOptionsPtr options,
-                          CreateWebnnContextCallback callback) override {
-    mojo::PendingRemote<blink_mojom::WebnnContext> blink_remote;
-    // The receiver bind to FakeWebnnContext.
-    mojo::MakeSelfOwnedReceiver<blink_mojom::WebnnContext>(
-        std::make_unique<FakeWebnnContext>(),
+  // Override methods from webnn::mojom::WebNNContextProvider.
+  void CreateWebNNContext(blink_mojom::CreateContextOptionsPtr options,
+                          CreateWebNNContextCallback callback) override {
+    mojo::PendingRemote<blink_mojom::WebNNContext> blink_remote;
+    // The receiver bind to FakeWebNNContext.
+    mojo::MakeSelfOwnedReceiver<blink_mojom::WebNNContext>(
+        std::make_unique<FakeWebNNContext>(),
         blink_remote.InitWithNewPipeAndPassReceiver());
 
     std::move(callback).Run(blink_mojom::CreateContextResult::kOk,
                             std::move(blink_remote));
   }
 
-  mojo::Receiver<blink_mojom::WebnnContextProvider> receiver_;
+  mojo::Receiver<blink_mojom::WebNNContextProvider> receiver_;
 };
 
-class ScopedWebnnServiceBinder {
+class ScopedWebNNServiceBinder {
  public:
-  explicit ScopedWebnnServiceBinder(V8TestingScope& scope)
+  explicit ScopedWebNNServiceBinder(V8TestingScope& scope)
       : fake_webnn_context_provider_(
-            std::make_unique<FakeWebnnContextProvider>()),
+            std::make_unique<FakeWebNNContextProvider>()),
         interface_broker_(
             scope.GetExecutionContext()->GetBrowserInterfaceBroker()) {
     interface_broker_.SetBinderForTesting(
-        blink_mojom::WebnnContextProvider::Name_,
+        blink_mojom::WebNNContextProvider::Name_,
         WTF::BindRepeating(
-            &FakeWebnnContextProvider::BindRequest,
+            &FakeWebNNContextProvider::BindRequest,
             WTF::Unretained(fake_webnn_context_provider_.get())));
   }
 
-  ~ScopedWebnnServiceBinder() {
+  ~ScopedWebNNServiceBinder() {
     interface_broker_.SetBinderForTesting(
-        blink_mojom::WebnnContextProvider::Name_, base::NullCallback());
+        blink_mojom::WebNNContextProvider::Name_, base::NullCallback());
   }
 
-  bool IsWebnnContextBound() const {
+  bool IsWebNNContextBound() const {
     return fake_webnn_context_provider_->IsBound();
   }
 
  private:
-  std::unique_ptr<FakeWebnnContextProvider> fake_webnn_context_provider_;
+  std::unique_ptr<FakeWebNNContextProvider> fake_webnn_context_provider_;
   const BrowserInterfaceBrokerProxy& interface_broker_;
 };
 
@@ -139,14 +139,14 @@ ScriptPromise BuildSimpleGraph(V8TestingScope& scope,
                         scope.GetExceptionState());
 }
 
-TEST_F(MLGraphMojoTest, CreateWebnnGraphTest) {
+TEST_F(MLGraphMojoTest, CreateWebNNGraphTest) {
   V8TestingScope scope;
-  // Bind fake Webnn Context in the service for testing.
-  ScopedWebnnServiceBinder scoped_setup_binder(scope);
+  // Bind fake WebNN Context in the service for testing.
+  ScopedWebNNServiceBinder scoped_setup_binder(scope);
 
   auto* script_state = scope.GetScriptState();
   auto* options = MLContextOptions::Create();
-  // Create Webnn Context with GPU device preference.
+  // Create WebNN Context with GPU device preference.
   options->setDevicePreference(V8MLDevicePreference::Enum::kGpu);
 
   {
@@ -160,7 +160,7 @@ TEST_F(MLGraphMojoTest, CreateWebnnGraphTest) {
     EXPECT_NE(exception, nullptr);
     EXPECT_EQ(exception->name(), "NotSupportedError");
     EXPECT_EQ(exception->message(), "Not implemented");
-    EXPECT_FALSE(scoped_setup_binder.IsWebnnContextBound());
+    EXPECT_FALSE(scoped_setup_binder.IsWebNNContextBound());
   }
 
   {
@@ -175,7 +175,7 @@ TEST_F(MLGraphMojoTest, CreateWebnnGraphTest) {
     EXPECT_TRUE(tester.IsFulfilled());
     auto* mojo_graph = ToMLGraphMojo(&scope, tester.Value());
     EXPECT_NE(mojo_graph, nullptr);
-    EXPECT_TRUE(scoped_setup_binder.IsWebnnContextBound());
+    EXPECT_TRUE(scoped_setup_binder.IsWebNNContextBound());
   }
 }
 

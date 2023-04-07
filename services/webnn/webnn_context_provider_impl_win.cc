@@ -13,28 +13,28 @@ namespace webnn {
 namespace {
 
 using mojom::CreateContextOptionsPtr;
-using mojom::WebnnContextProvider;
+using mojom::WebNNContextProvider;
 
 }  // namespace
 
 // static
-void WebnnContextProviderImplWin::Create(
-    mojo::PendingReceiver<WebnnContextProvider> receiver) {
-  mojo::MakeSelfOwnedReceiver<WebnnContextProvider>(
-      base::WrapUnique(new WebnnContextProviderImplWin()), std::move(receiver));
+void WebNNContextProviderImplWin::Create(
+    mojo::PendingReceiver<WebNNContextProvider> receiver) {
+  mojo::MakeSelfOwnedReceiver<WebNNContextProvider>(
+      base::WrapUnique(new WebNNContextProviderImplWin()), std::move(receiver));
 }
 
-WebnnContextProviderImplWin::~WebnnContextProviderImplWin() = default;
+WebNNContextProviderImplWin::~WebNNContextProviderImplWin() = default;
 
-WebnnContextProviderImplWin::WebnnContextProviderImplWin() = default;
+WebNNContextProviderImplWin::WebNNContextProviderImplWin() = default;
 
-void WebnnContextProviderImplWin::CreateWebnnContext(
+void WebNNContextProviderImplWin::CreateWebNNContext(
     CreateContextOptionsPtr options,
-    WebnnContextProvider::CreateWebnnContextCallback callback) {
+    WebNNContextProvider::CreateWebNNContextCallback callback) {
   // The remote sent to the renderer.
-  mojo::PendingRemote<mojom::WebnnContext> blink_remote;
-  // The receiver bind to WebnnContextImplWin.
-  WebnnContextImplWin::Create(blink_remote.InitWithNewPipeAndPassReceiver());
+  mojo::PendingRemote<mojom::WebNNContext> blink_remote;
+  // The receiver bind to WebNNContextImplWin.
+  WebNNContextImplWin::Create(blink_remote.InitWithNewPipeAndPassReceiver());
 
   std::move(callback).Run(mojom::CreateContextResult::kOk,
                           std::move(blink_remote));

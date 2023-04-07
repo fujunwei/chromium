@@ -17,7 +17,7 @@ enum PowerPreference {
   kLowPower = 2,
 };
 
-// Represents options of creating `WebnnContext` interface.
+// Represents options of creating `WebNNContext` interface.
 struct CreateContextOptions {
   // The power preference for power consumption.
   PowerPreference power_preference;
@@ -33,29 +33,29 @@ enum CreateContextResult {
 // Represents the `MLContext` object in the WebIDL definition that is a global
 // state of neural network compute workload and execution processes. This
 // interface runs in the GPU process and is called from the renderer process.
-interface WebnnContext {
-  // Called by the renderer process to create `WebnnGraph` message pipe for
+interface WebNNContext {
+  // Called by the renderer process to create `WebNNGraph` message pipe for
   // compiling and executing computational graph
-  CreateGraph() => (pending_remote<WebnnGraph>? remote);
+  CreateGraph() => (pending_remote<WebNNGraph>? remote);
 };
 
 // This interface runs in the GPU process and is called from the renderer
-// process to create `WebnnContext` interface.
-interface WebnnContextProvider {
+// process to create `WebNNContext` interface.
+interface WebNNContextProvider {
   // Called by the renderer process to create a message pipe for `MLContext`,
   // the `CreatContextResult::kNotSupported` with `mojo::NullRemote` will be
   // thrown if the configuration of options isn't supported.
-  CreateWebnnContext(CreateContextOptions options)
-      => (CreateContextResult result, pending_remote<WebnnContext>? remote);
+  CreateWebNNContext(CreateContextOptions options)
+      => (CreateContextResult result, pending_remote<WebNNContext>? remote);
 };
 
 // Represents the WebNN service to infer computational graph. There is only
 // one service running in GPU process to access the hardware accelerated OS
 // machine learning API (e.g. Direct Machine Learning (DirectML) on Windows).
 [ServiceSandbox=sandbox.mojom.Sandbox.kGpu,RequireContext=sandbox.mojom.Context.kBrowser]
-interface WebnnService {
-  // Bind `WebnnContextProvider` interface for every `navigator.ml` object which
+interface WebNNService {
+  // Bind `WebNNContextProvider` interface for every `navigator.ml` object which
   // is called by the renderer with `BrowserInterfaceBroker's GetInterface()`
-  // method to create a `WebnnContext` interface.
-  BindWebnnContextProvider(pending_receiver<WebnnContextProvider> receiver);
+  // method to create a `WebNNContext` interface.
+  BindWebNNContextProvider(pending_receiver<WebNNContextProvider> receiver);
 };

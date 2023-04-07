@@ -33,15 +33,15 @@ void ML::CreateModelLoader(ScriptState* script_state,
                                            std::move(callback));
 }
 
-void ML::CreateWebnnContext(
+void ML::CreateWebNNContext(
     webnn::mojom::blink::CreateContextOptionsPtr options,
-    webnn::mojom::blink::WebnnContextProvider::CreateWebnnContextCallback
+    webnn::mojom::blink::WebNNContextProvider::CreateWebNNContextCallback
         callback) {
   // Connect WebNN Service if needed.
-  EnsureWebnnServiceConnection();
+  EnsureWebNNServiceConnection();
 
-  // Create `WebnnGraph` message pipe with `WebnnContext` mojo interface.
-  webnn_context_provider_->CreateWebnnContext(std::move(options),
+  // Create `WebNNGraph` message pipe with `WebNNContext` mojo interface.
+  webnn_context_provider_->CreateWebNNContext(std::move(options),
                                               std::move(callback));
 }
 
@@ -109,7 +109,7 @@ void ML::BootstrapMojoConnectionIfNeeded(ScriptState* script_state) {
   }
 }
 
-void ML::EnsureWebnnServiceConnection() {
+void ML::EnsureWebNNServiceConnection() {
   if (webnn_context_provider_.is_bound()) {
     return;
   }

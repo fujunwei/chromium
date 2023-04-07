@@ -41,11 +41,11 @@ class MODULES_EXPORT ML final : public ScriptWrappable,
       ml::model_loader::mojom::blink::MLService::CreateModelLoaderCallback
           callback);
 
-  // Create `WebnnContext` message pipe with `WebnnContextProvider` mojo
+  // Create `WebNNContext` message pipe with `WebNNContextProvider` mojo
   // interface.
-  void CreateWebnnContext(
+  void CreateWebNNContext(
       webnn::mojom::blink::CreateContextOptionsPtr options,
-      webnn::mojom::blink::WebnnContextProvider::CreateWebnnContextCallback
+      webnn::mojom::blink::WebNNContextProvider::CreateWebNNContextCallback
           callback);
 
   void Trace(blink::Visitor*) const override;
@@ -68,15 +68,15 @@ class MODULES_EXPORT ML final : public ScriptWrappable,
 
   // There is only one service running out of renderer process to access the
   // hardware accelerated OS machine learning API. Every `navigator.ml`
-  // object has one `WebnnContextProvider` message pipe to create `WebnnContext`
+  // object has one `WebNNContextProvider` message pipe to create `WebNNContext`
   // mojo interface.
-  void EnsureWebnnServiceConnection();
+  void EnsureWebNNServiceConnection();
 
-  // Webnn support multiple types of neural network inference hardware
+  // WebNN support multiple types of neural network inference hardware
   // acceleration such as CPU, GPU and ML specialized accelerator, the context
   // of webnn in service is used to map different device and represent a state
   // of graph execution processes.
-  HeapMojoRemote<webnn::mojom::blink::WebnnContextProvider>
+  HeapMojoRemote<webnn::mojom::blink::WebNNContextProvider>
       webnn_context_provider_;
 };
 

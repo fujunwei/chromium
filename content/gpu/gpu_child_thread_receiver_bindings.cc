@@ -61,14 +61,14 @@ void GpuChildThread::BindServiceInterface(
 #endif
 
 #if !BUILDFLAG(IS_CHROMEOS)
-  if (auto webnn_receiver = receiver.As<webnn::mojom::WebnnService>()) {
+  if (auto webnn_receiver = receiver.As<webnn::mojom::WebNNService>()) {
     scoped_refptr<base::SingleThreadTaskRunner> task_runner =
         base::SingleThreadTaskRunner::GetCurrentDefault();
     task_runner->PostTask(
         FROM_HERE, base::BindOnce(
-                       [](mojo::PendingReceiver<webnn::mojom::WebnnService>
+                       [](mojo::PendingReceiver<webnn::mojom::WebNNService>
                               webnn_receiver) {
-                         static base::NoDestructor<webnn::WebnnService> service{
+                         static base::NoDestructor<webnn::WebNNService> service{
                              std::move(webnn_receiver)};
                        },
                        std::move(webnn_receiver)));

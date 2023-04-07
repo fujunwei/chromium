@@ -10,14 +10,14 @@
 namespace webnn {
 
 // static
-void WebnnGraphImplWin::Create(
-    mojo::PendingReceiver<mojom::WebnnGraph> receiver) {
-  mojo::MakeSelfOwnedReceiver<mojom::WebnnGraph>(
-      base::WrapUnique(new WebnnGraphImplWin()), std::move(receiver));
+void WebNNGraphImplWin::Create(
+    mojo::PendingReceiver<mojom::WebNNGraph> receiver) {
+  mojo::MakeSelfOwnedReceiver<mojom::WebNNGraph>(
+      base::WrapUnique(new WebNNGraphImplWin()), std::move(receiver));
 }
 
-WebnnGraphImplWin::~WebnnGraphImplWin() = default;
+WebNNGraphImplWin::~WebNNGraphImplWin() = default;
 
-WebnnGraphImplWin::WebnnGraphImplWin() = default;
+WebNNGraphImplWin::WebNNGraphImplWin() = default;
 
 }  // namespace webnn

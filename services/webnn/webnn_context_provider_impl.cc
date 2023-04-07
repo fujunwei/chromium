@@ -12,28 +12,28 @@ namespace webnn {
 namespace {
 
 using webnn::mojom::CreateContextOptionsPtr;
-using webnn::mojom::WebnnContextProvider;
+using webnn::mojom::WebNNContextProvider;
 
 }  // namespace
 
 // static
-void WebnnContextProviderImpl::Create(
-    mojo::PendingReceiver<WebnnContextProvider> receiver) {
-  mojo::MakeSelfOwnedReceiver<WebnnContextProvider>(
-      base::WrapUnique(new WebnnContextProviderImpl()), std::move(receiver));
+void WebNNContextProviderImpl::Create(
+    mojo::PendingReceiver<WebNNContextProvider> receiver) {
+  mojo::MakeSelfOwnedReceiver<WebNNContextProvider>(
+      base::WrapUnique(new WebNNContextProviderImpl()), std::move(receiver));
 }
 
-WebnnContextProviderImpl::~WebnnContextProviderImpl() = default;
+WebNNContextProviderImpl::~WebNNContextProviderImpl() = default;
 
-WebnnContextProviderImpl::WebnnContextProviderImpl() = default;
+WebNNContextProviderImpl::WebNNContextProviderImpl() = default;
 
-void WebnnContextProviderImpl::CreateWebnnContext(
+void WebNNContextProviderImpl::CreateWebNNContext(
     CreateContextOptionsPtr options,
-    WebnnContextProvider::CreateWebnnContextCallback callback) {
-  // TODO(crbug.com/1273291): Supporting Webnn Service on the platform.
+    WebNNContextProvider::CreateWebNNContextCallback callback) {
+  // TODO(crbug.com/1273291): Supporting WebNN Service on the platform.
   std::move(callback).Run(mojom::CreateContextResult::kNotSupported,
                           mojo::NullRemote());
-  DLOG(ERROR) << "Platform not supported for Webnn Service.";
+  DLOG(ERROR) << "Platform not supported for WebNN Service.";
 }
 
 }  // namespace webnn

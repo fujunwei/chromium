@@ -52,8 +52,8 @@ void MLContext::Trace(Visitor* visitor) const {
   ScriptWrappable::Trace(visitor);
 }
 
-HeapMojoRemote<webnn::mojom::blink::WebnnContext>&
-MLContext::GetRemoteWebnnContext() {
+HeapMojoRemote<webnn::mojom::blink::WebNNContext>&
+MLContext::GetRemoteWebNNContext() {
   return webnn_context_;
 }
 

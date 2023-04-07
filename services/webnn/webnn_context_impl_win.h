@@ -10,19 +10,19 @@
 
 namespace webnn {
 
-class WebnnContextImplWin : public mojom::WebnnContext {
+class WebNNContextImplWin : public mojom::WebNNContext {
  public:
-  ~WebnnContextImplWin() override;
-  static void Create(mojo::PendingReceiver<mojom::WebnnContext> receiver);
+  ~WebNNContextImplWin() override;
+  static void Create(mojo::PendingReceiver<mojom::WebNNContext> receiver);
 
-  WebnnContextImplWin(const WebnnContextImplWin&) = delete;
-  WebnnContextImplWin& operator=(const WebnnContextImplWin&) = delete;
+  WebNNContextImplWin(const WebNNContextImplWin&) = delete;
+  WebNNContextImplWin& operator=(const WebNNContextImplWin&) = delete;
 
  protected:
-  WebnnContextImplWin();
+  WebNNContextImplWin();
 
  private:
-  // mojom::WebnnContext
+  // mojom::WebNNContext
   void CreateGraph(CreateGraphCallback callback) override;
 };
 

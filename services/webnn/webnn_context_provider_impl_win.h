@@ -10,23 +10,23 @@
 
 namespace webnn {
 
-class WebnnContextProviderImplWin : public mojom::WebnnContextProvider {
+class WebNNContextProviderImplWin : public mojom::WebNNContextProvider {
  public:
-  ~WebnnContextProviderImplWin() override;
+  ~WebNNContextProviderImplWin() override;
   static void Create(
-      mojo::PendingReceiver<mojom::WebnnContextProvider> receiver);
+      mojo::PendingReceiver<mojom::WebNNContextProvider> receiver);
 
-  WebnnContextProviderImplWin(const WebnnContextProviderImplWin&) = delete;
-  WebnnContextProviderImplWin& operator=(const WebnnContextProviderImplWin&) =
+  WebNNContextProviderImplWin(const WebNNContextProviderImplWin&) = delete;
+  WebNNContextProviderImplWin& operator=(const WebNNContextProviderImplWin&) =
       delete;
 
  protected:
-  WebnnContextProviderImplWin();
+  WebNNContextProviderImplWin();
 
  private:
-  // mojom::WebnnContextProvider
-  void CreateWebnnContext(mojom::CreateContextOptionsPtr options,
-                          CreateWebnnContextCallback callback) override;
+  // mojom::WebNNContextProvider
+  void CreateWebNNContext(mojom::CreateContextOptionsPtr options,
+                          CreateWebNNContextCallback callback) override;
 };
 
 }  // namespace webnn

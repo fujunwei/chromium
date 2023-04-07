@@ -11,22 +11,22 @@
 namespace webnn {
 
 // static
-void WebnnContextImplWin::Create(
-    mojo::PendingReceiver<mojom::WebnnContext> receiver) {
-  mojo::MakeSelfOwnedReceiver<mojom::WebnnContext>(
-      base::WrapUnique(new WebnnContextImplWin()), std::move(receiver));
+void WebNNContextImplWin::Create(
+    mojo::PendingReceiver<mojom::WebNNContext> receiver) {
+  mojo::MakeSelfOwnedReceiver<mojom::WebNNContext>(
+      base::WrapUnique(new WebNNContextImplWin()), std::move(receiver));
 }
 
-WebnnContextImplWin::~WebnnContextImplWin() = default;
+WebNNContextImplWin::~WebNNContextImplWin() = default;
 
-WebnnContextImplWin::WebnnContextImplWin() = default;
+WebNNContextImplWin::WebNNContextImplWin() = default;
 
-void WebnnContextImplWin::CreateGraph(
-    mojom::WebnnContext::CreateGraphCallback callback) {
+void WebNNContextImplWin::CreateGraph(
+    mojom::WebNNContext::CreateGraphCallback callback) {
   // The remote sent to the renderer.
-  mojo::PendingRemote<mojom::WebnnGraph> blink_remote;
-  // The receiver bind to WebnnGraphImplWin.
-  WebnnGraphImplWin::Create(blink_remote.InitWithNewPipeAndPassReceiver());
+  mojo::PendingRemote<mojom::WebNNGraph> blink_remote;
+  // The receiver bound to WebNNGraphImplWin.
+  WebNNGraphImplWin::Create(blink_remote.InitWithNewPipeAndPassReceiver());
 
   std::move(callback).Run(std::move(blink_remote));
 }

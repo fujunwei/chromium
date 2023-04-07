@@ -1429,8 +1429,8 @@ ScriptPromise MLGraphBuilder::build(ScriptState* script_state,
   if (base::FeatureList::IsEnabled(
           blink::features::kEnableMachineLearningNeuralNetworkService)) {
     // Reject unsupported error on unimplemented platform when getting
-    // `WebnnContext` mojo interface with BrowserInterfaceBroker's
-    // GetInterface() method before creating `WebnnGraph` message pipe.
+    // `WebNNContext` mojo interface with BrowserInterfaceBroker's
+    // GetInterface() method before creating `WebNNGraph` message pipe.
     MLGraphMojo::ValidateAndBuildAsync(ml_context_, named_outputs, resolver);
     return promise;
   }

@@ -4,10 +4,10 @@
 
 module webnn.mojom;
 
-// WebnnGraph runs in the GPU process and is called by the renderer process to
+// WebNNGraph runs in the GPU process and is called by the renderer process to
 // compile and execute a computational graph. Graph building and execution is
 // performed by calling hardware accelerated OS machine learning APIs.
-interface WebnnGraph {
+interface WebNNGraph {
   // TODO(crbug.com/1273291): Add `Build` and `Compute` method to compile and
   // execute computational graph with system framework.
 };

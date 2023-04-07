@@ -14,17 +14,17 @@
 
 namespace webnn {
 
-WebnnService::WebnnService(mojo::PendingReceiver<mojom::WebnnService> receiver)
+WebNNService::WebNNService(mojo::PendingReceiver<mojom::WebNNService> receiver)
     : receiver_(this, std::move(receiver)) {}
 
-WebnnService::~WebnnService() = default;
+WebNNService::~WebNNService() = default;
 
-void WebnnService::BindWebnnContextProvider(
-    mojo::PendingReceiver<mojom::WebnnContextProvider> receiver) {
+void WebNNService::BindWebNNContextProvider(
+    mojo::PendingReceiver<mojom::WebNNContextProvider> receiver) {
 #if BUILDFLAG(IS_WIN)
-  WebnnContextProviderImplWin::Create(std::move(receiver));
+  WebNNContextProviderImplWin::Create(std::move(receiver));
 #else
-  WebnnContextProviderImpl::Create(std::move(receiver));
+  WebNNContextProviderImpl::Create(std::move(receiver));
 #endif
 }
 

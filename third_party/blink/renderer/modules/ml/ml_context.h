@@ -44,7 +44,7 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
 
   void Trace(Visitor* visitor) const override;
 
-  HeapMojoRemote<webnn::mojom::blink::WebnnContext>& GetRemoteWebnnContext();
+  HeapMojoRemote<webnn::mojom::blink::WebNNContext>& GetRemoteWebNNContext();
 
   // IDL interface:
   ScriptPromise compute(ScriptState* script_state,
@@ -66,10 +66,10 @@ class MODULES_EXPORT MLContext final : public ScriptWrappable {
 
   Member<ML> ml_;
 
-  // Webnn support multiple types of neural network inference hardware
-  // acceleration, the context of webnn in server side is used to map different
+  // WebNN support multiple types of neural network inference hardware
+  // acceleration, the context of WebNN in server side is used to map different
   // device and represent a state of graph execution processes.
-  HeapMojoRemote<webnn::mojom::blink::WebnnContext> webnn_context_;
+  HeapMojoRemote<webnn::mojom::blink::WebNNContext> webnn_context_;
 };
 
 }  // namespace blink
