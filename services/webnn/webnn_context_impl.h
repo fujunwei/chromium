@@ -2,24 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SERVICES_WEBNN_WEBNN_CONTEXT_IMPL_WIN_H_
-#define SERVICES_WEBNN_WEBNN_CONTEXT_IMPL_WIN_H_
+#ifndef SERVICES_WEBNN_WEBNN_CONTEXT_IMPL_H_
+#define SERVICES_WEBNN_WEBNN_CONTEXT_IMPL_H_
 
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "services/webnn/public/mojom/webnn_service.mojom.h"
 
 namespace webnn {
 
-class WebNNContextImplWin : public mojom::WebNNContext {
+class WebNNContextImpl : public mojom::WebNNContext {
  public:
-  ~WebNNContextImplWin() override;
+  ~WebNNContextImpl() override;
   static void Create(mojo::PendingReceiver<mojom::WebNNContext> receiver);
 
-  WebNNContextImplWin(const WebNNContextImplWin&) = delete;
-  WebNNContextImplWin& operator=(const WebNNContextImplWin&) = delete;
+  WebNNContextImpl(const WebNNContextImpl&) = delete;
+  WebNNContextImpl& operator=(const WebNNContextImpl&) = delete;
 
  protected:
-  WebNNContextImplWin();
+  WebNNContextImpl();
 
  private:
   // mojom::WebNNContext
@@ -28,4 +28,4 @@ class WebNNContextImplWin : public mojom::WebNNContext {
 
 }  // namespace webnn
 
-#endif  // SERVICES_WEBNN_WEBNN_CONTEXT_IMPL_WIN_H_
+#endif  // SERVICES_WEBNN_WEBNN_CONTEXT_IMPL_H_

@@ -2,24 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SERVICES_WEBNN_WEBNN_GRAPH_IMPL_WIN_H_
-#define SERVICES_WEBNN_WEBNN_GRAPH_IMPL_WIN_H_
+#ifndef SERVICES_WEBNN_WEBNN_GRAPH_IMPL_H_
+#define SERVICES_WEBNN_WEBNN_GRAPH_IMPL_H_
 
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "services/webnn/public/mojom/webnn_graph.mojom.h"
 
 namespace webnn {
 
-class WebNNGraphImplWin : public mojom::WebNNGraph {
+class WebNNGraphImpl : public mojom::WebNNGraph {
  public:
-  ~WebNNGraphImplWin() override;
+  ~WebNNGraphImpl() override;
   static void Create(mojo::PendingReceiver<mojom::WebNNGraph> receiver);
 
-  WebNNGraphImplWin(const WebNNGraphImplWin&) = delete;
-  WebNNGraphImplWin& operator=(const WebNNGraphImplWin&) = delete;
+  WebNNGraphImpl(const WebNNGraphImpl&) = delete;
+  WebNNGraphImpl& operator=(const WebNNGraphImpl&) = delete;
 
  protected:
-  WebNNGraphImplWin();
+  WebNNGraphImpl();
 
  private:
   // mojom::WebNNGraph
@@ -27,4 +27,4 @@ class WebNNGraphImplWin : public mojom::WebNNGraph {
 
 }  // namespace webnn
 
-#endif  // SERVICES_WEBNN_WEBNN_GRAPH_IMPL_WIN_H_
+#endif  // SERVICES_WEBNN_WEBNN_GRAPH_IMPL_H_

@@ -8,10 +8,6 @@
 #include "build/buildflag.h"
 #include "services/webnn/webnn_context_provider_impl.h"
 
-#if BUILDFLAG(IS_WIN)
-#include "services/webnn/webnn_context_provider_impl_win.h"
-#endif
-
 namespace webnn {
 
 WebNNService::WebNNService(mojo::PendingReceiver<mojom::WebNNService> receiver)
@@ -21,11 +17,7 @@ WebNNService::~WebNNService() = default;
 
 void WebNNService::BindWebNNContextProvider(
     mojo::PendingReceiver<mojom::WebNNContextProvider> receiver) {
-#if BUILDFLAG(IS_WIN)
-  WebNNContextProviderImplWin::Create(std::move(receiver));
-#else
   WebNNContextProviderImpl::Create(std::move(receiver));
-#endif
 }
 
 }  // namespace webnn

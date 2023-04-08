@@ -9,29 +9,29 @@
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "services/webnn/public/mojom/webnn_graph.mojom.h"
 #include "services/webnn/public/mojom/webnn_service.mojom.h"
-#include "services/webnn/webnn_context_provider_impl_win.h"
+#include "services/webnn/webnn_context_provider_impl.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace webnn {
 
-class WebNNContextImplWinTest : public testing::Test {
+class WebNNContextImplTest : public testing::Test {
  public:
-  WebNNContextImplWinTest(const WebNNContextImplWinTest&) = delete;
-  WebNNContextImplWinTest& operator=(const WebNNContextImplWinTest&) = delete;
+  WebNNContextImplTest(const WebNNContextImplTest&) = delete;
+  WebNNContextImplTest& operator=(const WebNNContextImplTest&) = delete;
 
  protected:
-  WebNNContextImplWinTest() = default;
-  ~WebNNContextImplWinTest() override = default;
+  WebNNContextImplTest() = default;
+  ~WebNNContextImplTest() override = default;
 
  private:
   base::test::TaskEnvironment task_environment_;
 };
 
-TEST_F(WebNNContextImplWinTest, CreateWebNNGraphTest) {
+TEST_F(WebNNContextImplTest, CreateWebNNGraphTest) {
   mojo::Remote<mojom::WebNNContextProvider> provider_remote;
   mojo::Remote<mojom::WebNNContext> webnn_context_remote;
 
-  WebNNContextProviderImplWin::Create(
+  WebNNContextProviderImpl::Create(
       provider_remote.BindNewPipeAndPassReceiver());
 
   bool is_callback_called = false;
@@ -42,13 +42,22 @@ TEST_F(WebNNContextImplWinTest, CreateWebNNGraphTest) {
       base::BindLambdaForTesting(
           [&](mojom::CreateContextResult result,
               mojo::PendingRemote<mojom::WebNNContext> remote) {
+#if BUILDFLAG(IS_WIN)
             EXPECT_EQ(result, mojom::CreateContextResult::kOk);
             webnn_context_remote.Bind(std::move(remote));
+#else
+            EXPECT_EQ(result, mojom::CreateContextResult::kNotSupported);
+#endif
             is_callback_called = true;
             run_loop_create_context.Quit();
           }));
   run_loop_create_context.Run();
   EXPECT_TRUE(is_callback_called);
+
+  if (!webnn_context_remote.is_bound()) {
+    // Don't continue testing for unsupported platforms.
+    return;
+  }
 
   base::RunLoop run_loop_create_graph;
   is_callback_called = false;

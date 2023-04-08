@@ -4,22 +4,15 @@
 
 source_set("webnn") {
   sources = [
+    "webnn_context_impl.cc",
+    "webnn_context_impl.h",
     "webnn_context_provider_impl.cc",
     "webnn_context_provider_impl.h",
+    "webnn_graph_impl.cc",
+    "webnn_graph_impl.h",
     "webnn_service.cc",
     "webnn_service.h",
   ]
-
-  if (is_win) {
-    sources += [
-      "webnn_context_impl_win.cc",
-      "webnn_context_impl_win.h",
-      "webnn_context_provider_impl_win.cc",
-      "webnn_context_provider_impl_win.h",
-      "webnn_graph_impl_win.cc",
-      "webnn_graph_impl_win.h",
-    ]
-  }
 
   deps = [
     "//base",
@@ -31,7 +24,7 @@ source_set("webnn") {
 source_set("tests") {
   testonly = true
   if (is_win) {
-    sources = [ "webnn_context_impl_win_unittest.cc" ]
+    sources = [ "webnn_context_impl_unittest.cc" ]
   }
 
   deps = [
