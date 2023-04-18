@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_cros.h"
 
+#include "base/numerics/checked_math.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_compute_result.h"
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
@@ -18,6 +19,8 @@ namespace blink {
 namespace {
 
 flatbuffers::DetachedBuffer* g_flatbuffer_for_testing = nullptr;
+
+using ml::model_loader::mojom::blink::ComputeResult;
 
 }  // namespace
 
@@ -115,9 +118,115 @@ void MLGraphCrOS::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
                                    const MLNamedArrayBufferViews& outputs,
                                    ScriptPromiseResolver* resolver,
                                    ExceptionState& exception_state) {
-  // TODO(crbug.com/1273291): Support async compute.
-  resolver->Reject(MakeGarbageCollected<DOMException>(
-      DOMExceptionCode::kNotSupportedError, "Not implemented."));
+  // Verifies the inputs are expected for the computational graph.
+  if (input_tensor_name_to_info_.size() != inputs.size()) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kDataError,
+        "The number of inputs doesn't match graph's expectation."));
+    return;
+  }
+  for (const auto& [name, array_buffer_view] : inputs) {
+    auto iter = input_tensor_name_to_info_.find(name);
+    if (iter == input_tensor_name_to_info_.end()) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kDataError, "Unknown input: " + name));
+      return;
+    }
+    if (iter->value->byte_size != array_buffer_view->byteLength()) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kUnknownError, "Wrong input size."));
+      return;
+    }
+  }
+
+  // Fills the buffer with input tensors.
+  HashMap<String, Vector<uint8_t>> input_mojo;
+  for (const auto& [name, array_buffer_view] : inputs) {
+    wtf_size_t size =
+        base::checked_cast<wtf_size_t>(array_buffer_view->byteLength());
+    Vector<uint8_t> tensor(size);
+    memcpy(tensor.data(), array_buffer_view->BaseAddress(), size);
+
+    input_mojo.insert(name, std::move(tensor));
+  }
+  remote_model_->Compute(
+      std::move(input_mojo),
+      WTF::BindOnce(
+          &MLGraphCrOS::OnComputeGraph, WrapPersistent(this),
+          WrapPersistent(resolver),
+          WrapPersistent(MakeGarbageCollected<MLNamedArrayBufferViews>(inputs)),
+          WrapPersistent(
+              MakeGarbageCollected<MLNamedArrayBufferViews>(outputs))));
+}
+
+void MLGraphCrOS::OnComputeGraph(
+    ScriptPromiseResolver* resolver,
+    const MLNamedArrayBufferViews* named_inputs,
+    const MLNamedArrayBufferViews* named_outputs,
+    ComputeResult mojo_result,
+    const absl::optional<HashMap<String, Vector<uint8_t>>>& outputs) {
+  if (mojo_result != ComputeResult::kOk || !outputs.has_value()) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kOperationError,
+        "Failed to obtain the computation result."));
+    return;
+  }
+
+  if (outputs.value().size() != output_tensor_name_to_info_.size()) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kUnknownError,
+        "The number of outputs doesn't match the graph's expectation."));
+    return;
+  }
+
+  for (const auto& name_tensor : outputs.value()) {
+    auto iter = output_tensor_name_to_info_.find(name_tensor.key);
+    if (iter == output_tensor_name_to_info_.end()) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kUnknownError,
+          "There is an unknown output tensor in the computation result: " +
+              name_tensor.key));
+      return;
+    }
+    if (name_tensor.value.size() != iter->value->byte_size) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kUnknownError,
+          "The output tensor size does not match graph's expectation: " +
+              name_tensor.key));
+      return;
+    }
+  }
+  // Verifies the inputs are not detached.
+  for (const auto& [name, array_buffer_view] : *named_inputs) {
+    if (array_buffer_view->IsDetached()) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kUnknownError,
+          "The array buffer view is detached: " + name));
+      return;
+    }
+  }
+
+  for (const auto& [name, array_buffer_view] : *named_outputs) {
+    auto iter = outputs.value().find(name);
+    if (iter == outputs.value().end()) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kOperationError,
+          "Failed to get result for the output " + name));
+      return;
+    }
+    if (array_buffer_view->IsDetached()) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kUnknownError,
+          "The array buffer view is detached: " + name));
+      return;
+    }
+    memcpy(array_buffer_view->BaseAddress(), iter->value.data(),
+           iter->value.size());
+  }
+  auto* result = MLComputeResult::Create();
+  result->setInputs(*named_inputs);
+  result->setOutputs(*named_outputs);
+  resolver->Resolve(result);
 }
 
 void MLGraphCrOS::ComputeSyncImpl(const MLNamedArrayBufferViews& inputs,

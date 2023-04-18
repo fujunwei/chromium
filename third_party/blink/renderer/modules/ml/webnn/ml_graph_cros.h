@@ -69,6 +69,14 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
                         const MLNamedArrayBufferViews& outputs,
                         ScriptPromiseResolver* resolver,
                         ExceptionState& exception_state) override;
+  // Resolve the promise with an MLComputeResult that contains input and output
+  // ArrayBufferViews in this callback.
+  void OnComputeGraph(
+      ScriptPromiseResolver* resolver,
+      const MLNamedArrayBufferViews* named_inputs,
+      const MLNamedArrayBufferViews* named_outputs,
+      ml::model_loader::mojom::blink::ComputeResult result,
+      const absl::optional<HashMap<String, Vector<uint8_t>>>& outputs);
 
   // Compute the converted model with synchronous call of `Model` interface.
   void ComputeSyncImpl(const MLNamedArrayBufferViews& inputs,
