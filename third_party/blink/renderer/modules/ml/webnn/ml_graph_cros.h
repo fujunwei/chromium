@@ -35,11 +35,6 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
 
   void Trace(Visitor* visitor) const override;
 
-  const HashMap<String, ml::model_loader::mojom::blink::TensorInfoPtr>&
-  GetInputTensorInfoMapForTesting() const;
-  const HashMap<String, ml::model_loader::mojom::blink::TensorInfoPtr>&
-  GetOutputTensorInfoMapForTesting() const;
-
   // The caller of this function is responsible to keep flatbuffer alive and
   // unset it when it's no longer used.
   static void SetFlatbufferForTesting(flatbuffers::DetachedBuffer* flatbuffer);
@@ -73,10 +68,10 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
   // ArrayBufferViews in this callback.
   void OnComputeGraph(
       ScriptPromiseResolver* resolver,
-      const MLNamedArrayBufferViews* named_inputs,
-      const MLNamedArrayBufferViews* named_outputs,
-      ml::model_loader::mojom::blink::ComputeResult result,
-      const absl::optional<HashMap<String, Vector<uint8_t>>>& outputs);
+      const MLNamedArrayBufferViews* ml_inputs,
+      const MLNamedArrayBufferViews* ml_outputs,
+      ml::model_loader::mojom::blink::ComputeResult mojo_result,
+      const absl::optional<HashMap<String, Vector<uint8_t>>>& mojo_outputs);
 
   // Compute the converted model with synchronous call of `Model` interface.
   void ComputeSyncImpl(const MLNamedArrayBufferViews& inputs,
@@ -84,10 +79,6 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
                        ExceptionState& exception_state) override;
 
   HeapMojoRemote<ml::model_loader::mojom::blink::Model> remote_model_;
-  HashMap<String, ml::model_loader::mojom::blink::TensorInfoPtr>
-      input_tensor_name_to_info_;
-  HashMap<String, ml::model_loader::mojom::blink::TensorInfoPtr>
-      output_tensor_name_to_info_;
 };
 
 }  // namespace blink

@@ -220,18 +220,12 @@ struct ElementWiseAddTester {
         helper.BuildGraph(scope, builder, {{"output", output}});
     EXPECT_NE(graph, nullptr);
     MLGraphCrOS* cros_graph = static_cast<MLGraphCrOS*>(graph.Get());
-    const auto& input_tensor_info =
-        cros_graph->GetInputTensorInfoMapForTesting();
+    const auto& input_tensor_info = cros_graph->GetInputResourcesInfo();
     EXPECT_EQ(input_tensor_info.size(), 1u);
     EXPECT_EQ(input_tensor_info.Contains("input"), true);
-    EXPECT_EQ(input_tensor_info.find("input")->value->dimensions,
-              lhs.dimensions);
-    const auto& output_tensor_info =
-        cros_graph->GetOutputTensorInfoMapForTesting();
+    const auto& output_tensor_info = cros_graph->GetOutputResourcesInfo();
     EXPECT_EQ(output_tensor_info.size(), 1u);
     EXPECT_EQ(output_tensor_info.Contains("output"), true);
-    EXPECT_EQ(output_tensor_info.find("output")->value->dimensions,
-              expected.dimensions);
 
     // Compute the graph.
     MLNamedArrayBufferViews inputs(
