@@ -196,7 +196,8 @@ void MLGraphCrOS::OnComputeGraph(
       return;
     }
   }
-  // Verifies the inputs are not detached.
+  // Verifies the inputs because the ArrayBufferView can be detached before
+  // invoking the callback of computing.
   for (const auto& [name, array_buffer_view] : *named_inputs) {
     if (array_buffer_view->IsDetached()) {
       resolver->Reject(MakeGarbageCollected<DOMException>(
@@ -214,6 +215,8 @@ void MLGraphCrOS::OnComputeGraph(
           "Failed to get result for the output " + name));
       return;
     }
+    // Verifies the output because the ArrayBufferView can be detached before
+    // invoking the callback of computing.
     if (array_buffer_view->IsDetached()) {
       resolver->Reject(MakeGarbageCollected<DOMException>(
           DOMExceptionCode::kUnknownError,
