@@ -7,6 +7,7 @@
 
 #include "components/ml/mojom/web_platform_model.mojom-blink.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_utils.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
 #include "third_party/blink/renderer/modules/modules_export.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
@@ -68,8 +69,10 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
   // ArrayBufferViews in this callback.
   void OnComputeGraph(
       ScriptPromiseResolver* resolver,
-      const MLNamedArrayBufferViews* ml_inputs,
-      const MLNamedArrayBufferViews* ml_outputs,
+      std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>>
+          inputs_info,
+      std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>>
+          outputs_info,
       ml::model_loader::mojom::blink::ComputeResult mojo_result,
       const absl::optional<HashMap<String, Vector<uint8_t>>>& mojo_outputs);
 

@@ -145,7 +145,7 @@ void MLGraphCrOS::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
                                    const MLNamedArrayBufferViews& outputs,
                                    ScriptPromiseResolver* resolver,
                                    ExceptionState& exception_state) {
-  // The inputs has been verified in the basic class. so we can fill the buffer
+  // The inputs has been verified in the base class. so we can fill the buffer
   // directly with the input tensors.
   HashMap<String, Vector<uint8_t>> input_mojo;
   for (const auto& [name, array_buffer_view] : inputs) {
@@ -156,20 +156,36 @@ void MLGraphCrOS::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
 
     input_mojo.insert(name, std::move(tensor));
   }
+  // Transfer the `MLNamedArrayBufferViews` to `NamedArrayBufferViewsInfo` which
+  // is safe to compute asynchronously.
+  auto inputs_info = TransferNamedArrayBufferViews(
+      resolver->GetScriptState()->GetIsolate(), inputs, exception_state);
+  if (!inputs_info) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kDataError,
+        "Invalid inputs: " + exception_state.Message()));
+    return;
+  }
+  auto outputs_info = TransferNamedArrayBufferViews(
+      resolver->GetScriptState()->GetIsolate(), outputs, exception_state);
+  if (!outputs_info) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kDataError,
+        "Invalid outputs: " + exception_state.Message()));
+    return;
+  }
   remote_model_->Compute(
       std::move(input_mojo),
-      WTF::BindOnce(
-          &MLGraphCrOS::OnComputeGraph, WrapPersistent(this),
-          WrapPersistent(resolver),
-          WrapPersistent(MakeGarbageCollected<MLNamedArrayBufferViews>(inputs)),
-          WrapPersistent(
-              MakeGarbageCollected<MLNamedArrayBufferViews>(outputs))));
+      WTF::BindOnce(&MLGraphCrOS::OnComputeGraph, WrapPersistent(this),
+                    WrapPersistent(resolver), std::move(inputs_info),
+                    std::move(outputs_info)));
 }
 
 void MLGraphCrOS::OnComputeGraph(
     ScriptPromiseResolver* resolver,
-    const MLNamedArrayBufferViews* ml_inputs,
-    const MLNamedArrayBufferViews* ml_outputs,
+    std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>> inputs_info,
+    std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>>
+        outputs_info,
     ComputeResult mojo_result,
     const absl::optional<HashMap<String, Vector<uint8_t>>>& mojo_outputs) {
   if (mojo_result != ComputeResult::kOk || !mojo_outputs.has_value()) {
@@ -179,16 +195,7 @@ void MLGraphCrOS::OnComputeGraph(
     return;
   }
 
-  for (const auto& [name, array_buffer_view] : *ml_outputs) {
-    // Verifies the output because the ArrayBufferView can be detached before
-    // invoking the callback of computing.
-    if (array_buffer_view->IsDetached()) {
-      resolver->Reject(MakeGarbageCollected<DOMException>(
-          DOMExceptionCode::kUnknownError,
-          "The array buffer view is detached: " + name));
-      return;
-    }
-
+  for (const auto& [name, view_info] : *outputs_info) {
     // The verification before computing ensures the `ml_outputs` match graph's
     // expectation, so we only need to verify the `mojo_outputs` here.
     auto output_tensor_data = mojo_outputs.value().find(name);
@@ -198,19 +205,19 @@ void MLGraphCrOS::OnComputeGraph(
           "Failed to get result for the output " + name));
       return;
     }
-    if (output_tensor_data->value.size() != array_buffer_view->byteLength()) {
+    if (output_tensor_data->value.size() != view_info.contents.DataLength()) {
       resolver->Reject(MakeGarbageCollected<DOMException>(
           DOMExceptionCode::kUnknownError,
           "The output tensor size does not match graph's expectation: " +
               name));
       return;
     }
-    memcpy(array_buffer_view->BaseAddress(), output_tensor_data->value.data(),
+    memcpy(view_info.contents.Data(), output_tensor_data->value.data(),
            output_tensor_data->value.size());
   }
   auto* result = MLComputeResult::Create();
-  result->setInputs(*ml_inputs);
-  result->setOutputs(*ml_outputs);
+  result->setInputs(*CreateNamedArrayBufferViews(std::move(inputs_info)));
+  result->setOutputs(*CreateNamedArrayBufferViews(std::move(outputs_info)));
   resolver->Resolve(result);
 }
 
