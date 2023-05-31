@@ -12,13 +12,6 @@
 
 namespace blink {
 
-namespace {
-
-using NamedArrayBufferViewsInfo =
-    Vector<std::pair<String, ArrayBufferViewInfo>>;
-
-}  // namespace
-
 HeapVector<Member<const MLOperator>>* GetOperatorsInTopologicalOrder(
     const MLNamedOperands& named_outputs) {
   // A WebNN graph is represented by a directed acyclic graph (DAG) that has

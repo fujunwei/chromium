@@ -30,10 +30,6 @@ using XnnSubgraphPtr =
     std::unique_ptr<xnn_subgraph, decltype(&xnn_delete_subgraph)>;
 using XnnExternalValuesPtr = std::unique_ptr<Vector<xnn_external_value>>;
 
-typedef Vector<std::pair<String, ArrayBufferViewInfo>>
-    NamedArrayBufferViewsInfo;
-using NamedArrayBufferViewsInfoPtr = std::unique_ptr<NamedArrayBufferViewsInfo>;
-
 class MODULES_EXPORT MLGraphXnnpack final : public MLGraph {
  public:
   // Create and build an MLGraphXnnpack object. Resolve the promise with
@@ -129,8 +125,8 @@ class MODULES_EXPORT MLGraphXnnpack final : public MLGraph {
   // `ArrayBufferView` while the background thread is accessing them. And it
   // would also avoid accessing the heap-allocated `ArrayBufferView` in the
   // background thread.
-  void ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
-                        const MLNamedArrayBufferViews& outputs,
+  void ComputeAsyncImpl(NamedArrayBufferViewsInfoPtr inputs_info,
+                                NamedArrayBufferViewsInfoPtr outputs_info,
                         ScriptPromiseResolver* resolver,
                         ExceptionState& exception_state) override;
 
@@ -187,8 +183,8 @@ class MODULES_EXPORT MLGraphXnnpack final : public MLGraph {
   // up the XNNPACK Runtime object. The returned vector is sorted by
   // `xnn_external_value::id`.
   XnnExternalValuesPtr CreateExternalValues(
-      const MLNamedArrayBufferViews& inputs,
-      const MLNamedArrayBufferViews& outputs) const;
+      const NamedArrayBufferViewsInfo* inputs_info,
+      const NamedArrayBufferViewsInfo* outputs_info) const;
 
   // Task runner for running XNNPACK time-consuming operations, e.g. library
   // initialization, Runtime creation and invcation.

@@ -18,11 +18,15 @@ namespace blink {
 
 class MLContext;
 class ScriptPromiseResolver;
+struct ArrayBufferViewInfo;
 
 // Implement the MLNamedArrayBufferViews type definition of WebNN spec:
 // https://www.w3.org/TR/webnn/#typedefdef-mlnamedarraybufferviews
 typedef HeapVector<std::pair<String, NotShared<DOMArrayBufferView>>>
     MLNamedArrayBufferViews;
+typedef Vector<std::pair<String, ArrayBufferViewInfo>>
+    NamedArrayBufferViewsInfo;
+using NamedArrayBufferViewsInfoPtr = std::unique_ptr<NamedArrayBufferViewsInfo>;
 
 class MODULES_EXPORT MLGraph : public ScriptWrappable {
   DEFINE_WRAPPERTYPEINFO();
@@ -119,8 +123,8 @@ class MODULES_EXPORT MLGraph : public ScriptWrappable {
   // the resolver will be resolved with an MLComputeResult that contains the
   // input and output buffers. Otherwise, the resolver will be rejected with a
   // DOMException accordingly.
-  virtual void ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
-                                const MLNamedArrayBufferViews& outputs,
+  virtual void ComputeAsyncImpl(NamedArrayBufferViewsInfoPtr inputs_info,
+                                NamedArrayBufferViewsInfoPtr outputs_info,
                                 ScriptPromiseResolver* resolver,
                                 ExceptionState& exception_state) = 0;
 

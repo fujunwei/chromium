@@ -1500,32 +1500,13 @@ MLGraph* MLGraphXnnpack::BuildSyncImpl(const MLNamedOperands& named_outputs,
   return this;
 }
 
-void MLGraphXnnpack::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
-                                      const MLNamedArrayBufferViews& outputs,
+void MLGraphXnnpack::ComputeAsyncImpl(NamedArrayBufferViewsInfoPtr inputs_info,
+                                NamedArrayBufferViewsInfoPtr outputs_info,
                                       ScriptPromiseResolver* resolver,
                                       ExceptionState& exception_state) {
   // `MLNamedArrayBufferViews` objects should be accessed on the thread owning
   // the heap before transferring.
-  auto external_values = CreateExternalValues(inputs, outputs);
-
-  // Transfer the `MLNamedArrayBufferViews` to `NamedArrayBufferViewsInfo` which
-  // is safe to be posted to a worker thread.
-  auto inputs_info = TransferNamedArrayBufferViews(
-      resolver->GetScriptState()->GetIsolate(), inputs, exception_state);
-  if (!inputs_info) {
-    resolver->Reject(MakeGarbageCollected<DOMException>(
-        DOMExceptionCode::kDataError,
-        "Invalid inputs: " + exception_state.Message()));
-    return;
-  }
-  auto outputs_info = TransferNamedArrayBufferViews(
-      resolver->GetScriptState()->GetIsolate(), outputs, exception_state);
-  if (!outputs_info) {
-    resolver->Reject(MakeGarbageCollected<DOMException>(
-        DOMExceptionCode::kDataError,
-        "Invalid outputs: " + exception_state.Message()));
-    return;
-  }
+  auto external_values = CreateExternalValues(inputs_info.get(), outputs_info.get());
 
   // Pass `inputs_info` and `outputs_info` forward for `MLNamedArrayBufferViews`
   // re-creation in `OnDidCompute()`.
@@ -1727,25 +1708,25 @@ xnn_status MLGraphXnnpack::CreateXnnSubgraph(
 }
 
 XnnExternalValuesPtr MLGraphXnnpack::CreateExternalValues(
-    const MLNamedArrayBufferViews& inputs,
-    const MLNamedArrayBufferViews& outputs) const {
+    const NamedArrayBufferViewsInfo* inputs_info,
+    const NamedArrayBufferViewsInfo* outputs_info) const {
   auto external_values = std::make_unique<Vector<xnn_external_value>>();
-  external_values->reserve((inputs.size() + outputs.size()));
+  external_values->reserve((inputs_info->size() + outputs->size()));
   // Although XNNPACK doesn't validate the pointers, the base address and the
   // byte length of the array buffer views are already validated by
   // ValidateNamedArrayBufferViews(). It should be safe to setup XNNPACK Runtime
   // object with them.
-  for (const auto& [name, array_buffer_view] : inputs) {
+  for (const auto& [name, views_info] : *inputs_info) {
     DCHECK(input_external_value_id_map_.Contains(name));
     external_values->emplace_back(
         xnn_external_value{.id = input_external_value_id_map_.at(name),
-                           .data = array_buffer_view->BaseAddress()});
+                           .data = views_info.contents.Data()});
   }
-  for (const auto& [name, array_buffer_view] : outputs) {
+  for (const auto& [name, views_info] : outputs_info) {
     DCHECK(output_external_value_id_map_.Contains(name));
     external_values->emplace_back(
         xnn_external_value{.id = output_external_value_id_map_.at(name),
-                           .data = array_buffer_view->BaseAddress()});
+                           .data = views_info.contents.Data()});
   }
   base::ranges::sort(*external_values, base::ranges::less{},
                      &xnn_external_value::id);

@@ -17,6 +17,7 @@
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_deque.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_hash_set.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_utils.h"
 
 namespace blink {
 
@@ -114,8 +115,27 @@ void MLGraph::ComputeAsync(const MLNamedArrayBufferViews& inputs,
     return;
   }
 
+  // Transfer the `MLNamedArrayBufferViews` to `NamedArrayBufferViewsInfo` which
+  // is safe to compute asynchronously.
+  auto inputs_info = TransferNamedArrayBufferViews(
+      resolver->GetScriptState()->GetIsolate(), inputs, exception_state);
+  if (!inputs_info) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kDataError,
+        "Invalid inputs: " + exception_state.Message()));
+    return;
+  }
+  auto outputs_info = TransferNamedArrayBufferViews(
+      resolver->GetScriptState()->GetIsolate(), outputs, exception_state);
+  if (!outputs_info) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kDataError,
+        "Invalid outputs: " + exception_state.Message()));
+    return;
+  }
+
   // Call ComputeAsyncImpl() implemented by an MLGraph backend.
-  ComputeAsyncImpl(inputs, outputs, resolver, exception_state);
+  ComputeAsyncImpl(std::move(inputs_info), std::move(outputs_info), resolver, exception_state);
 }
 
 void MLGraph::ComputeSync(const MLNamedArrayBufferViews& inputs,
