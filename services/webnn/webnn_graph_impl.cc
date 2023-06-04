@@ -13,6 +13,34 @@
 
 namespace webnn {
 
+webnn::Operand::DataType MojoOperandTypeToComponent(
+    mojom::Operand::DataType data_type) {
+  switch (data_type) {
+    case mojom::Operand::DataType::kFloat32:
+      return webnn::Operand::DataType::kFloat32;
+    case mojom::Operand::DataType::kFloat16:
+      return webnn::Operand::DataType::kFloat16;
+    case mojom::Operand::DataType::kInt32:
+      return webnn::Operand::DataType::kInt32;
+    case mojom::Operand::DataType::kUint32:
+      return webnn::Operand::DataType::kUint32;
+    case mojom::Operand::DataType::kInt8:
+      return webnn::Operand::DataType::kInt8;
+    case mojom::Operand::DataType::kUint8:
+      return webnn::Operand::DataType::kUint8;
+  }
+  NOTREACHED_NORETURN();
+}
+
+// Converters from mojo to WebNN component type.
+template <>
+struct TypeConverter<webnn::Operand, mojom::Operand*> {
+  static webnn::Operand Convert(const mojom::Operand* mojo_operand) {
+    return webnn::Operand(MojoOperandTypeToComponent(mojo_operand->data_type),
+                          mojo_operand->dimensions);
+  }
+};
+
 namespace {
 
 // Maps the id to its `mojo::Operand`.
@@ -34,20 +62,6 @@ size_t GetBytesPerElement(mojom::Operand::DataType operand_type) {
       return sizeof(uint8_t);
   }
   NOTREACHED();
-}
-
-bool IsFloatingPointType(mojom::Operand::DataType data_type) {
-  switch (data_type) {
-    case mojom::Operand::DataType::kFloat32:
-    case mojom::Operand::DataType::kFloat16:
-      return true;
-    case mojom::Operand::DataType::kInt32:
-    case mojom::Operand::DataType::kUint32:
-    case mojom::Operand::DataType::kInt8:
-    case mojom::Operand::DataType::kUint8:
-      return false;
-  }
-  NOTREACHED_NORETURN();
 }
 
 bool ValidateInputOperand(const IdToOperandMap& id_to_operand_map,
@@ -189,20 +203,11 @@ bool ValidateSoftmax(const IdToOperandMap& id_to_operand_map,
     // The softmax operator is invalid.
     return false;
   }
-  if (input->dimensions.size() != 2) {
-    // The input must be a 2-D tensor.
+  auto input_com_operand = ValidateSoftmax(ConvertTo<webnn::Operand>(input));
+  if (!input_com_operand.has_value()) {
     return false;
   }
-  if (output->dimensions != input->dimensions) {
-    // The output shapes are not expected.
-    return false;
-  }
-  if (!IsFloatingPointType(input->data_type)) {
-    // The input type must be one of the floating point types.
-    return false;
-  }
-  if (output->data_type != input->data_type) {
-    // The output data type doesn't match input data type.
+  if (input_com_operand != ConvertTo<webnn::Operand>(output)) {
     return false;
   }
 

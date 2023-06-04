@@ -13,6 +13,59 @@
 
 namespace webnn {
 
+// The webnn::TypeConverter mechanism is similar with mojo::TypeConverter,
+// - "mojo/public/cpp/bindings/type_converter.h"
+template <typename T, typename U>
+struct TypeConverter;
+
+template <typename T, typename U>
+inline T ConvertTo(const U& obj);
+
+template <typename T, typename U>
+inline T ConvertTo(const U* obj) {
+  return TypeConverter<T, U*>::Convert(obj);
+}
+
+// The struct defined in this file need to be synced with,
+// - "services/webnnpublic/mojom/webnn_graph.mojom"
+//
+// Represents the `MLOperand` which describes not only input and constant
+// operand, but also the output operand of operator.
+struct Operand {
+  // Represents the `MLOperandType` in the WebIDL definition.
+  enum DataType {
+    kFloat32,
+    kFloat16,
+    kInt32,
+    kUint32,
+    kInt8,
+    kUint8,
+  };
+
+  Operand(DataType data_type, std::vector<uint32_t>& dimensions);
+  // Used for converting MLOperand to the component::Operand.
+  Operand(DataType data_type, base::span<const uint32_t> dimensions);
+  ~Operand();
+
+  Operand(Operand&& other);
+  Operand& operator=(Operand&& other);
+
+  bool operator==(const Operand& other) const;
+  bool operator!=(const Operand& other) const;
+
+  Operand(const Operand&) = delete;
+  Operand& operator=(const Operand&) = delete;
+
+  // The data type of the operand.
+  DataType data_type;
+  // The dimensions of the operand.
+  std::vector<uint32_t> dimensions;
+};
+
+// Validate softmax operator defined in WebIDL here
+// https://www.w3.org/TR/webnn/#api-mlgraphbuilder-softmax
+base::expected<Operand, std::string> ValidateSoftmax(Operand input);
+
 base::expected<size_t, std::string> ValidateAndCalculateElementsNumber(
     base::span<const uint32_t> dimensions);
 

@@ -42,6 +42,38 @@
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_mojo.h"
 #endif
 
+namespace webnn {
+
+Operand::DataType BlinkOperandTypeToComponent(
+    blink::V8MLOperandType::Enum type) {
+  switch (type) {
+    case blink::V8MLOperandType::Enum::kFloat32:
+      return Operand::DataType::kFloat32;
+    case blink::V8MLOperandType::Enum::kFloat16:
+      return Operand::DataType::kFloat16;
+    case blink::V8MLOperandType::Enum::kInt32:
+      return Operand::DataType::kInt32;
+    case blink::V8MLOperandType::Enum::kUint32:
+      return Operand::DataType::kUint32;
+    case blink::V8MLOperandType::Enum::kInt8:
+      return Operand::DataType::kInt8;
+    case blink::V8MLOperandType::Enum::kUint8:
+      return Operand::DataType::kUint8;
+  }
+  NOTREACHED_NORETURN();
+}
+
+// Converters from IDL to WebNN component type.
+template <>
+struct TypeConverter<webnn::Operand, blink::MLOperand*> {
+  static webnn::Operand Convert(const blink::MLOperand* ml_operand) {
+    return webnn::Operand(BlinkOperandTypeToComponent(ml_operand->Type()),
+                          ml_operand->Dimensions());
+  }
+};
+
+}  // namespace webnn
+
 namespace blink {
 
 namespace {
@@ -1865,19 +1897,12 @@ MLOperand* MLGraphBuilder::slice(const MLOperand* input,
 
 MLOperand* MLGraphBuilder::softmax(const MLOperand* input,
                                    ExceptionState& exception_state) {
-  // According to WebNN spec:
-  // https://www.w3.org/TR/webnn/#api-mlgraphbuilder-softmax, The input must be
-  // a 2-D tensor.
-  if (input->Dimensions().size() != 2) {
-    exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
-                                      "The input must be a 2-D tensor.");
-    return nullptr;
-  }
-  // The input type must be one of the floating point types.
-  if (!IsFloatingPointType(input->Type())) {
+  auto input_com_operand =
+      webnn::ValidateSoftmax(webnn::ConvertTo<webnn::Operand>(input));
+  if (!input_com_operand.has_value()) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kDataError,
-        "The input type must be one of the floating point types.");
+        WTF::String::FromUTF8(input_com_operand.error()));
     return nullptr;
   }
   auto* softmax = MakeGarbageCollected<MLOperator>(
