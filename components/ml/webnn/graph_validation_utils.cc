@@ -28,7 +28,7 @@ bool IsFloatingPointType(Operand::DataType data_type) {
 
 }  // namespace
 
-Operand::Operand(DataType data_type, std::vector<uint32_t>& dimensions) {
+Operand::Operand(DataType data_type, std::vector<uint32_t> dimensions) {
   this->data_type = data_type;
   this->dimensions = std::move(dimensions);
 }

@@ -19,15 +19,12 @@ template <typename T, typename U>
 struct TypeConverter;
 
 template <typename T, typename U>
-inline T ConvertTo(const U& obj);
-
-template <typename T, typename U>
 inline T ConvertTo(const U* obj) {
   return TypeConverter<T, U*>::Convert(obj);
 }
 
 // The struct defined in this file need to be synced with,
-// - "services/webnnpublic/mojom/webnn_graph.mojom"
+// - "services/webnn/public/mojom/webnn_graph.mojom"
 //
 // Represents the `MLOperand` which describes not only input and constant
 // operand, but also the output operand of operator.
@@ -42,7 +39,7 @@ struct Operand {
     kUint8,
   };
 
-  Operand(DataType data_type, std::vector<uint32_t>& dimensions);
+  Operand(DataType data_type, std::vector<uint32_t> dimensions);
   // Used for converting MLOperand to the component::Operand.
   Operand(DataType data_type, base::span<const uint32_t> dimensions);
   ~Operand();
