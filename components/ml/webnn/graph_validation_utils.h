@@ -13,16 +13,6 @@
 
 namespace webnn {
 
-// The webnn::TypeConverter mechanism is similar with mojo::TypeConverter,
-// - "mojo/public/cpp/bindings/type_converter.h"
-template <typename T, typename U>
-struct TypeConverter;
-
-template <typename T, typename U>
-inline T ConvertTo(const U* obj) {
-  return TypeConverter<T, U*>::Convert(obj);
-}
-
 // The struct defined in this file need to be synced with,
 // - "services/webnn/public/mojom/webnn_graph.mojom"
 //

@@ -10,23 +10,24 @@
 #include "base/types/expected.h"
 #include "components/ml/webnn/graph_validation_utils.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
+#include "mojo/public/cpp/bindings/type_converter.h"
 
-namespace webnn {
+namespace mojo {
 
 webnn::Operand::DataType MojoOperandTypeToComponent(
-    mojom::Operand::DataType data_type) {
+    webnn::mojom::Operand::DataType data_type) {
   switch (data_type) {
-    case mojom::Operand::DataType::kFloat32:
+    case webnn::mojom::Operand::DataType::kFloat32:
       return webnn::Operand::DataType::kFloat32;
-    case mojom::Operand::DataType::kFloat16:
+    case webnn::mojom::Operand::DataType::kFloat16:
       return webnn::Operand::DataType::kFloat16;
-    case mojom::Operand::DataType::kInt32:
+    case webnn::mojom::Operand::DataType::kInt32:
       return webnn::Operand::DataType::kInt32;
-    case mojom::Operand::DataType::kUint32:
+    case webnn::mojom::Operand::DataType::kUint32:
       return webnn::Operand::DataType::kUint32;
-    case mojom::Operand::DataType::kInt8:
+    case webnn::mojom::Operand::DataType::kInt8:
       return webnn::Operand::DataType::kInt8;
-    case mojom::Operand::DataType::kUint8:
+    case webnn::mojom::Operand::DataType::kUint8:
       return webnn::Operand::DataType::kUint8;
   }
   NOTREACHED_NORETURN();
@@ -34,12 +35,16 @@ webnn::Operand::DataType MojoOperandTypeToComponent(
 
 // Converters from mojo to WebNN component type.
 template <>
-struct TypeConverter<webnn::Operand, mojom::Operand*> {
-  static webnn::Operand Convert(const mojom::Operand* mojo_operand) {
+struct TypeConverter<webnn::Operand, webnn::mojom::Operand*> {
+  static webnn::Operand Convert(const webnn::mojom::Operand* mojo_operand) {
     return webnn::Operand(MojoOperandTypeToComponent(mojo_operand->data_type),
                           mojo_operand->dimensions);
   }
 };
+
+}  // namespace mojo
+
+namespace webnn {
 
 namespace {
 
@@ -203,11 +208,12 @@ bool ValidateSoftmax(const IdToOperandMap& id_to_operand_map,
     // The softmax operator is invalid.
     return false;
   }
-  auto input_com_operand = ValidateSoftmax(ConvertTo<webnn::Operand>(input));
-  if (!input_com_operand.has_value()) {
+  auto validated_output =
+      ValidateSoftmax(mojo::ConvertTo<webnn::Operand>(input));
+  if (!validated_output.has_value()) {
     return false;
   }
-  if (input_com_operand != ConvertTo<webnn::Operand>(output)) {
+  if (validated_output != mojo::ConvertTo<webnn::Operand>(output)) {
     return false;
   }
 

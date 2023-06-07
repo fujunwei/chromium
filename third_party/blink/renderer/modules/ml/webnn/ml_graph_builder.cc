@@ -8,6 +8,7 @@
 
 #include "base/numerics/checked_math.h"
 #include "components/ml/webnn/graph_validation_utils.h"
+#include "mojo/public/cpp/bindings/type_converter.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_clamp_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_conv_2d_options.h"
@@ -42,23 +43,23 @@
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_mojo.h"
 #endif
 
-namespace webnn {
+namespace mojo {
 
-Operand::DataType BlinkOperandTypeToComponent(
+webnn::Operand::DataType BlinkOperandTypeToComponent(
     blink::V8MLOperandType::Enum type) {
   switch (type) {
     case blink::V8MLOperandType::Enum::kFloat32:
-      return Operand::DataType::kFloat32;
+      return webnn::Operand::DataType::kFloat32;
     case blink::V8MLOperandType::Enum::kFloat16:
-      return Operand::DataType::kFloat16;
+      return webnn::Operand::DataType::kFloat16;
     case blink::V8MLOperandType::Enum::kInt32:
-      return Operand::DataType::kInt32;
+      return webnn::Operand::DataType::kInt32;
     case blink::V8MLOperandType::Enum::kUint32:
-      return Operand::DataType::kUint32;
+      return webnn::Operand::DataType::kUint32;
     case blink::V8MLOperandType::Enum::kInt8:
-      return Operand::DataType::kInt8;
+      return webnn::Operand::DataType::kInt8;
     case blink::V8MLOperandType::Enum::kUint8:
-      return Operand::DataType::kUint8;
+      return webnn::Operand::DataType::kUint8;
   }
   NOTREACHED_NORETURN();
 }
@@ -72,7 +73,7 @@ struct TypeConverter<webnn::Operand, blink::MLOperand*> {
   }
 };
 
-}  // namespace webnn
+}  // namespace mojo
 
 namespace blink {
 
@@ -1897,12 +1898,12 @@ MLOperand* MLGraphBuilder::slice(const MLOperand* input,
 
 MLOperand* MLGraphBuilder::softmax(const MLOperand* input,
                                    ExceptionState& exception_state) {
-  auto input_com_operand =
-      webnn::ValidateSoftmax(webnn::ConvertTo<webnn::Operand>(input));
-  if (!input_com_operand.has_value()) {
+  auto validated_output =
+      webnn::ValidateSoftmax(mojo::ConvertTo<webnn::Operand>(input));
+  if (!validated_output.has_value()) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kDataError,
-        WTF::String::FromUTF8(input_com_operand.error()));
+        WTF::String::FromUTF8(validated_output.error()));
     return nullptr;
   }
   auto* softmax = MakeGarbageCollected<MLOperator>(

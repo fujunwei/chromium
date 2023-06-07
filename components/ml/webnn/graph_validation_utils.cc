@@ -63,6 +63,7 @@ base::expected<Operand, std::string> ValidateSoftmax(Operand input) {
     return base::unexpected(
         "The input type must be one of the floating point types.");
   }
+  // The output tensor of softmax is the same shape as the input tensor.
   return Operand(input.data_type, std::move(input.dimensions));
 }
 
