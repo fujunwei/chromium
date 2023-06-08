@@ -28,6 +28,45 @@ struct Operand {
   string? name;
 };
 
+// Represents the `MLInputOperandLayout` that specifies the layout format of
+// the input tensor. N is the batch, C is input channels, H is height and W is
+// the width of the tensor.
+enum InputOperandLayout { kNchw, kNhwc };
+
+// Represents the `MLAutoPad`. `Explicit` means that the values in the
+// options.padding array should be used for input padding, with `SameUpper`
+// and `SameLower` options, the padding values are automatically computed.
+enum AutoPad { kExplicit, kSameUpper, kSameLower };
+
+// Represents the `MLRoundingType` that is used to compute the output shape.
+enum RoundingType { kFloor, kCeil };
+
+// Contains the attributes of pool2d operator.
+struct Pool2dAttributes {
+  // The dimensions of the sliding window.
+  array<uint32>? window_dimensions;
+  // The additional rows and columns added to the beginning and ending of each
+  // spatial dimension of input.
+  array<uint32> padding;
+  // The stride of the sliding window for each spatial dimension of input.
+  array<uint32> strides;
+  // The dilation factor for each spatial dimension of input.
+  array<uint32> dilations;
+  // The automatic input padding options.
+  AutoPad auto_pad = AutoPad.kExplicit;
+  // The layout format of the input.
+  InputOperandLayout layout = InputOperandLayout.kNchw;
+  // The rounding function used to compute the output shape.
+  RoundingType rounding_type = RoundingType.kFloor;
+  // The sizes of the two spacial dimensions of the output tensor.
+  array<uint32> output_sizes;
+};
+
+// Holds one of operator attributes.
+union OperatorAttributes {
+  Pool2dAttributes pool2d;
+};
+
 // Represents the operations defined in `MLGraphBuilder` that describes the
 // functional semantics.
 struct Operator {
@@ -52,6 +91,8 @@ struct Operator {
   // The id array from the `GraphInfo.operands` will be used to map the output
   // operands of `Operator`.
   array<uint64> output_operands;
+  // The attributes of `Operator`.
+  OperatorAttributes? attributes;
 };
 
 // Describes an entire WebNN graph information.

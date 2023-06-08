@@ -15,6 +15,7 @@
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/heap_vector.h"
 #include "third_party/blink/renderer/platform/heap/member.h"
+#include "third_party/blink/renderer/bindings/modules/v8/v8_ml_auto_pad.h"
 
 namespace blink {
 
@@ -72,6 +73,8 @@ TransferNamedArrayBufferViews(v8::Isolate* isolate,
 
 MLNamedArrayBufferViews* CreateNamedArrayBufferViews(
     std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>> views_info);
+
+webnn::AutoPad BlinkAutoPadToComponent(blink::V8MLAutoPad::Enum type);
 
 }  // namespace blink
 

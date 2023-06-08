@@ -519,61 +519,8 @@ xnn_status DefineXnnNodeForClamp(xnn_subgraph_t subgraph,
   return xnn_status_success;
 }
 
-struct XnnPadding2D {
-  uint32_t top;
-  uint32_t bottom;
-  uint32_t left;
-  uint32_t right;
-};
-
-// Helper to get padding sizes for XNNPACK convolution 2d or pooling 2d Nodes.
-template <typename OptionsType>
-XnnPadding2D GetXnnPadding2D(const OptionsType* options,
-                             uint32_t input_height,
-                             uint32_t input_width,
-                             uint32_t filter_height,
-                             uint32_t filter_width,
-                             uint32_t stride_height,
-                             uint32_t stride_width,
-                             uint32_t dilation_height,
-                             uint32_t dilation_width) {
-  XnnPadding2D xnn_padding;
-  switch (options->autoPad().AsEnum()) {
-    case V8MLAutoPad::Enum::kExplicit: {
-      // Set the XNNPACK padding from WebNN explicit padding that is in
-      // [beginning_height, ending_height, beginning_width, ending_width],
-      // default to 0.
-      const Vector<uint32_t> default_pads({0, 0, 0, 0});
-      xnn_padding.top = options->getPaddingOr(default_pads)[0];
-      xnn_padding.bottom = options->getPaddingOr(default_pads)[1];
-      xnn_padding.left = options->getPaddingOr(default_pads)[2];
-      xnn_padding.right = options->getPaddingOr(default_pads)[3];
-      break;
-    }
-    case V8MLAutoPad::Enum::kSameUpper:
-    case V8MLAutoPad::Enum::kSameLower: {
-      // Calculate the XNNPACK padding based on WebNN auto padding mode and
-      // sizes.
-      auto padding_sizes_height = MLGraphBuilder::CalculateConv2dPadding(
-          options->autoPad().AsEnum(), input_height, filter_height,
-          stride_height, dilation_height);
-      CHECK(padding_sizes_height);
-      xnn_padding.top = padding_sizes_height.value().begin;
-      xnn_padding.bottom = padding_sizes_height.value().end;
-      auto padding_sizes_width = MLGraphBuilder::CalculateConv2dPadding(
-          options->autoPad().AsEnum(), input_width, filter_width, stride_width,
-          dilation_width);
-      CHECK(padding_sizes_width);
-      xnn_padding.left = padding_sizes_width.value().begin;
-      xnn_padding.right = padding_sizes_width.value().end;
-      break;
-    }
-  }
-  return xnn_padding;
-}
-
 // Helper to get padding sizes for XNNPACK convTranspose2d Nodes.
-XnnPadding2D GetXnnConvTransposePadding2D(
+webnn::Padding2D GetXnnConvTransposePadding2D(
     const MLConvTranspose2dOptions* options,
     uint32_t input_height,
     uint32_t input_width,
@@ -585,7 +532,7 @@ XnnPadding2D GetXnnConvTransposePadding2D(
     uint32_t dilation_width,
     uint32_t output_padding_height,
     uint32_t output_padding_width) {
-  XnnPadding2D xnn_padding;
+  webnn::Padding2D xnn_padding;
   switch (options->autoPad().AsEnum()) {
     case V8MLAutoPad::Enum::kExplicit: {
       // Set the XNNPACK convTranspose2d padding from WebNN explicit padding
@@ -714,9 +661,11 @@ xnn_status DefineXnnNodeForConv2d(xnn_subgraph_t subgraph,
   }
 
   // Set or calculate padding sizes of XNNPACK conv2d.
-  const auto padding = GetXnnPadding2D(
-      options, input_height, input_width, filter_height, filter_width,
-      stride_height, stride_width, dilation_height, dilation_width);
+  const auto padding = webnn::GetPadding2D(
+      BlinkAutoPadToComponent(options->autoPad().AsEnum()),
+      options->getPaddingOr({0, 0, 0, 0}), input_height, input_width,
+      filter_height, filter_width, stride_height, stride_width, dilation_height,
+      dilation_width);
 
   // Set the minimum and maximum output values for XNNPACK conv2d based on the
   // fused activation function. If no fused activation function is set, there
@@ -1176,9 +1125,11 @@ xnn_status DefineXnnNodeForPool2d(xnn_subgraph_t subgraph,
   }
 
   // Set or calculate padding sizes of XNNPACK pooling 2d Node.
-  const auto padding = GetXnnPadding2D(
-      options, input_height, input_width, filter_height, filter_width,
-      stride_height, stride_width, dilation_height, dilation_width);
+  const auto padding =
+      webnn::GetPadding2D(BlinkAutoPadToComponent(options->autoPad().AsEnum()),
+                   options->getPaddingOr({0, 0, 0, 0}), input_height,
+                   input_width, filter_height, filter_width, stride_height,
+                   stride_width, dilation_height, dilation_width);
 
   // Define XNNPACK average or max pooling 2d Node for the Subgraph object.
   const float output_min = -std::numeric_limits<float>::infinity();
