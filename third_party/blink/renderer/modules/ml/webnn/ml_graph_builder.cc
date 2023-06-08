@@ -81,6 +81,25 @@ namespace {
 
 MLGraphBuilder::BackendForTesting* g_backend_for_testing = nullptr;
 
+blink::V8MLOperandType::Enum ComponentOperandTypeToBlink(
+    webnn::Operand::DataType type) {
+  switch (type) {
+    case webnn::Operand::DataType::kFloat32:
+      return blink::V8MLOperandType::Enum::kFloat32;
+    case webnn::Operand::DataType::kFloat16:
+      return blink::V8MLOperandType::Enum::kFloat16;
+    case webnn::Operand::DataType::kInt32:
+      return blink::V8MLOperandType::Enum::kInt32;
+    case webnn::Operand::DataType::kUint32:
+      return blink::V8MLOperandType::Enum::kUint32;
+    case webnn::Operand::DataType::kInt8:
+      return blink::V8MLOperandType::Enum::kInt8;
+    case webnn::Operand::DataType::kUint8:
+      return blink::V8MLOperandType::Enum::kUint8;
+  }
+  NOTREACHED_NORETURN();
+}
+
 bool IsFloatingPointType(V8MLOperandType::Enum operand_type) {
   switch (operand_type) {
     case V8MLOperandType::Enum::kFloat32:
@@ -1908,9 +1927,9 @@ MLOperand* MLGraphBuilder::softmax(const MLOperand* input,
   }
   auto* softmax = MakeGarbageCollected<MLOperator>(
       this, MLOperator::OperatorKind::kSoftmax);
-  // The output tensor has the same shape as the input tensor.
   auto output = MLOperand::ValidateAndCreateOutput(
-      this, input->Type(), input->Dimensions(), softmax);
+      this, ComponentOperandTypeToBlink(validated_output.value().data_type),
+      Vector<uint32_t>(validated_output.value().dimensions), softmax);
   if (!output.has_value()) {
     exception_state.ThrowDOMException(DOMExceptionCode::kDataError,
                                       output.error());
