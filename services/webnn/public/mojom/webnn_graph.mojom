@@ -44,14 +44,14 @@ enum RoundingType { kFloor, kCeil };
 // Contains the attributes of pool2d operator.
 struct Pool2dAttributes {
   // The dimensions of the sliding window.
-  array<uint32>? window_dimensions;
+  array<uint32, 2>? window_dimensions;
   // The additional rows and columns added to the beginning and ending of each
   // spatial dimension of input.
-  array<uint32> padding;
+  array<uint32, 4> padding;
   // The stride of the sliding window for each spatial dimension of input.
-  array<uint32> strides;
+  array<uint32, 2> strides;
   // The dilation factor for each spatial dimension of input.
-  array<uint32> dilations;
+  array<uint32, 2> dilations;
   // The automatic input padding options.
   AutoPad auto_pad = AutoPad.kExplicit;
   // The layout format of the input.
@@ -59,7 +59,7 @@ struct Pool2dAttributes {
   // The rounding function used to compute the output shape.
   RoundingType rounding_type = RoundingType.kFloor;
   // The sizes of the two spacial dimensions of the output tensor.
-  array<uint32> output_sizes;
+  array<uint32>? output_sizes;
 };
 
 // Holds one of operator attributes.
@@ -81,6 +81,8 @@ struct Operator {
     kRelu,
     kReshape,
     kSoftmax,
+    kAveragePool2d,
+    kMaxPool2d,
   };
 
   // The kind of this `Operator`.

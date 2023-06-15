@@ -576,6 +576,268 @@ TEST_P(MLGraphTestMojo, SoftmaxTest) {
   }
 }
 
+struct Pool2dTester {
+  OperandInfoBlink input;
+  struct Pool2dOptions {
+    absl::optional<Vector<uint32_t>> window_dimensions;
+    absl::optional<Vector<uint32_t>> padding;
+    absl::optional<Vector<uint32_t>> strides;
+    absl::optional<Vector<uint32_t>> dilations;
+    blink::V8MLAutoPad::Enum auto_pad;
+    blink::V8MLInputOperandLayout::Enum layout;
+    blink::V8MLRoundingType::Enum rounding_type;
+    absl::optional<Vector<uint32_t>> output_sizes;
+  };
+  Pool2dOptions options;
+  OperandInfoMojo expected_operand;
+  Pool2dOptions expected_attributes;
+
+  void Test(MLGraphTestMojo& helper,
+            V8TestingScope& scope,
+            MLGraphBuilder* builder) {
+    Test(helper, scope, builder, Pool2dKind::kAverage);
+    Test(helper, scope, builder, Pool2dKind::kMax);
+  }
+
+  void Test(MLGraphTestMojo& helper,
+            V8TestingScope& scope,
+            MLGraphBuilder* builder,
+            Pool2dKind kind) {
+    // Build the graph.
+    auto* input_operand = BuildInput(builder, "input", input.dimensions,
+                                     input.type, scope.GetExceptionState());
+    MLPool2dOptions* ml_pool2d_options = MLPool2dOptions::Create();
+    if (options.window_dimensions) {
+      ml_pool2d_options->setWindowDimensions(options.window_dimensions.value());
+    }
+    if (options.padding) {
+      ml_pool2d_options->setPadding(options.padding.value());
+    }
+    if (options.strides) {
+      ml_pool2d_options->setStrides(options.strides.value());
+    }
+    if (options.dilations) {
+      ml_pool2d_options->setDilations(options.dilations.value());
+    }
+    ml_pool2d_options->setAutoPad(options.auto_pad);
+    ml_pool2d_options->setLayout(options.layout);
+    ml_pool2d_options->setRoundingType(options.rounding_type);
+    if (options.output_sizes) {
+      ml_pool2d_options->setOutputSizes(options.output_sizes.value());
+    }
+    auto* output_operand =
+        BuildPool2d(scope, builder, kind, input_operand, ml_pool2d_options);
+    auto [graph, build_exception] =
+        helper.BuildGraph(scope, builder, {{"output", output_operand}});
+    ASSERT_NE(graph, nullptr);
+
+    auto graph_info = helper.GetGraphInfo();
+    // Verify the graph information of mojo are as expected.
+    ASSERT_EQ(graph_info->operators.size(), 1u);
+    auto& operation = graph_info->operators[0];
+    switch (kind) {
+      case Pool2dKind::kAverage:
+        EXPECT_EQ(operation->kind, blink_mojom::Operator::Kind::kAveragePool2d);
+        break;
+      case Pool2dKind::kMax:
+        EXPECT_EQ(operation->kind, blink_mojom::Operator::Kind::kMaxPool2d);
+        break;
+      default:
+        NOTREACHED();
+    }
+    auto& pool2d_attributes = operation->attributes->get_pool2d();
+    EXPECT_EQ(pool2d_attributes->window_dimensions,
+              expected_attributes.window_dimensions);
+    EXPECT_EQ(pool2d_attributes->padding, expected_attributes.padding);
+    EXPECT_EQ(pool2d_attributes->strides, expected_attributes.strides);
+    EXPECT_EQ(pool2d_attributes->dilations, expected_attributes.dilations);
+    switch (ml_pool2d_options->autoPad().AsEnum()) {
+      case blink::V8MLAutoPad::Enum::kExplicit:
+        EXPECT_EQ(pool2d_attributes->auto_pad, blink_mojom::AutoPad::kExplicit);
+        break;
+      case blink::V8MLAutoPad::Enum::kSameUpper:
+        EXPECT_EQ(pool2d_attributes->auto_pad,
+                  blink_mojom::AutoPad::kSameUpper);
+        break;
+      case blink::V8MLAutoPad::Enum::kSameLower:
+        EXPECT_EQ(pool2d_attributes->auto_pad,
+                  blink_mojom::AutoPad::kSameLower);
+        break;
+      default:
+        NOTREACHED();
+    }
+    switch (ml_pool2d_options->layout().AsEnum()) {
+      case blink::V8MLInputOperandLayout::Enum::kNchw:
+        EXPECT_EQ(pool2d_attributes->layout,
+                  blink_mojom::InputOperandLayout::kNchw);
+        break;
+      case blink::V8MLInputOperandLayout::Enum::kNhwc:
+        EXPECT_EQ(pool2d_attributes->layout,
+                  blink_mojom::InputOperandLayout::kNhwc);
+        break;
+      default:
+        NOTREACHED();
+    }
+    switch (ml_pool2d_options->roundingType().AsEnum()) {
+      case blink::V8MLRoundingType::Enum::kFloor:
+        EXPECT_EQ(pool2d_attributes->rounding_type,
+                  blink_mojom::RoundingType::kFloor);
+        break;
+      case blink::V8MLRoundingType::Enum::kCeil:
+        EXPECT_EQ(pool2d_attributes->rounding_type,
+                  blink_mojom::RoundingType::kCeil);
+        break;
+      default:
+        NOTREACHED();
+    }
+    EXPECT_EQ(pool2d_attributes->output_sizes,
+              expected_attributes.output_sizes);
+    EXPECT_EQ(graph_info->output_operands.size(), 1u);
+    auto output_operand_id = graph_info->output_operands[0];
+    auto output_operand_iter =
+        graph_info->id_to_operand_map.find(output_operand_id);
+    ASSERT_TRUE(output_operand_iter != graph_info->id_to_operand_map.end());
+    EXPECT_EQ(output_operand_iter->value->data_type, expected_operand.type);
+    EXPECT_EQ(output_operand_iter->value->dimensions,
+              expected_operand.dimensions);
+  }
+};
+
+TEST_P(MLGraphTestMojo, Pool2dTest) {
+  V8TestingScope scope;
+  // Bind fake WebNN Context in the service for testing.
+  ScopedWebNNServiceBinder scoped_setup_binder(*this, scope);
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(
+      blink::features::kEnableMachineLearningNeuralNetworkService);
+  auto* options = MLContextOptions::Create();
+  // Create WebNN Context with GPU device preference.
+  options->setDevicePreference(V8MLDevicePreference::Enum::kGpu);
+  auto* builder = CreateMLGraphBuilder(scope.GetExecutionContext(), options);
+  {
+    // Test pool2d with default options.
+    Pool2dTester{
+        .input = {.type = V8MLOperandType::Enum::kFloat32,
+                  .dimensions = {1, 3, 4, 4}},
+        .expected_operand = {.type = blink_mojom::Operand::DataType::kFloat32,
+                             .dimensions = {1, 3, 1, 1}},
+        .expected_attributes = {.window_dimensions = absl::nullopt,
+                                .padding = Vector<uint32_t>({0, 0, 0, 0}),
+                                .strides = Vector<uint32_t>({1, 1}),
+                                .dilations = Vector<uint32_t>({1, 1}),
+                                .output_sizes = absl::nullopt}}
+        .Test(*this, scope, builder);
+  }
+  {
+    // Test pool2d without padding.
+    Pool2dTester{
+        .input = {.type = V8MLOperandType::Enum::kFloat32,
+                  .dimensions = {1, 3, 4, 4}},
+        .options = {.window_dimensions = Vector<uint32_t>({3, 3})},
+        .expected_operand = {.type = blink_mojom::Operand::DataType::kFloat32,
+                             .dimensions = {1, 3, 2, 2}},
+        .expected_attributes = {.window_dimensions = Vector<uint32_t>({3, 3}),
+                                .padding = Vector<uint32_t>({0, 0, 0, 0}),
+                                .strides = Vector<uint32_t>({1, 1}),
+                                .dilations = Vector<uint32_t>({1, 1}),
+                                .output_sizes = absl::nullopt}}
+        .Test(*this, scope, builder);
+  }
+  {
+    // Test pool2d with autoPad="same-upper".
+    Pool2dTester{
+        .input = {.type = V8MLOperandType::Enum::kFloat32,
+                  .dimensions = {1, 3, 5, 5}},
+        .options = {.window_dimensions = Vector<uint32_t>({5, 5}),
+                    .auto_pad = V8MLAutoPad::Enum::kSameUpper},
+        .expected_operand = {.type = blink_mojom::Operand::DataType::kFloat32,
+                             .dimensions = {1, 3, 5, 5}},
+        .expected_attributes = {.window_dimensions = Vector<uint32_t>({5, 5}),
+                                .padding = Vector<uint32_t>({0, 0, 0, 0}),
+                                .strides = Vector<uint32_t>({1, 1}),
+                                .dilations = Vector<uint32_t>({1, 1}),
+                                .output_sizes = absl::nullopt}}
+        .Test(*this, scope, builder);
+  }
+  {
+    // Test pool2d with strides=2, padding=1 and roundingType="floor".
+    Pool2dTester{
+        .input = {.type = V8MLOperandType::Enum::kFloat32,
+                  .dimensions = {1, 3, 7, 7}},
+        .options = {.window_dimensions = Vector<uint32_t>({4, 4}),
+                    .padding = Vector<uint32_t>({1, 1, 1, 1}),
+                    .strides = Vector<uint32_t>({2, 2}),
+                    .rounding_type = V8MLRoundingType::Enum::kFloor},
+        .expected_operand = {.type = blink_mojom::Operand::DataType::kFloat32,
+                             .dimensions = {1, 3, 3, 3}},
+        .expected_attributes = {.window_dimensions = Vector<uint32_t>({4, 4}),
+                                .padding = Vector<uint32_t>({1, 1, 1, 1}),
+                                .strides = Vector<uint32_t>({2, 2}),
+                                .dilations = Vector<uint32_t>({1, 1}),
+                                .output_sizes = absl::nullopt}}
+        .Test(*this, scope, builder);
+  }
+  {
+    // Test pool2d with strides=2, padding=1 and roundingType="ceil".
+    Pool2dTester{
+        .input = {.type = V8MLOperandType::Enum::kFloat32,
+                  .dimensions = {1, 3, 7, 7}},
+        .options = {.window_dimensions = Vector<uint32_t>({4, 4}),
+                    .padding = Vector<uint32_t>({1, 1, 1, 1}),
+                    .strides = Vector<uint32_t>({2, 2}),
+                    .rounding_type = V8MLRoundingType::Enum::kCeil},
+        .expected_operand = {.type = blink_mojom::Operand::DataType::kFloat32,
+                             .dimensions = {1, 3, 4, 4}},
+        .expected_attributes = {.window_dimensions = Vector<uint32_t>({4, 4}),
+                                .padding = Vector<uint32_t>({1, 1, 1, 1}),
+                                .strides = Vector<uint32_t>({2, 2}),
+                                .dilations = Vector<uint32_t>({1, 1}),
+                                .output_sizes = absl::nullopt}}
+        .Test(*this, scope, builder);
+  }
+  {
+    // Test pool2d with strides=2, padding=1 and outputSizes=[3, 3].
+    // When the output sizes are explicitly specified, the
+    // options.roundingType is ignored.
+    Pool2dTester{
+        .input = {.type = V8MLOperandType::Enum::kFloat32,
+                  .dimensions = {1, 3, 7, 7}},
+        .options = {.window_dimensions = Vector<uint32_t>({4, 4}),
+                    .padding = Vector<uint32_t>({1, 1, 1, 1}),
+                    .strides = Vector<uint32_t>({2, 2}),
+                    .rounding_type = V8MLRoundingType::Enum::kCeil,
+                    .output_sizes = Vector<uint32_t>({3, 3})},
+        .expected_operand = {.type = blink_mojom::Operand::DataType::kFloat32,
+                             .dimensions = {1, 3, 3, 3}},
+        .expected_attributes = {.window_dimensions = Vector<uint32_t>({4, 4}),
+                                .padding = Vector<uint32_t>({1, 1, 1, 1}),
+                                .strides = Vector<uint32_t>({2, 2}),
+                                .dilations = Vector<uint32_t>({1, 1}),
+                                .output_sizes = Vector<uint32_t>({3, 3})}}
+        .Test(*this, scope, builder);
+  }
+  {
+    // Test pool2d with layout="nhwc".
+    Pool2dTester{
+        .input = {.type = V8MLOperandType::Enum::kFloat32,
+                  .dimensions = {1, 7, 7, 3}},
+        .options = {.window_dimensions = Vector<uint32_t>({4, 4}),
+                    .padding = Vector<uint32_t>({1, 1, 1, 1}),
+                    .strides = Vector<uint32_t>({2, 2}),
+                    .layout = V8MLInputOperandLayout::Enum::kNhwc,
+                    .rounding_type = V8MLRoundingType::Enum::kCeil,
+                    .output_sizes = Vector<uint32_t>({3, 3})},
+        .expected_operand = {.type = blink_mojom::Operand::DataType::kFloat32,
+                             .dimensions = {1, 3, 3, 3}},
+        .expected_attributes = {.window_dimensions = Vector<uint32_t>({4, 4}),
+                                .padding = Vector<uint32_t>({1, 1, 1, 1}),
+                                .strides = Vector<uint32_t>({2, 2}),
+                                .dilations = Vector<uint32_t>({1, 1}),
+                                .output_sizes = Vector<uint32_t>({3, 3})}}
+        .Test(*this, scope, builder);
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(
     All,
     MLGraphTestMojo,

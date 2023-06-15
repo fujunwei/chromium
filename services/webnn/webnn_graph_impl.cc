@@ -37,8 +37,67 @@ webnn::Operand::DataType MojoOperandTypeToComponent(
 template <>
 struct TypeConverter<webnn::Operand, webnn::mojom::Operand*> {
   static webnn::Operand Convert(const webnn::mojom::Operand* mojo_operand) {
+    CHECK(mojo_operand);
     return webnn::Operand(MojoOperandTypeToComponent(mojo_operand->data_type),
                           mojo_operand->dimensions);
+  }
+};
+
+webnn::AutoPad MojoAutoPadToComponent(webnn::mojom::AutoPad type) {
+  switch (type) {
+    case webnn::mojom::AutoPad::kExplicit:
+      return webnn::AutoPad::kExplicit;
+    case webnn::mojom::AutoPad::kSameUpper:
+      return webnn::AutoPad::kSameUpper;
+    case webnn::mojom::AutoPad::kSameLower:
+      return webnn::AutoPad::kSameLower;
+  }
+  NOTREACHED_NORETURN();
+}
+
+webnn::InputOperandLayout MojoInputOperandLayoutToComponent(
+    webnn::mojom::InputOperandLayout type) {
+  switch (type) {
+    case webnn::mojom::InputOperandLayout::kNchw:
+      return webnn::InputOperandLayout::kNchw;
+    case webnn::mojom::InputOperandLayout::kNhwc:
+      return webnn::InputOperandLayout::kNhwc;
+  }
+  NOTREACHED_NORETURN();
+}
+
+webnn::RoundingType MojoRoundingTypeToComponent(
+    webnn::mojom::RoundingType type) {
+  switch (type) {
+    case webnn::mojom::RoundingType::kFloor:
+      return webnn::RoundingType::kFloor;
+    case webnn::mojom::RoundingType::kCeil:
+      return webnn::RoundingType::kCeil;
+  }
+  NOTREACHED_NORETURN();
+}
+
+template <>
+struct TypeConverter<webnn::Pool2dAttributes, webnn::mojom::Pool2dAttributes*> {
+  static webnn::Pool2dAttributes Convert(
+      const webnn::mojom::Pool2dAttributes* mojo_attributes) {
+    CHECK(mojo_attributes);
+    webnn::Pool2dAttributes attributes;
+    if (mojo_attributes->window_dimensions) {
+      attributes.window_dimensions = mojo_attributes->window_dimensions.value();
+    }
+    attributes.padding = mojo_attributes->padding;
+    attributes.strides = mojo_attributes->strides;
+    attributes.dilations = mojo_attributes->dilations;
+    attributes.auto_pad = MojoAutoPadToComponent(mojo_attributes->auto_pad);
+    attributes.layout =
+        MojoInputOperandLayoutToComponent(mojo_attributes->layout);
+    attributes.rounding_type =
+        MojoRoundingTypeToComponent(mojo_attributes->rounding_type);
+    if (mojo_attributes->output_sizes) {
+      attributes.output_sizes = mojo_attributes->output_sizes.value();
+    }
+    return attributes;
   }
 };
 
@@ -220,6 +279,29 @@ bool ValidateSoftmax(const IdToOperandMap& id_to_operand_map,
   return true;
 }
 
+bool ValidatePool2d(const IdToOperandMap& id_to_operand_map,
+                    const mojom::OperatorPtr& operation) {
+  auto* input = GetMojoOperand(id_to_operand_map, operation->input_operands);
+  auto* output = GetMojoOperand(id_to_operand_map, operation->output_operands);
+  if (!input || !output || !operation->attributes) {
+    // The pool2d operator is invalid.
+    return false;
+  }
+  auto* attributes = operation->attributes->get_pool2d().get();
+  CHECK(attributes);
+  auto validated_output =
+      ValidatePool2d(mojo::ConvertTo<webnn::Operand>(input),
+                     mojo::ConvertTo<webnn::Pool2dAttributes>(attributes));
+  if (!validated_output.has_value()) {
+    return false;
+  }
+  if (validated_output != mojo::ConvertTo<webnn::Operand>(output)) {
+    return false;
+  }
+
+  return true;
+}
+
 bool ValidateOperator(const IdToOperandMap& id_to_operand_map,
                       const mojom::OperatorPtr& operation) {
   switch (operation->kind) {
@@ -236,6 +318,9 @@ bool ValidateOperator(const IdToOperandMap& id_to_operand_map,
       return ValidateReshape(id_to_operand_map, operation);
     case mojom::Operator::Kind::kSoftmax:
       return ValidateSoftmax(id_to_operand_map, operation);
+    case mojom::Operator::Kind::kAveragePool2d:
+    case mojom::Operator::Kind::kMaxPool2d:
+      return ValidatePool2d(id_to_operand_map, operation);
   }
   NOTREACHED_NORETURN();
 }

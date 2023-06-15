@@ -404,4 +404,187 @@ TEST_F(WebNNGraphImplTest, SoftmaxTest) {
   }
 }
 
+struct Pool2dTester {
+  OperandInfo input;
+  struct Pool2dAttributes {
+    absl::optional<std::vector<uint32_t>> window_dimensions;
+    std::vector<uint32_t> padding = {0, 0, 0, 0};
+    std::vector<uint32_t> strides = {1, 1};
+    std::vector<uint32_t> dilations = {1, 1};
+    mojom::AutoPad auto_pad;
+    mojom::InputOperandLayout layout;
+    mojom::RoundingType rounding_type;
+    absl::optional<std::vector<uint32_t>> output_sizes;
+  };
+  Pool2dAttributes attributes;
+  OperandInfo output;
+  bool expected;
+
+  void Test(WebNNGraphImplTest& helper) {
+    Test(helper, mojom::Operator::Kind::kAveragePool2d);
+    Test(helper, mojom::Operator::Kind::kMaxPool2d);
+  }
+
+  void Test(WebNNGraphImplTest& helper, mojom::Operator::Kind kind) {
+    // Build the graph with mojo type.
+    auto graph_info = mojom::GraphInfo::New();
+    uint64_t input_operand_id =
+        helper.BuildInput(graph_info, "input", input.dimensions, input.type);
+    uint64_t output_operand_id = helper.BuildOutput(
+        graph_info, "output", output.dimensions, output.type);
+    auto operation =
+        CreateOperator(kind, {input_operand_id}, {output_operand_id});
+    mojom::Pool2dAttributesPtr mojo_attributes = mojom::Pool2dAttributes::New();
+    mojo_attributes->window_dimensions = attributes.window_dimensions;
+    mojo_attributes->padding = attributes.padding;
+    mojo_attributes->strides = attributes.strides;
+    mojo_attributes->dilations = attributes.dilations;
+    mojo_attributes->auto_pad = attributes.auto_pad;
+    mojo_attributes->layout = attributes.layout;
+    mojo_attributes->rounding_type = attributes.rounding_type;
+    mojo_attributes->output_sizes = attributes.output_sizes;
+    operation->attributes =
+        mojom::OperatorAttributes::NewPool2d(std::move(mojo_attributes));
+    graph_info->operators.emplace_back(std::move(operation));
+    auto result = helper.ValidateGraph(std::move(graph_info));
+    EXPECT_EQ(result, expected);
+  }
+};
+
+TEST_F(WebNNGraphImplTest, Pool2dTest) {
+  {
+    // Test pool2d with default attributes.
+    Pool2dTester{.input = {.type = mojom::Operand::DataType::kFloat32,
+                           .dimensions = {1, 3, 4, 4}},
+                 .output = {.type = mojom::Operand::DataType::kFloat32,
+                            .dimensions = {1, 3, 1, 1}},
+                 .expected = true}
+        .Test(*this);
+  }
+  {
+    // Test pool2d with autoPad="same-upper".
+    Pool2dTester{
+        .input = {.type = mojom::Operand::DataType::kInt8,
+                  .dimensions = {1, 3, 5, 5}},
+        .attributes = {.window_dimensions = std::vector<uint32_t>({2, 2}),
+                       .strides = {2, 2},
+                       .auto_pad = mojom::AutoPad::kSameUpper},
+        .output = {.type = mojom::Operand::DataType::kInt8,
+                   .dimensions = {1, 3, 3, 3}},
+        .expected = true}
+        .Test(*this);
+  }
+  {
+    // Test pool2d with autoPad="same-lower".
+    Pool2dTester{
+        .input = {.type = mojom::Operand::DataType::kInt8,
+                  .dimensions = {1, 3, 5, 5}},
+        .attributes = {.window_dimensions = std::vector<uint32_t>({2, 2}),
+                       .strides = {2, 2},
+                       .auto_pad = mojom::AutoPad::kSameLower},
+        .output = {.type = mojom::Operand::DataType::kInt8,
+                   .dimensions = {1, 3, 3, 3}},
+        .expected = true}
+        .Test(*this);
+  }
+  {
+    // Test pool2d with strides=2, padding=1 and roundingType="floor".
+    Pool2dTester{
+        .input = {.type = mojom::Operand::DataType::kInt8,
+                  .dimensions = {1, 3, 7, 7}},
+        .attributes = {.window_dimensions = std::vector<uint32_t>({4, 4}),
+                       .padding = {1, 1, 1, 1},
+                       .strides = {2, 2},
+                       .rounding_type = mojom::RoundingType::kFloor},
+        .output = {.type = mojom::Operand::DataType::kInt8,
+                   .dimensions = {1, 3, 3, 3}},
+        .expected = true}
+        .Test(*this);
+  }
+  {
+    // Test pool2d with strides=2, padding=1 and roundingType="ceil".
+    Pool2dTester{
+        .input = {.type = mojom::Operand::DataType::kInt8,
+                  .dimensions = {1, 3, 7, 7}},
+        .attributes = {.window_dimensions = std::vector<uint32_t>({4, 4}),
+                       .padding = {1, 1, 1, 1},
+                       .strides = {2, 2},
+                       .rounding_type = mojom::RoundingType::kCeil},
+        .output = {.type = mojom::Operand::DataType::kInt8,
+                   .dimensions = {1, 3, 4, 4}},
+        .expected = true}
+        .Test(*this);
+  }
+  {
+    // Test pool2d with strides=2, padding=1 and outputSizes=[4, 4].
+    Pool2dTester{
+        .input = {.type = mojom::Operand::DataType::kInt8,
+                  .dimensions = {1, 3, 7, 7}},
+        .attributes = {.window_dimensions = std::vector<uint32_t>({4, 4}),
+                       .padding = {1, 1, 1, 1},
+                       .strides = {2, 2},
+                       .output_sizes = std::vector<uint32_t>({4, 4})},
+        .output = {.type = mojom::Operand::DataType::kInt8,
+                   .dimensions = {1, 3, 4, 4}},
+        .expected = true}
+        .Test(*this);
+  }
+  {
+    // Test pool2d with layout="nhwc".
+    Pool2dTester{
+        .input = {.type = mojom::Operand::DataType::kInt8,
+                  .dimensions = {1, 5, 5, 2}},
+        .attributes = {.window_dimensions = std::vector<uint32_t>({3, 3}),
+                       .layout = mojom::InputOperandLayout::kNhwc},
+        .output = {.type = mojom::Operand::DataType::kInt8,
+                   .dimensions = {1, 3, 3, 2}},
+        .expected = true}
+        .Test(*this);
+  }
+  {
+    // Test the invalid graph when the input is not a 4-D tensor.
+    Pool2dTester{
+        .input = {.type = mojom::Operand::DataType::kFloat32,
+                  .dimensions = {3, 5, 5}},
+        .attributes = {.window_dimensions = std::vector<uint32_t>({5, 5}),
+                       .padding = {2, 2, 2, 2}},
+        .output = {.type = mojom::Operand::DataType::kFloat32,
+                   .dimensions = {3, 5, 5}},
+        .expected = false}
+        .Test(*this);
+  }
+  {
+    // Test throwing exception when the output size is incorrect.
+    Pool2dTester{
+        .input = {.type = mojom::Operand::DataType::kInt32,
+                  .dimensions = {1, 2, 5, 5}},
+        .attributes = {.window_dimensions = std::vector<uint32_t>({2, 2}),
+                       .padding = {2, 2, 2, 2},
+                       .strides = {2, 2},
+                       .output_sizes = std::vector<uint32_t>({3, 3})},
+        .output = {.type = mojom::Operand::DataType::kInt32,
+                   .dimensions = {1, 2, 4, 4}},
+        .expected = false}
+        .Test(*this);
+  }
+  {
+    // Test the invalid graph for the output shapes are not expected.
+    Pool2dTester{.input = {.type = mojom::Operand::DataType::kFloat32,
+                           .dimensions = {1, 3, 4, 4}},
+                 .output = {.type = mojom::Operand::DataType::kFloat32,
+                            .dimensions = {1, 2, 1, 1}},
+                 .expected = false}
+        .Test(*this);
+  }
+  {
+    // Test the invalid graph for output types don't match.
+    Pool2dTester{.input = {.type = mojom::Operand::DataType::kFloat32,
+                           .dimensions = {1, 3, 4, 4}},
+                 .output = {.type = mojom::Operand::DataType::kInt32,
+                            .dimensions = {1, 3, 1, 1}},
+                 .expected = false}
+        .Test(*this);
+  }
+}
+
 }  // namespace webnn
