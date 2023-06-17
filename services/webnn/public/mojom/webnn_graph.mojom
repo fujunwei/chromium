@@ -62,8 +62,23 @@ struct Pool2dAttributes {
   array<uint32>? output_sizes;
 };
 
+// Contains the attributes of gemm operator.
+struct GemmAttributes {
+  // The id of third input tensor.
+  uint64? c_operand_id;
+  // A float scalar multiplier for the first input.
+  float alpha = 1.0;
+  // A float scalar multiplier for the third input.
+  float beta = 1.0;
+  // True is to transpose the first input prior to calculating the output.
+  bool a_transpose = false;
+  // True is to transpose the second input prior to calculating the output.
+  bool b_transpose = false;
+};
+
 // Holds one of operator attributes.
 union OperatorAttributes {
+  GemmAttributes gemm;
   Pool2dAttributes pool2d;
 };
 
@@ -78,6 +93,7 @@ struct Operator {
     kDiv,
     kMax,
     kMin,
+    kGemm,
     kRelu,
     kReshape,
     kSoftmax,

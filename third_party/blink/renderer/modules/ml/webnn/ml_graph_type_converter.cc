@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_type_converter.h"
 
+#include "third_party/blink/renderer/bindings/modules/v8/v8_ml_gemm_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_pool_2d_options.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operand.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_operator.h"
@@ -149,6 +150,23 @@ uint64_t GetOperatorOutputId(const MLOperator* op,
   return operand_to_id_map.at(output);
 }
 
+webnn::mojom::blink::GemmAttributesPtr CreateGemmAttributes(
+    const OperandToIdMap& operand_to_id_map,
+    const blink::MLGemmOptions* options) {
+  if (!options) {
+    return nullptr;
+  }
+  auto attributes = webnn::mojom::blink::GemmAttributes::New();
+  if (options->hasC()) {
+    attributes->c_operand_id = operand_to_id_map.at(options->c());
+  }
+  attributes->alpha = options->alpha();
+  attributes->beta = options->beta();
+  attributes->a_transpose = options->aTranspose();
+  attributes->b_transpose = options->bTranspose();
+  return attributes;
+}
+
 OperatorPtr CreateElementWiseBinaryOperator(
     const OperandToIdMap& operand_to_id_map,
     const MLOperator* binary) {
@@ -184,6 +202,24 @@ OperatorPtr CreateElementWiseBinaryOperator(
   }
   operator_mojo->input_operands = {lhs_operand_id, rhs_operand_id};
   operator_mojo->output_operands = {output_operand_id};
+  return operator_mojo;
+}
+
+OperatorPtr CreateGemmOperator(const OperandToIdMap& operand_to_id_map,
+                               const MLOperator* gemm) {
+  const uint64_t a_operand_id = GetOperatorInputId(gemm, operand_to_id_map, 0);
+  const uint64_t b_operand_id = GetOperatorInputId(gemm, operand_to_id_map, 1);
+  const uint64_t output_operand_id =
+      GetOperatorOutputId(gemm, operand_to_id_map);
+
+  auto operator_mojo = webnn::mojom::blink::Operator::New();
+  operator_mojo->kind = Operator::Kind::kGemm;
+  operator_mojo->input_operands = {a_operand_id, b_operand_id};
+  operator_mojo->output_operands = {output_operand_id};
+  const auto* options = static_cast<const MLGemmOptions*>(gemm->Options());
+  CHECK(options);
+  operator_mojo->attributes = webnn::mojom::blink::OperatorAttributes::NewGemm(
+      CreateGemmAttributes(operand_to_id_map, options));
   return operator_mojo;
 }
 
@@ -268,6 +304,8 @@ OperatorPtr ConvertToMojoOperator(const OperandToIdMap& operand_to_id_map,
     case MLOperator::OperatorKind::kMin:
     case MLOperator::OperatorKind::kMax:
       return CreateElementWiseBinaryOperator(operand_to_id_map, op);
+    case MLOperator::OperatorKind::kGemm:
+      return CreateGemmOperator(operand_to_id_map, op);
     case MLOperator::OperatorKind::kRelu:
       return CreateReluOperator(operand_to_id_map, op);
     case MLOperator::OperatorKind::kReshape:
@@ -279,7 +317,6 @@ OperatorPtr ConvertToMojoOperator(const OperandToIdMap& operand_to_id_map,
       return CreatePool2dOperator(operand_to_id_map, op);
     case MLOperator::OperatorKind::kClamp:
     case MLOperator::OperatorKind::kConv2d:
-    case MLOperator::OperatorKind::kGemm:
     case MLOperator::OperatorKind::kHardSwish:
     case MLOperator::OperatorKind::kResample2d:
     case MLOperator::OperatorKind::kSigmoid:

@@ -11,6 +11,7 @@
 #include "components/ml/webnn/graph_validation_utils.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "mojo/public/cpp/bindings/type_converter.h"
+#include "third_party/abseil-cpp/absl/types/optional.h"
 
 namespace mojo {
 
@@ -128,6 +129,33 @@ size_t GetBytesPerElement(mojom::Operand::DataType operand_type) {
   NOTREACHED();
 }
 
+absl::optional<webnn::GemmAttributes> ConvertToGemmAttributes(
+    const IdToOperandMap& id_to_operand_map,
+    const webnn::mojom::OperatorAttributesPtr& attributes) {
+  auto& mojo_attributes = attributes->get_gemm();
+  if (!mojo_attributes) {
+    // The attributes of gemm were not configured.
+    return absl::nullopt;
+  }
+  webnn::GemmAttributes component_attributes;
+  auto& c_operand_id = mojo_attributes->c_operand_id;
+  if (c_operand_id) {
+    if (!id_to_operand_map.contains(c_operand_id.value())) {
+      // Invalid the third operand.
+      return absl::nullopt;
+    }
+    const mojom::OperandPtr& c_operand =
+        id_to_operand_map.at(c_operand_id.value());
+    component_attributes.c_operand =
+        mojo::ConvertTo<webnn::Operand>(c_operand.get());
+  }
+  component_attributes.alpha = mojo_attributes->alpha;
+  component_attributes.beta = mojo_attributes->beta;
+  component_attributes.a_transpose = mojo_attributes->a_transpose;
+  component_attributes.b_transpose = mojo_attributes->b_transpose;
+  return component_attributes;
+}
+
 bool ValidateInputOperand(const IdToOperandMap& id_to_operand_map,
                           uint64_t input_id) {
   if (!id_to_operand_map.contains(input_id)) {
@@ -208,6 +236,33 @@ bool ValidateElementWiseBinary(const IdToOperandMap& id_to_operand_map,
     // The output shapes are not expected.
     return false;
   }
+  return true;
+}
+
+bool ValidateGemm(const IdToOperandMap& id_to_operand_map,
+                  const mojom::OperatorPtr& operation) {
+  auto* a = GetMojoOperand(id_to_operand_map, operation->input_operands, 0);
+  auto* b = GetMojoOperand(id_to_operand_map, operation->input_operands, 1);
+  auto* output = GetMojoOperand(id_to_operand_map, operation->output_operands);
+  if (!a || !b || !output || !operation->attributes) {
+    // The gemm operator is invalid.
+    return false;
+  }
+  auto component_attributes =
+      ConvertToGemmAttributes(id_to_operand_map, operation->attributes);
+  if (!component_attributes) {
+    return false;
+  }
+  auto validated_output = ValidateGemm(mojo::ConvertTo<webnn::Operand>(a),
+                                       mojo::ConvertTo<webnn::Operand>(b),
+                                       std::move(component_attributes.value()));
+  if (!validated_output.has_value()) {
+    return false;
+  }
+  if (validated_output != mojo::ConvertTo<webnn::Operand>(output)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -312,6 +367,8 @@ bool ValidateOperator(const IdToOperandMap& id_to_operand_map,
     case mojom::Operator::Kind::kMax:
     case mojom::Operator::Kind::kMin:
       return ValidateElementWiseBinary(id_to_operand_map, operation);
+    case mojom::Operator::Kind::kGemm:
+      return ValidateGemm(id_to_operand_map, operation);
     case mojom::Operator::Kind::kRelu:
       return ValidateRelu(id_to_operand_map, operation);
     case mojom::Operator::Kind::kReshape:

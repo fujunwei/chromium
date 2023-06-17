@@ -92,6 +92,29 @@ struct Pool2dAttributes {
   absl::optional<std::vector<uint32_t>> output_sizes;
 };
 
+// Contains the attributes of gemm operator.
+struct GemmAttributes {
+  GemmAttributes();
+  ~GemmAttributes();
+
+  GemmAttributes(GemmAttributes&& other);
+  GemmAttributes& operator=(GemmAttributes&& other);
+
+  GemmAttributes(const GemmAttributes&) = delete;
+  GemmAttributes& operator=(const GemmAttributes&) = delete;
+
+  // The id of third input tensor.
+  absl::optional<Operand> c_operand;
+  // A float scalar multiplier for the first input
+  float alpha = 1.0;
+  // A float scalar multiplier for the third input
+  float beta = 1.0;
+  // True is to transpose the first input prior to calculating the output.
+  bool a_transpose = false;
+  // True is to transpose the second input prior to calculating the output.
+  bool b_transpose = false;
+};
+
 // Validate softmax operator defined in WebIDL here
 // https://www.w3.org/TR/webnn/#api-mlgraphbuilder-softmax
 base::expected<Operand, std::string> ValidateSoftmax(Operand input);
@@ -101,6 +124,12 @@ base::expected<Operand, std::string> ValidateSoftmax(Operand input);
 base::expected<Operand, std::string> ValidatePool2d(
     Operand input,
     Pool2dAttributes attributes);
+
+// Validate gemm operator defined in WebIDL here
+// https://www.w3.org/TR/webnn/#api-mlgraphbuilder-gemm
+base::expected<Operand, std::string> ValidateGemm(Operand a,
+                                                  Operand b,
+                                                  GemmAttributes attributes);
 
 base::expected<size_t, std::string> ValidateAndCalculateElementsNumber(
     base::span<const uint32_t> dimensions);
