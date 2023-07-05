@@ -10,7 +10,6 @@
 
 #include "base/types/expected.h"
 #include "components/ml/webnn/graph_validation_utils.h"
-#include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
 
 #if BUILDFLAG(IS_WIN)
@@ -427,7 +426,48 @@ bool ValidateOperator(const IdToOperandMap& id_to_operand_map,
 
 }  // namespace
 
-WebNNGraphImpl::WebNNGraphImpl() = default;
+WebNNGraphImpl::ComputeBufferValidator::ComputeBufferValidator(
+    const mojom::GraphInfoPtr& graph_info) {
+  // Calculate the byte length of inputs for validating before computing.
+  for (auto& input_id : graph_info->input_operands) {
+    const mojom::OperandPtr& operand =
+        graph_info->id_to_operand_map.at(input_id);
+    // The `operand` is valid and the byte length of it was already verified in
+    // `ValidateGraphInfo` function.
+    CHECK(operand);
+    auto byte_length = ValidateAndCalculateByteLength(
+        GetBytesPerElement(operand->data_type), operand->dimensions);
+    CHECK(byte_length.has_value());
+    input_byte_length_map[operand->name.value()] = byte_length.value();
+  }
+}
+
+WebNNGraphImpl::ComputeBufferValidator::~ComputeBufferValidator() = default;
+
+bool WebNNGraphImpl::ComputeBufferValidator::Validate(
+    const base::flat_map<std::string, mojo_base::BigBuffer>& inputs) {
+  if (inputs.size() != input_byte_length_map.size()) {
+    // The size of inputs is not expected.
+    return false;
+  }
+  for (auto& [name, big_buffer] : inputs) {
+    auto input_buffer_iter = input_byte_length_map.find(name);
+    if (input_buffer_iter == input_byte_length_map.end()) {
+      // There is no the input tensor with the name.
+      return false;
+    }
+    if (big_buffer.size() != input_buffer_iter->second) {
+      // The byte length of input doesn't match the expected.
+      return false;
+    }
+  }
+
+  return true;
+}
+
+WebNNGraphImpl::WebNNGraphImpl(
+    std::unique_ptr<ComputeBufferValidator> compute_buffer_validator)
+    : compute_buffer_validator_(std::move(compute_buffer_validator)) {}
 
 WebNNGraphImpl::~WebNNGraphImpl() = default;
 
@@ -473,6 +513,19 @@ bool WebNNGraphImpl::ValidateGraph(const mojom::GraphInfoPtr& graph_info) {
   }
 
   return true;
+}
+
+void WebNNGraphImpl::Compute(
+    base::flat_map<std::string, mojo_base::BigBuffer> named_inputs,
+    mojom::WebNNGraph::ComputeCallback callback) {
+  if (!compute_buffer_validator_->Validate(named_inputs)) {
+    std::move(callback).Run(mojom::ComputeResult::kInvalidInputs,
+                            absl::nullopt);
+    return;
+  }
+
+  // Call ComputeImpl() implemented by an `mojom::WebNNGraph` backend.
+  ComputeImpl(std::move(named_inputs), std::move(callback));
 }
 
 }  // namespace webnn
