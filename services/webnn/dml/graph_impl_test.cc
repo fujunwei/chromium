@@ -70,9 +70,9 @@ TEST_F(WebNNGraphDMLImplTest, BuildSingleOperatorRelu) {
   // Build the mojom graph info.
   GraphInfoBuilder builder;
   uint64_t input_operand_id = builder.BuildInput(
-      "input", {1, 2, 3, 4}, mojom::Operand::DataType::kFloat32);
+      "input", {2, 2}, mojom::Operand::DataType::kFloat32);
   uint64_t output_operand_id = builder.BuildOutput(
-      "output", {1, 2, 3, 4}, mojom::Operand::DataType::kFloat32);
+      "output", {2, 2}, mojom::Operand::DataType::kFloat32);
   builder.BuildOperator(mojom::Operator::Kind::kRelu, {input_operand_id},
                         {output_operand_id});
   EXPECT_TRUE(CreateAndBuildGraph(builder.GetGraphInfo()));
@@ -216,11 +216,11 @@ TEST_F(WebNNGraphDMLImplTest, BuildSingleOperatorGemm) {
   // Build the mojom graph info.
   GraphInfoBuilder builder;
   uint64_t input_a_operand_id =
-      builder.BuildInput("input_a", {2, 2}, mojom::Operand::DataType::kFloat32);
+      builder.BuildInput("input_a", {1, 1, 2, 2}, mojom::Operand::DataType::kFloat32);
   uint64_t input_b_operand_id =
-      builder.BuildInput("input_b", {2, 2}, mojom::Operand::DataType::kFloat32);
+      builder.BuildInput("input_b", {1, 1, 2, 2}, mojom::Operand::DataType::kFloat32);
   uint64_t output_operand_id =
-      builder.BuildOutput("output", {2, 2}, mojom::Operand::DataType::kFloat32);
+      builder.BuildOutput("output", {1, 1, 2, 2}, mojom::Operand::DataType::kFloat32);
   mojom::GemmAttributesPtr attributes = mojom::GemmAttributes::New();
   builder.BuildOperator(
       mojom::Operator::Kind::kGemm, {input_a_operand_id, input_b_operand_id},

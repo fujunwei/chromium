@@ -984,4 +984,39 @@ TEST_F(WebNNGraphImplTest, ValidateInputsTest) {
   }
 }
 
+struct ConstantOperandTester {
+  std::vector<uint8_t> values;
+  bool expected;
+
+  void Test() {
+    const std::vector<uint32_t> dimensions = {3, 5};
+    // Build the graph with mojo type.
+    GraphInfoBuilder builder;
+    uint64_t lhs_operand_id =
+        builder.BuildInput("lhs", dimensions, mojom::Operand::DataType::kUint8);
+    uint64_t rhs_operand_id = builder.BuildConstant(
+        dimensions, mojom::Operand::DataType::kUint8, values);
+    uint64_t output_operand_id = builder.BuildOutput(
+        "output", dimensions, mojom::Operand::DataType::kUint8);
+    builder.BuildOperator(mojom::Operator::Kind::kAdd,
+                          {lhs_operand_id, rhs_operand_id},
+                          {output_operand_id});
+    EXPECT_EQ(WebNNGraphImpl::ValidateGraph(builder.GetGraphInfo()), expected);
+  }
+};
+
+TEST_F(WebNNGraphImplTest, ValidateConstantOperandTest) {
+  {
+    // Test valid constant data.
+    ConstantOperandTester{.values = std::vector<uint8_t>(15), .expected = true}
+        .Test();
+  }
+  {
+    // Test the invalid graph for the byte length of constant data doesn't match
+    // the graph's expected.
+    ConstantOperandTester{.values = std::vector<uint8_t>(10), .expected = false}
+        .Test();
+  }
+}
+
 }  // namespace webnn

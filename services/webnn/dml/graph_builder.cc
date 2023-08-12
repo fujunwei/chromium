@@ -102,11 +102,12 @@ ComPtr<IDMLCompiledOperator> GraphBuilder::Compile(
   ComPtr<IDMLCompiledOperator> compiled_operator;
   // If there is only one operator node in the graph, just compile the operator
   // and return the compiled operator.
-  if (dml_operators_.size() == 1) {
-    RETURN_NULL_IF_FAILED(dml_device_->CompileOperator(
-        dml_operators_[0].Get(), flags, IID_PPV_ARGS(&compiled_operator)));
-    return compiled_operator;
-  }
+  // if (dml_operators_.size() == 1) {
+  //   RETURN_NULL_IF_FAILED(dml_device_->CompileOperator(
+  //       dml_operators_[0].Get(), flags, IID_PPV_ARGS(&compiled_operator)));
+  //   LOG(ERROR) << "=========CompileOperator";
+  //   return compiled_operator;
+  // }
 
   // Create output edges with node outputs.
   size_t outputs_count = node_output_infos.size();

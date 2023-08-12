@@ -155,15 +155,21 @@ absl::optional<webnn::GemmAttributes> ConvertToGemmAttributes(
   return component_attributes;
 }
 
-bool ValidateInputOperand(const IdToOperandMap& id_to_operand_map,
-                          uint64_t input_id) {
-  if (!id_to_operand_map.contains(input_id)) {
+// Combine the validation of inputs and outputs into this function because there
+// are the same steps. The `operand_kind` arguments specify this function is
+// used for input or output of graph.
+bool ValidateOperand(mojom::Operand::Kind operand_kind,
+                     const IdToOperandMap& id_to_operand_map,
+                     uint64_t operand_id) {
+  CHECK(operand_kind == mojom::Operand::Kind::kInput ||
+        operand_kind == mojom::Operand::Kind::kOutput);
+  if (!id_to_operand_map.contains(operand_id)) {
     // Invalid input operand.
     return false;
   }
 
-  const mojom::OperandPtr& operand = id_to_operand_map.at(input_id);
-  if (operand->kind != mojom::Operand::Kind::kInput) {
+  const mojom::OperandPtr& operand = id_to_operand_map.at(operand_id);
+  if (operand->kind != operand_kind) {
     // Invalid input kind.
     return false;
   }
@@ -173,26 +179,44 @@ bool ValidateInputOperand(const IdToOperandMap& id_to_operand_map,
     return false;
   }
 
+  base::expected<size_t, std::string> byte_length =
+      ValidateAndCalculateByteLength(GetBytesPerElement(operand->data_type),
+                                     operand->dimensions);
+  if (!byte_length.has_value()) {
+    return false;
+  }
+
   return true;
 }
 
-bool ValidateOutputOperand(const IdToOperandMap& id_to_operand_map,
-                           uint64_t output_id) {
-  if (!id_to_operand_map.contains(output_id)) {
-    // Invalid output operand.
+bool ValidateConstantOperand(const IdToOperandMap& id_to_operand_map,
+                             uint64_t constant_id,
+                             const mojo_base::BigBuffer& constant_buffer) {
+  if (!id_to_operand_map.contains(constant_id)) {
+    // Invalid constant operand.
     return false;
   }
 
-  const mojom::OperandPtr& operand = id_to_operand_map.at(output_id);
-  if (operand->kind != mojom::Operand::Kind::kOutput) {
-    // Invalid output kind.
+  const mojom::OperandPtr& operand = id_to_operand_map.at(constant_id);
+  if (operand->kind != mojom::Operand::Kind::kConstant) {
+    // Invalid constant kind.
     return false;
   }
-  absl::optional<std::string>& name = operand->name;
-  if (name && name.value().empty()) {
-    // The name of output operand is empty.
+  if (operand->name) {
+    // The name of constant operand should be empty.
     return false;
   }
+
+  auto byte_length = ValidateAndCalculateByteLength(
+      GetBytesPerElement(operand->data_type), operand->dimensions);
+  if (!byte_length.has_value()) {
+    return false;
+  }
+  if (constant_buffer.size() != byte_length.value()) {
+    // Invalid constant buffer.
+    return false;
+  }
+
   return true;
 }
 
@@ -458,21 +482,29 @@ bool WebNNGraphImpl::ValidateGraph(const mojom::GraphInfoPtr& graph_info) {
     return false;
   }
 
-  // Validate all operands in the graph for the dimensions and the byte length
-  // of operand that can't be out of range.
-  for (auto& [_, operand] : graph_info->id_to_operand_map) {
-    base::expected<size_t, std::string> byte_length =
-        ValidateAndCalculateByteLength(GetBytesPerElement(operand->data_type),
-                                       operand->dimensions);
-    if (!byte_length.has_value()) {
+  // Validate the input operands of graph for the name that can't be empty, and
+  // the kind of operand must be `kInput`.
+  for (auto& input_id : graph_info->input_operands) {
+    if (!ValidateOperand(mojom::Operand::Kind::kInput,
+                         graph_info->id_to_operand_map, input_id)) {
       return false;
     }
   }
 
-  // Validate the input operands of graph for the name that can't be empty, and
-  // the kind of operand must be `kInput`.
-  for (auto& input_id : graph_info->input_operands) {
-    if (!ValidateInputOperand(graph_info->id_to_operand_map, input_id)) {
+  // Validate the constant weight data are valid.
+  for (auto& [constant_id, constant_buffer] :
+       graph_info->constant_id_to_buffer_map) {
+    if (!ValidateConstantOperand(graph_info->id_to_operand_map, constant_id,
+                                 constant_buffer)) {
+      return false;
+    }
+  }
+  
+  // Validate the output operands in the entire graph for the name that can't be
+  // empty, and the kind of operand must be `kOutput`.
+  for (auto& output_id : graph_info->output_operands) {
+    if (!ValidateOperand(mojom::Operand::Kind::kOutput,
+                         graph_info->id_to_operand_map, output_id)) {
       return false;
     }
   }
@@ -480,14 +512,6 @@ bool WebNNGraphImpl::ValidateGraph(const mojom::GraphInfoPtr& graph_info) {
   // Validate the operators which are sorted in the topological order.
   for (auto& operation : graph_info->operators) {
     if (!ValidateOperator(graph_info->id_to_operand_map, operation)) {
-      return false;
-    }
-  }
-
-  // Validate the output operands in the entire graph for the name that can't be
-  // empty, and the kind of operand must be `kOutput`.
-  for (auto& output_id : graph_info->output_operands) {
-    if (!ValidateOutputOperand(graph_info->id_to_operand_map, output_id)) {
       return false;
     }
   }

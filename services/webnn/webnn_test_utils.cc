@@ -37,6 +37,17 @@ uint64_t GraphInfoBuilder::BuildInput(const std::string& name,
   return operand_id;
 }
 
+uint64_t GraphInfoBuilder::BuildConstant(
+    const std::vector<uint32_t>& dimensions,
+    mojom::Operand::DataType type,
+    const std::vector<uint8_t>& values) {
+  uint64_t operand_id =
+      BuildOperand(dimensions, type, mojom::Operand::Kind::kConstant);
+  graph_info_->constant_id_to_buffer_map[operand_id] =
+      mojo_base::BigBuffer(values);
+  return operand_id;
+}
+
 uint64_t GraphInfoBuilder::BuildOutput(const std::string& name,
                                        const std::vector<uint32_t>& dimensions,
                                        mojom::Operand::DataType type) {
@@ -61,7 +72,22 @@ void GraphInfoBuilder::BuildOperator(
 
 mojom::GraphInfoPtr GraphInfoBuilder::CloneGraphInfo() const {
   CHECK_IS_TEST();
-  return graph_info_.Clone();
+  mojom::GraphInfoPtr cloned_graph_info = mojom::GraphInfo::New();
+  for (auto& [operand_id, operand_info] : graph_info_->id_to_operand_map) {
+    cloned_graph_info->id_to_operand_map[operand_id] = operand_info.Clone();
+  }
+  cloned_graph_info->input_operands = graph_info_->input_operands;
+  cloned_graph_info->output_operands = graph_info_->output_operands;
+  cloned_graph_info->operators.reserve(graph_info_->operators.size());
+  for (auto& operation : graph_info_->operators) {
+    cloned_graph_info->operators.push_back(operation.Clone());
+  }
+  for (auto& [constant_id, constant_buffer] :
+       graph_info_->constant_id_to_buffer_map) {
+    cloned_graph_info->constant_id_to_buffer_map[constant_id] =
+        mojo_base::BigBuffer(constant_buffer.byte_span());
+  }
+  return cloned_graph_info;
 }
 
 }  // namespace webnn
