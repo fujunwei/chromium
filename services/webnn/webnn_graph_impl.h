@@ -18,9 +18,9 @@ namespace webnn {
 class WebNNGraphImpl : public mojom::WebNNGraph {
  public:
   // The members of `ComputeBufferValidator ` are used to validate the inputs
-  // and outputs of an WebNNGraph execution. The input name and byte length of
-  // computation must match graph's expectation, and the output name and byte
-  // length are used to create the result of computation.
+  // of a graph execution. The input name and byte length of computation must
+  // match graph's expectation, and the output name and byte length are used to
+  // create the result of computation.
   class ComputeBufferValidator {
    public:
     explicit ComputeBufferValidator(const mojom::GraphInfoPtr& graph_info);
@@ -50,7 +50,7 @@ class WebNNGraphImpl : public mojom::WebNNGraph {
   static bool ValidateGraph(const mojom::GraphInfoPtr& graph_info);
 
  private:
-  // The validator is to make sure the inputs from a compute call matche the
+  // The validator is to make sure the inputs from a compute call match the
   // built graph's expected.
   std::unique_ptr<ComputeBufferValidator> compute_buffer_validator_;
 

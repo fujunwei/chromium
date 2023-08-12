@@ -67,6 +67,7 @@ class GraphImpl final : public WebNNGraphImpl {
   static void OnCompilationComplete(
       mojom::WebNNContext::CreateGraphCallback callback,
       std::unique_ptr<CommandRecorder> command_recorder,
+      std::unique_ptr<ComputeBufferValidator> compute_buffer_validator,
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_operator);
 
   // Create the GraphImpl instance and bind it to the mojom::WebNNGraph

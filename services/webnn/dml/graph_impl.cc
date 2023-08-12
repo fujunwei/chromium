@@ -269,6 +269,7 @@ ComPtr<IDMLCompiledOperator> GraphImpl::CompileOnBackgroundThread(
 void GraphImpl::OnCompilationComplete(
     mojom::WebNNContext::CreateGraphCallback callback,
     std::unique_ptr<CommandRecorder> command_recorder,
+    std::unique_ptr<ComputeBufferValidator> compute_buffer_validator,
     ComPtr<IDMLCompiledOperator> compiled_operator) {
   if (!compiled_operator) {
     DLOG(ERROR) << "Failed to compile the graph.";
@@ -347,8 +348,7 @@ void GraphImpl::OnCompilationComplete(
   hr = command_queue->WaitAsync(base::BindOnce(
       &GraphImpl::OnInitializationComplete, std::move(command_recorder),
       std::move(persistent_buffer), std::move(compiled_operator),
-      std::make_unique<ComputeBufferValidator>(graph_info),
-      std::move(callback)));
+      std::move(compute_buffer_validator), std::move(callback)));
   if (FAILED(hr)) {
     DLOG(ERROR) << "Failed to wait the initialization completed: "
                 << logging::SystemErrorCodeToString(hr);
@@ -481,7 +481,8 @@ void GraphImpl::CreateAndBuild(
       base::BindOnce(&GraphImpl::CompileOnBackgroundThread,
                      std::move(graph_outputs), std::move(graph_builder)),
       base::BindOnce(&GraphImpl::OnCompilationComplete, std::move(callback),
-                     std::move(command_recorder)));
+                     std::move(command_recorder),
+                     std::make_unique<ComputeBufferValidator>(graph_info)));
 }
 
 void GraphImpl::ComputeImpl(

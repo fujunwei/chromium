@@ -184,12 +184,12 @@ void MLGraphMojo::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
   }
   remote_graph_->Compute(
       std::move(name_to_buffer_map),
-      WTF::BindOnce(&MLGraphMojo::OnComputeGraph, WrapPersistent(this),
+      WTF::BindOnce(&MLGraphMojo::OnComputeAsyncComplete, WrapPersistent(this),
                     WrapPersistent(resolver), std::move(inputs_info),
                     std::move(outputs_info)));
 }
 
-void MLGraphMojo::OnComputeGraph(
+void MLGraphMojo::OnComputeAsyncComplete(
     ScriptPromiseResolver* resolver,
     std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>> inputs_info,
     std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>>

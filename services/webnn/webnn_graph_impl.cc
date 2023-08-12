@@ -433,7 +433,7 @@ WebNNGraphImpl::ComputeBufferValidator::ComputeBufferValidator(
     const mojom::OperandPtr& operand =
         graph_info->id_to_operand_map.at(input_id);
     // The `operand` is valid and the byte length of it was already verified in
-    // `ValidateGraphInfo` function.
+    // `ValidateGraph` function.
     CHECK(operand);
     auto byte_length = ValidateAndCalculateByteLength(
         GetBytesPerElement(operand->data_type), operand->dimensions);

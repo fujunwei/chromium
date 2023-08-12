@@ -50,7 +50,7 @@ class MODULES_EXPORT MLGraphMojo final : public MLGraph {
                         ExceptionState& exception_state) override;
   // The callback of computing `WebNNGraph` by calling hardware accelerated OS
   // machine learning APIs.
-  void OnComputeGraph(
+  void OnComputeAsyncComplete(
       ScriptPromiseResolver* resolver,
       std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>>
           inputs_info,
