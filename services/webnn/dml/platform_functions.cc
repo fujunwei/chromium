@@ -32,9 +32,12 @@ PlatformFunctions::PlatformFunctions() {
     return;
   }
 
+  LOG(ERROR) << "==================";
   // DirectML
-  base::ScopedNativeLibrary dml_library(
-      std::move(base::LoadSystemLibrary(L"directml.dll")));
+  base::ScopedNativeLibrary dml_library(std::move(base::LoadNativeLibrary(
+      base::FilePath(L"D:\\upstream\\chromium\\src\\out\\upstream_bots_"
+                     L"debug\\directml.dll"),
+      nullptr)));
   if (!dml_library.is_valid()) {
     DLOG(ERROR) << "Failed to load directml.dll.";
     return;
