@@ -609,7 +609,7 @@ void GraphImpl::OnInitializationComplete(
   mojo::MakeSelfOwnedReceiver<mojom::WebNNGraph>(
       base::WrapUnique(new GraphImpl(
           std::move(command_recorder), std::move(persistent_buffer),
-          compiled_operator, std::move(compute_buffer_validator))),
+          std::move(compiled_operator), std::move(compute_buffer_validator))),
       blink_remote.InitWithNewPipeAndPassReceiver());
   command_queue->ReleaseCompletedResources();
   std::move(callback).Run(std::move(blink_remote));
@@ -722,19 +722,6 @@ void GraphImpl::CreateAndBuild(
       base::BindOnce(&GraphImpl::OnCompilationComplete, std::move(callback),
                      std::move(command_recorder),
                      std::make_unique<ComputeBufferValidator>(graph_info)));
-
-  // ComPtr<IDMLCompiledOperator> compiled_operator = 
-  // graph_builder.Compile(graph_outputs, DML_EXECUTION_FLAG_NONE);
-
-  // command_recorder->Open();
-  // Relu operator initializer deson't need to bind any input and persistent
-  // resources.
-  // command_recorder->InitializeOperator(
-  //     compiled_operator.Get(), absl::nullopt, absl::nullopt);
-  // command_recorder->CloseAndExecute();
-  // command_recorder->GetCommandQueue()->WaitSyncForTesting();
-
-  
 }
 
 void GraphImpl::ComputeImpl(
