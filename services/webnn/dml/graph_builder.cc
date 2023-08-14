@@ -105,6 +105,7 @@ ComPtr<IDMLCompiledOperator> GraphBuilder::Compile(
   if (dml_operators_.size() == 1) {
     RETURN_NULL_IF_FAILED(dml_device_->CompileOperator(
         dml_operators_[0].Get(), flags, IID_PPV_ARGS(&compiled_operator)));
+    LOG(ERROR) << "=========CompileOperator";
     return compiled_operator;
   }
 
