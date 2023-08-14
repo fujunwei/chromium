@@ -4,6 +4,7 @@
 
 #include "services/webnn/dml/graph_impl.h"
 
+#include "base/bits.h"
 #include "base/check.h"
 #include "base/containers/flat_map.h"
 #include "base/memory/ptr_util.h"
@@ -488,7 +489,7 @@ void GraphImpl::CreateAndBuild(
 void GraphImpl::ComputeImpl(
     base::flat_map<std::string, mojo_base::BigBuffer> named_inputs,
     mojom::WebNNGraph::ComputeCallback callback) {
-  // Copy all array buffers of inputs to an _UPLOAD heap and create a committed
+  // Copy all array buffers of inputs to an upload heap and create a committed
   // resource which is mapped to the heap.
   //
   // Calculate the total byte length of inputs array buffer to create an upload
@@ -503,8 +504,8 @@ void GraphImpl::ComputeImpl(
     // The buffer has a minimum base address alignment requirement of 16 bytes
     // in the macro `DML_MINIMUM_BUFFER_TENSOR_ALIGNMENT`:
     // https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-directml-constants
-    total_byte_length +=
-        (base::MakeCheckedNum<size_t>(input_buffer.size()) + 15) & ~15ull;
+    total_byte_length += base::bits::AlignUp<size_t>(
+        input_buffer.size(), DML_MINIMUM_BUFFER_TENSOR_ALIGNMENT);
     if (!total_byte_length.IsValid()) {
       DLOG(ERROR) << "Failed to calculate the total byte length of inputs.";
       std::move(callback).Run(mojom::ComputeResult::kUnknownError,
