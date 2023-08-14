@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/ranges/algorithm.h"
 #include "base/types/expected.h"
 #include "components/ml/webnn/graph_validation_utils.h"
 #include "third_party/abseil-cpp/absl/types/optional.h"
@@ -426,7 +427,7 @@ bool ValidateOperator(const IdToOperandMap& id_to_operand_map,
 
 }  // namespace
 
-WebNNGraphImpl::ComputeBufferValidator::ComputeBufferValidator(
+WebNNGraphImpl::ComputeResourceValidator::ComputeResourceValidator(
     const mojom::GraphInfoPtr& graph_info) {
   // Calculate the byte length of inputs for validating before computing.
   for (auto& input_id : graph_info->input_operands) {
@@ -438,35 +439,14 @@ WebNNGraphImpl::ComputeBufferValidator::ComputeBufferValidator(
     auto byte_length = ValidateAndCalculateByteLength(
         GetBytesPerElement(operand->data_type), operand->dimensions);
     CHECK(byte_length.has_value());
-    input_byte_length_map[operand->name.value()] = byte_length.value();
+    input_name_to_byte_length_map[operand->name.value()] = byte_length.value();
   }
 }
 
-WebNNGraphImpl::ComputeBufferValidator::~ComputeBufferValidator() = default;
-
-bool WebNNGraphImpl::ComputeBufferValidator::Validate(
-    const base::flat_map<std::string, mojo_base::BigBuffer>& inputs) {
-  if (inputs.size() != input_byte_length_map.size()) {
-    // The size of inputs is not expected.
-    return false;
-  }
-  for (auto& [name, big_buffer] : inputs) {
-    auto input_buffer_iter = input_byte_length_map.find(name);
-    if (input_buffer_iter == input_byte_length_map.end()) {
-      // There is no the input tensor with the name.
-      return false;
-    }
-    if (big_buffer.size() != input_buffer_iter->second) {
-      // The byte length of input doesn't match the expected.
-      return false;
-    }
-  }
-
-  return true;
-}
+WebNNGraphImpl::ComputeResourceValidator::~ComputeResourceValidator() = default;
 
 WebNNGraphImpl::WebNNGraphImpl(
-    std::unique_ptr<ComputeBufferValidator> compute_buffer_validator)
+    std::unique_ptr<ComputeResourceValidator> compute_buffer_validator)
     : compute_buffer_validator_(std::move(compute_buffer_validator)) {}
 
 WebNNGraphImpl::~WebNNGraphImpl() = default;
@@ -518,7 +498,16 @@ bool WebNNGraphImpl::ValidateGraph(const mojom::GraphInfoPtr& graph_info) {
 void WebNNGraphImpl::Compute(
     base::flat_map<std::string, mojo_base::BigBuffer> named_inputs,
     mojom::WebNNGraph::ComputeCallback callback) {
-  if (!compute_buffer_validator_->Validate(named_inputs)) {
+  // Validate the inputs for computation match the built graph's expected.
+  if (!base::ranges::equal(
+          named_inputs,
+          compute_buffer_validator_->input_name_to_byte_length_map,
+          [](const auto& iter_a, const auto& iter_b) {
+            // Compare the input name with the key of map and the byte length of
+            // buffer with value of map.
+            return iter_a.first == iter_b.first &&
+                   iter_a.second.size() == iter_b.second;
+          })) {
     std::move(callback).Run(mojom::ComputeResult::kInvalidInputs,
                             absl::nullopt);
     return;

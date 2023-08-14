@@ -17,31 +17,26 @@ namespace webnn {
 
 class WebNNGraphImpl : public mojom::WebNNGraph {
  public:
-  // The members of `ComputeBufferValidator` are used to validate the inputs
+  // The members of `ComputeResourceValidator` are used to validate the inputs
   // of a graph execution. The input name and byte length of computation must
   // match graph's expectation, the output name and byte length are used to
   // create the result of computation.
-  class ComputeBufferValidator {
+  struct ComputeResourceValidator {
    public:
-    explicit ComputeBufferValidator(const mojom::GraphInfoPtr& graph_info);
-    ~ComputeBufferValidator();
+    explicit ComputeResourceValidator(const mojom::GraphInfoPtr& graph_info);
+    ~ComputeResourceValidator();
 
-    ComputeBufferValidator(const ComputeBufferValidator&) = delete;
-    ComputeBufferValidator& operator=(const ComputeBufferValidator&) = delete;
+    ComputeResourceValidator(const ComputeResourceValidator&) = delete;
+    ComputeResourceValidator& operator=(const ComputeResourceValidator&) =
+        delete;
 
-    // Validate the built graph's expected input matches what we received from a
-    // compute call.
-    bool Validate(
-        const base::flat_map<std::string, mojo_base::BigBuffer>& inputs);
-
-   private:
-    std::map<std::string, size_t> input_byte_length_map;
+    base::flat_map<std::string, size_t> input_name_to_byte_length_map;
     // TODO(crbug.com/1455278): Add output information.
-    // std::map<std::string, size_t> output_byte_length_map_;
+    // base::flat_map<std::string, size_t> output_name_to_byte_length_map;
   };
 
   explicit WebNNGraphImpl(
-      std::unique_ptr<ComputeBufferValidator> compute_buffer_validator);
+      std::unique_ptr<ComputeResourceValidator> compute_buffer_validator);
   WebNNGraphImpl(const WebNNGraphImpl&) = delete;
   WebNNGraphImpl& operator=(const WebNNGraphImpl&) = delete;
   ~WebNNGraphImpl() override;
@@ -52,7 +47,7 @@ class WebNNGraphImpl : public mojom::WebNNGraph {
  private:
   // The validator is to make sure the inputs from a compute call match the
   // built graph's expected.
-  std::unique_ptr<ComputeBufferValidator> compute_buffer_validator_;
+  std::unique_ptr<ComputeResourceValidator> compute_buffer_validator_;
 
   // mojom::WebNNGraph
   void Compute(base::flat_map<std::string, mojo_base::BigBuffer> named_inputs,

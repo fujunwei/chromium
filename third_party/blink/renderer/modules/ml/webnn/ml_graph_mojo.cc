@@ -154,8 +154,8 @@ void MLGraphMojo::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
                                    const MLNamedArrayBufferViews& outputs,
                                    ScriptPromiseResolver* resolver,
                                    ExceptionState& exception_state) {
-  // Transfer the `MLNamedArrayBufferViews` to `NamedArrayBufferViewsInfo` which
-  // is safe to compute asynchronously.
+  // TransferNamedArrayBufferViews deteches input and output array buffers, so
+  // JavaScript can't modify them during Compute().
   auto inputs_info = TransferNamedArrayBufferViews(
       resolver->GetScriptState()->GetIsolate(), inputs, exception_state);
   if (!inputs_info) {
@@ -184,12 +184,12 @@ void MLGraphMojo::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
   }
   remote_graph_->Compute(
       std::move(name_to_buffer_map),
-      WTF::BindOnce(&MLGraphMojo::OnComputeAsyncComplete, WrapPersistent(this),
+      WTF::BindOnce(&MLGraphMojo::OnDidCompute, WrapPersistent(this),
                     WrapPersistent(resolver), std::move(inputs_info),
                     std::move(outputs_info)));
 }
 
-void MLGraphMojo::OnComputeAsyncComplete(
+void MLGraphMojo::OnDidCompute(
     ScriptPromiseResolver* resolver,
     std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>> inputs_info,
     std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>>

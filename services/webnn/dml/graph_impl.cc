@@ -250,7 +250,7 @@ GraphImpl::GraphImpl(
     std::unique_ptr<CommandRecorder> command_recorder,
     ComPtr<ID3D12Resource> persistent_buffer,
     ComPtr<IDMLCompiledOperator> compiled_operator,
-    std::unique_ptr<ComputeBufferValidator> compute_buffer_validator)
+    std::unique_ptr<ComputeResourceValidator> compute_buffer_validator)
     : WebNNGraphImpl(std::move(compute_buffer_validator)),
       persistent_buffer_(std::move(persistent_buffer)),
       command_recorder_(std::move(command_recorder)),
@@ -270,7 +270,7 @@ ComPtr<IDMLCompiledOperator> GraphImpl::CompileOnBackgroundThread(
 void GraphImpl::OnCompilationComplete(
     mojom::WebNNContext::CreateGraphCallback callback,
     std::unique_ptr<CommandRecorder> command_recorder,
-    std::unique_ptr<ComputeBufferValidator> compute_buffer_validator,
+    std::unique_ptr<ComputeResourceValidator> compute_buffer_validator,
     ComPtr<IDMLCompiledOperator> compiled_operator) {
   if (!compiled_operator) {
     DLOG(ERROR) << "Failed to compile the graph.";
@@ -362,7 +362,7 @@ void GraphImpl::OnInitializationComplete(
     std::unique_ptr<CommandRecorder> command_recorder,
     ComPtr<ID3D12Resource> persistent_buffer,
     ComPtr<IDMLCompiledOperator> compiled_operator,
-    std::unique_ptr<ComputeBufferValidator> compute_buffer_validator,
+    std::unique_ptr<ComputeResourceValidator> compute_buffer_validator,
     mojom::WebNNContext::CreateGraphCallback callback) {
   scoped_refptr<CommandQueue> command_queue(
       command_recorder->GetCommandQueue());
@@ -483,7 +483,7 @@ void GraphImpl::CreateAndBuild(
                      std::move(graph_outputs), std::move(graph_builder)),
       base::BindOnce(&GraphImpl::OnCompilationComplete, std::move(callback),
                      std::move(command_recorder),
-                     std::make_unique<ComputeBufferValidator>(graph_info)));
+                     std::make_unique<ComputeResourceValidator>(graph_info)));
 }
 
 void GraphImpl::ComputeImpl(
