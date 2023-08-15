@@ -468,8 +468,7 @@ GraphImpl::GraphImpl(
   std::vector<DML_BINDING_DESC> input_bindings(
       {// InputA.
        {.Type = DML_BINDING_TYPE_BUFFER, .Desc = &inputA_buffer_binding},
-       {.Type = DML_BINDING_TYPE_BUFFER, .Desc = &inputB_buffer_binding},
-       {.Type = DML_BINDING_TYPE_NONE, .Desc = nullptr}});
+       {.Type = DML_BINDING_TYPE_BUFFER, .Desc = &inputB_buffer_binding}});
   DML_BUFFER_BINDING output_buffer_binding{.Buffer = output_buffer.Get(),
                                            .Offset = 0,
                                            .SizeInBytes =
