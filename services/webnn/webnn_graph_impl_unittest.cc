@@ -24,8 +24,8 @@ namespace {
 class FakeWebNNGraphImpl final : public WebNNGraphImpl {
  public:
   explicit FakeWebNNGraphImpl(
-      std::unique_ptr<ComputeResourceValidator> compute_buffer_validator)
-      : WebNNGraphImpl(std::move(compute_buffer_validator)) {}
+      std::unique_ptr<ComputeResourceInfo> compute_resource_info)
+      : WebNNGraphImpl(std::move(compute_resource_info)) {}
   ~FakeWebNNGraphImpl() override = default;
 
   static void CreateAndBuild(
@@ -35,7 +35,7 @@ class FakeWebNNGraphImpl final : public WebNNGraphImpl {
     // The receiver bound to FakeWebNNGraphImpl.
     mojo::MakeSelfOwnedReceiver<mojom::WebNNGraph>(
         std::make_unique<FakeWebNNGraphImpl>(
-            std::make_unique<ComputeResourceValidator>(graph_info)),
+            std::make_unique<ComputeResourceInfo>(graph_info)),
         blink_remote.InitWithNewPipeAndPassReceiver());
     std::move(callback).Run(std::move(blink_remote));
   }

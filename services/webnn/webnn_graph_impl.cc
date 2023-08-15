@@ -427,7 +427,7 @@ bool ValidateOperator(const IdToOperandMap& id_to_operand_map,
 
 }  // namespace
 
-WebNNGraphImpl::ComputeResourceValidator::ComputeResourceValidator(
+WebNNGraphImpl::ComputeResourceInfo::ComputeResourceInfo(
     const mojom::GraphInfoPtr& graph_info) {
   // Calculate the byte length of inputs for validating before computing.
   for (auto& input_id : graph_info->input_operands) {
@@ -443,11 +443,11 @@ WebNNGraphImpl::ComputeResourceValidator::ComputeResourceValidator(
   }
 }
 
-WebNNGraphImpl::ComputeResourceValidator::~ComputeResourceValidator() = default;
+WebNNGraphImpl::ComputeResourceInfo::~ComputeResourceInfo() = default;
 
 WebNNGraphImpl::WebNNGraphImpl(
-    std::unique_ptr<ComputeResourceValidator> compute_buffer_validator)
-    : compute_buffer_validator_(std::move(compute_buffer_validator)) {}
+    std::unique_ptr<ComputeResourceInfo> compute_resource_info)
+    : compute_resource_info_(std::move(compute_resource_info)) {}
 
 WebNNGraphImpl::~WebNNGraphImpl() = default;
 
@@ -500,8 +500,7 @@ void WebNNGraphImpl::Compute(
     mojom::WebNNGraph::ComputeCallback callback) {
   // Validate the inputs for computation match the built graph's expected.
   if (!base::ranges::equal(
-          named_inputs,
-          compute_buffer_validator_->input_name_to_byte_length_map,
+          named_inputs, compute_resource_info_->input_name_to_byte_length_map,
           [](const auto& iter_a, const auto& iter_b) {
             // Compare the input name with the key of map and the byte length of
             // buffer with value of map.

@@ -246,12 +246,11 @@ bool CreateOperatorNodeForGemm(const IdToOperandMap& id_to_operand_map,
 
 }  // namespace
 
-GraphImpl::GraphImpl(
-    std::unique_ptr<CommandRecorder> command_recorder,
-    ComPtr<ID3D12Resource> persistent_buffer,
-    ComPtr<IDMLCompiledOperator> compiled_operator,
-    std::unique_ptr<ComputeResourceValidator> compute_buffer_validator)
-    : WebNNGraphImpl(std::move(compute_buffer_validator)),
+GraphImpl::GraphImpl(std::unique_ptr<CommandRecorder> command_recorder,
+                     ComPtr<ID3D12Resource> persistent_buffer,
+                     ComPtr<IDMLCompiledOperator> compiled_operator,
+                     std::unique_ptr<ComputeResourceInfo> compute_resource_info)
+    : WebNNGraphImpl(std::move(compute_resource_info)),
       persistent_buffer_(std::move(persistent_buffer)),
       command_recorder_(std::move(command_recorder)),
       compiled_operator_(std::move(compiled_operator)) {}
@@ -270,7 +269,7 @@ ComPtr<IDMLCompiledOperator> GraphImpl::CompileOnBackgroundThread(
 void GraphImpl::OnCompilationComplete(
     mojom::WebNNContext::CreateGraphCallback callback,
     std::unique_ptr<CommandRecorder> command_recorder,
-    std::unique_ptr<ComputeResourceValidator> compute_buffer_validator,
+    std::unique_ptr<ComputeResourceInfo> compute_resource_info,
     ComPtr<IDMLCompiledOperator> compiled_operator) {
   if (!compiled_operator) {
     DLOG(ERROR) << "Failed to compile the graph.";
@@ -349,7 +348,7 @@ void GraphImpl::OnCompilationComplete(
   hr = command_queue->WaitAsync(base::BindOnce(
       &GraphImpl::OnInitializationComplete, std::move(command_recorder),
       std::move(persistent_buffer), std::move(compiled_operator),
-      std::move(compute_buffer_validator), std::move(callback)));
+      std::move(compute_resource_info), std::move(callback)));
   if (FAILED(hr)) {
     DLOG(ERROR) << "Failed to wait the initialization completed: "
                 << logging::SystemErrorCodeToString(hr);
@@ -362,7 +361,7 @@ void GraphImpl::OnInitializationComplete(
     std::unique_ptr<CommandRecorder> command_recorder,
     ComPtr<ID3D12Resource> persistent_buffer,
     ComPtr<IDMLCompiledOperator> compiled_operator,
-    std::unique_ptr<ComputeResourceValidator> compute_buffer_validator,
+    std::unique_ptr<ComputeResourceInfo> compute_resource_info,
     mojom::WebNNContext::CreateGraphCallback callback) {
   scoped_refptr<CommandQueue> command_queue(
       command_recorder->GetCommandQueue());
@@ -372,7 +371,7 @@ void GraphImpl::OnInitializationComplete(
   mojo::MakeSelfOwnedReceiver<mojom::WebNNGraph>(
       base::WrapUnique(new GraphImpl(
           std::move(command_recorder), std::move(persistent_buffer),
-          std::move(compiled_operator), std::move(compute_buffer_validator))),
+          std::move(compiled_operator), std::move(compute_resource_info))),
       blink_remote.InitWithNewPipeAndPassReceiver());
   command_queue->ReleaseCompletedResources();
   std::move(callback).Run(std::move(blink_remote));
@@ -483,7 +482,7 @@ void GraphImpl::CreateAndBuild(
                      std::move(graph_outputs), std::move(graph_builder)),
       base::BindOnce(&GraphImpl::OnCompilationComplete, std::move(callback),
                      std::move(command_recorder),
-                     std::make_unique<ComputeResourceValidator>(graph_info)));
+                     std::make_unique<ComputeResourceInfo>(graph_info)));
 }
 
 void GraphImpl::ComputeImpl(
