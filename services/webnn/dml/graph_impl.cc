@@ -217,13 +217,12 @@ bool CreateOperatorNodeForGemm(const IdToOperandMap& id_to_operand_map,
     }
   }
 
+  TensorDesc input_tensor_desc(DML_TENSOR_DATA_TYPE_FLOAT32, {1, 1, 2, 2});
   DML_GEMM_OPERATOR_DESC gemm_operator_desc{
-      .ATensor = &input_a_tensor_desc.GetDMLTensorDesc(),
-      .BTensor = &input_b_tensor_desc.GetDMLTensorDesc(),
-      .CTensor = (input_c_tensor_desc.has_value())
-                     ? &input_c_tensor_desc->GetDMLTensorDesc()
-                     : nullptr,
-      .OutputTensor = &output_tensor_desc.GetDMLTensorDesc(),
+      .ATensor = &input_tensor_desc.GetDMLTensorDesc(),
+      .BTensor = &input_tensor_desc.GetDMLTensorDesc(),
+      .CTensor = nullptr,
+      .OutputTensor = &input_tensor_desc.GetDMLTensorDesc(),
       .TransA = (gemm_attributes->a_transpose) ? DML_MATRIX_TRANSFORM_TRANSPOSE
                                                : DML_MATRIX_TRANSFORM_NONE,
       .TransB = (gemm_attributes->b_transpose) ? DML_MATRIX_TRANSFORM_TRANSPOSE
@@ -463,12 +462,14 @@ GraphImpl::GraphImpl(
   DML_BUFFER_BINDING inputA_buffer_binding{.Buffer = inputA_buffer.Get(),
                                           .Offset = 0,
                                           .SizeInBytes = input_buffer_size};
-  // DML_BUFFER_BINDING inputB_buffer_binding{.Buffer = inputB_buffer.Get(),
-  //                                         .Offset = 0,
-  //                                         .SizeInBytes = input_buffer_size};
+  DML_BUFFER_BINDING inputB_buffer_binding{.Buffer = inputB_buffer.Get(),
+                                          .Offset = 0,
+                                          .SizeInBytes = input_buffer_size};
   std::vector<DML_BINDING_DESC> input_bindings(
       {// InputA.
-       {.Type = DML_BINDING_TYPE_BUFFER, .Desc = &inputA_buffer_binding}});
+       {.Type = DML_BINDING_TYPE_BUFFER, .Desc = &inputA_buffer_binding},
+       {.Type = DML_BINDING_TYPE_BUFFER, .Desc = &inputB_buffer_binding},
+       {.Type = DML_BINDING_TYPE_NONE, .Desc = nullptr}});
   DML_BUFFER_BINDING output_buffer_binding{.Buffer = output_buffer.Get(),
                                            .Offset = 0,
                                            .SizeInBytes =
