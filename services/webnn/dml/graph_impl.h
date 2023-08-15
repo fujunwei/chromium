@@ -82,7 +82,7 @@ class GraphImpl final : public WebNNGraphImpl {
       std::unique_ptr<ComputeResourceValidator> compute_buffer_validator,
       mojom::WebNNContext::CreateGraphCallback callback);
 
-  // Execute the compiled platform graph asynchronously. The `inputs` was
+  // Execute the compiled platform graph asynchronously. The `named_inputs` was
   // validated in base class so we can use them to compute directly, the result
   // of inference will be returned to renderer process with the `callback`.
   void ComputeImpl(
