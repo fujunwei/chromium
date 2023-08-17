@@ -499,7 +499,7 @@ bool WebNNGraphImpl::ValidateGraph(const mojom::GraphInfoPtr& graph_info) {
       return false;
     }
   }
-  
+
   // Validate the output operands in the entire graph for the name that can't be
   // empty, and the kind of operand must be `kOutput`.
   for (auto& output_id : graph_info->output_operands) {

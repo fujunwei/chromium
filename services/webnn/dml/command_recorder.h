@@ -126,9 +126,8 @@ class CommandRecorder final {
   // from the reading-back heap of the owned D3D12 device.
   HRESULT CreateReadbackBuffer(uint64_t size, ComPtr<ID3D12Resource>& resource);
 
-  ComPtr<IDMLDevice> GetDMLDevice() {
-    return dml_device_;
-  }
+  ComPtr<IDMLDevice> GetDMLDevice() { return dml_device_; }
+
  private:
   CommandRecorder(scoped_refptr<CommandQueue> command_queue,
                   ComPtr<IDMLDevice> dml_device,

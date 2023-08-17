@@ -27,6 +27,12 @@ uint64_t GraphInfoBuilder::BuildOperand(const std::vector<uint32_t>& dimensions,
   return operand_id_++;
 }
 
+uint64_t GraphInfoBuilder::BuildIntermediateOperand(
+    const std::vector<uint32_t>& dimensions,
+    mojom::Operand::DataType type) {
+  return BuildOperand(dimensions, type, mojom::Operand::Kind::kOutput);
+}
+
 uint64_t GraphInfoBuilder::BuildInput(const std::string& name,
                                       const std::vector<uint32_t>& dimensions,
                                       mojom::Operand::DataType type) {
@@ -40,7 +46,7 @@ uint64_t GraphInfoBuilder::BuildInput(const std::string& name,
 uint64_t GraphInfoBuilder::BuildConstant(
     const std::vector<uint32_t>& dimensions,
     mojom::Operand::DataType type,
-    const std::vector<uint8_t>& values) {
+    base::span<const uint8_t> values) {
   uint64_t operand_id =
       BuildOperand(dimensions, type, mojom::Operand::Kind::kConstant);
   graph_info_->constant_id_to_buffer_map[operand_id] =

@@ -85,17 +85,129 @@ std::string OpKindToString(Operator::Kind kind) {
 // to focus on converting the mojo graph struct to corresponding DML graph node
 // by using dml::GraphBuilder as a helper. dml::GraphBuilder should be decoupled
 // from mojo graph structs and focus on manipulating DML graph structs.
+//
+// Create the input node of graph for computation with the default tensor flag,
+// specifying the DML_TENSOR_FLAG_OWNED_BY_DML is to create input node for
+// constant weight data.
 void CreateInputNode(const IdToOperandMap& id_to_operand_map,
                      uint64_t input_id,
                      GraphBuilder& graph_builder,
-                     IdToNodeOutputMap& id_to_node_output_map) {
+                     IdToNodeOutputMap& id_to_node_output_map,
+                     DML_TENSOR_FLAGS flags = DML_TENSOR_FLAG_NONE) {
   const OperandPtr& operand = id_to_operand_map.at(input_id);
-  TensorDesc input_tensor_desc(GetTensorDataType(operand->data_type),
+  TensorDesc input_tensor_desc(GetTensorDataType(operand->data_type), flags,
                                operand->dimensions);
   NodeInfo input_node = graph_builder.CreateInputNode();
   NodeOutputInfo input_node_output = graph_builder.CreateNodeOutput(
       std::move(input_node), std::move(input_tensor_desc));
   id_to_node_output_map[input_id] = std::move(input_node_output);
+}
+
+D3D12_RESOURCE_BARRIER CreateTransitionBarrier(ID3D12Resource* resource,
+                                               D3D12_RESOURCE_STATES before,
+                                               D3D12_RESOURCE_STATES after) {
+  return {.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+          .Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
+          .Transition = {.pResource = resource,
+                         .Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                         .StateBefore = before,
+                         .StateAfter = after}};
+}
+
+void Upload(CommandRecorder* command_recorder,
+            size_t buffer_size,
+            ComPtr<ID3D12Resource> dst_resource,
+            ComPtr<ID3D12Resource> upload_buffer) {
+  // Copy the input data from upload buffer to input buffer.
+  D3D12_RESOURCE_BARRIER barriers[1];
+  barriers[0] = CreateTransitionBarrier(dst_resource.Get(),
+                                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                                        D3D12_RESOURCE_STATE_COPY_DEST);
+  command_recorder->ResourceBarrier(barriers);
+  command_recorder->CopyBufferRegion(dst_resource.Get(), 0, upload_buffer.Get(),
+                                     0, buffer_size);
+  // The bound resources should be in D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+  // state before the execution of RecordDispatch on the GPU.
+  barriers[0] = CreateTransitionBarrier(dst_resource.Get(),
+                                        D3D12_RESOURCE_STATE_COPY_DEST,
+                                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+  command_recorder->ResourceBarrier(barriers);
+
+  // Keep the upload_buffer alive until the GPU work is done.
+  command_recorder->GetCommandQueue()->ReferenceUntilCompleted(
+      std::move(upload_buffer));
+  command_recorder->GetCommandQueue()->ReferenceUntilCompleted(
+      std::move(dst_resource));
+}
+
+absl::optional<std::pair<ComPtr<ID3D12Resource>, std::vector<D3D12_RANGE>>>
+UploadConstantWeightData(CommandRecorder* command_recorder,
+                         const base::flat_map<uint64_t, mojo_base::BigBuffer>&
+                             constant_id_to_buffer_map) {
+  std::vector<D3D12_RANGE> sub_resource_range;
+  sub_resource_range.reserve(constant_id_to_buffer_map.size());
+  // Copy all array buffers of constants to an upload heap and create a
+  // committed resource which is mapped to the heap.
+  //
+  // Calculate the total byte length of constants array buffer to create an
+  // upload buffer which can be read by GPU.
+  base::CheckedNumeric<size_t> total_byte_length(0);
+  base::flat_map<uint64_t, size_t> constant_to_byte_offset_map;
+  for (auto& [constant_id, constant_buffer] : constant_id_to_buffer_map) {
+    // There is only one upload heap for all inputs, the byte offset is used to
+    // get the copied address for each input tensor.
+    constant_to_byte_offset_map[constant_id] = total_byte_length.ValueOrDie();
+
+    // The buffer has a minimum base address alignment requirement of 16 bytes
+    // in the macro `DML_MINIMUM_BUFFER_TENSOR_ALIGNMENT`:
+    // https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-directml-constants
+    total_byte_length += base::bits::AlignUp<size_t>(
+        constant_buffer.size(), DML_MINIMUM_BUFFER_TENSOR_ALIGNMENT);
+    if (!total_byte_length.IsValid()) {
+      DLOG(ERROR) << "Failed to calculate the total byte length of inputs.";
+      return absl::nullopt;
+    }
+    sub_resource_range.push_back(
+        D3D12_RANGE{.Begin = constant_to_byte_offset_map[constant_id],
+                    .End = total_byte_length.ValueOrDie()});
+  }
+  // Create the upload heap and a resource that is mapped to the heap.
+  ComPtr<ID3D12Resource> constant_upload_buffer;
+  HRESULT hr = command_recorder->CreateUploadBuffer(
+      total_byte_length.ValueOrDie(), constant_upload_buffer);
+  if (FAILED(hr)) {
+    DLOG(ERROR) << "Failed to create upload buffer for inputs: "
+                << logging::SystemErrorCodeToString(hr);
+    return absl::nullopt;
+  }
+  // Map entire resource to copy the array buffer of input one by one with byte
+  // offset.
+  void* mapped_upload_buffer = nullptr;
+  hr = constant_upload_buffer->Map(0, nullptr, &mapped_upload_buffer);
+  if (FAILED(hr)) {
+    DLOG(ERROR) << "Failed to map upload buffer for inputs: "
+                << logging::SystemErrorCodeToString(hr);
+    return absl::nullopt;
+  }
+  // The order of constant
+  for (auto& [constant_id, constant_buffer] : constant_id_to_buffer_map) {
+    memcpy(static_cast<uint8_t*>(mapped_upload_buffer) +
+               constant_to_byte_offset_map.at(constant_id),
+           constant_buffer.data(), constant_buffer.size());
+  }
+  constant_upload_buffer->Unmap(0, nullptr);
+
+  ComPtr<ID3D12Resource> constant_default_buffer;
+  hr = command_recorder->CreateDefaultBuffer(total_byte_length.ValueOrDie(),
+                                             constant_default_buffer);
+  if (FAILED(hr)) {
+    DLOG(ERROR) << "Failed to CreateDefaultBuffer: "
+                << logging::SystemErrorCodeToString(hr);
+    return absl::nullopt;
+  }
+  Upload(command_recorder, total_byte_length.ValueOrDie(),
+         constant_default_buffer, constant_upload_buffer);
+  return std::make_pair(constant_default_buffer, std::move(sub_resource_range));
 }
 
 void CreateOperatorNodeForRelu(const IdToOperandMap& id_to_operand_map,
@@ -218,12 +330,13 @@ bool CreateOperatorNodeForGemm(const IdToOperandMap& id_to_operand_map,
     }
   }
 
-  TensorDesc input_tensor_desc(DML_TENSOR_DATA_TYPE_FLOAT32, {1, 1, 2, 2});
   DML_GEMM_OPERATOR_DESC gemm_operator_desc{
-      .ATensor = &input_tensor_desc.GetDMLTensorDesc(),
-      .BTensor = &input_tensor_desc.GetDMLTensorDesc(),
-      .CTensor = nullptr,
-      .OutputTensor = &input_tensor_desc.GetDMLTensorDesc(),
+      .ATensor = &input_a_tensor_desc.GetDMLTensorDesc(),
+      .BTensor = &input_b_tensor_desc.GetDMLTensorDesc(),
+      .CTensor = (input_c_tensor_desc.has_value())
+                     ? &input_c_tensor_desc->GetDMLTensorDesc()
+                     : nullptr,
+      .OutputTensor = &output_tensor_desc.GetDMLTensorDesc(),
       .TransA = (gemm_attributes->a_transpose) ? DML_MATRIX_TRANSFORM_TRANSPOSE
                                                : DML_MATRIX_TRANSFORM_NONE,
       .TransB = (gemm_attributes->b_transpose) ? DML_MATRIX_TRANSFORM_TRANSPOSE
@@ -248,17 +361,6 @@ bool CreateOperatorNodeForGemm(const IdToOperandMap& id_to_operand_map,
 }
 
 }  // namespace
-
-D3D12_RESOURCE_BARRIER CreateTransitionBarrier(ID3D12Resource* resource,
-                                               D3D12_RESOURCE_STATES before,
-                                               D3D12_RESOURCE_STATES after) {
-  return {.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-          .Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
-          .Transition = {.pResource = resource,
-                         .Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-                         .StateBefore = before,
-                         .StateAfter = after}};
-}
 
 void Upload(CommandRecorder* command_recorder,
             void* src_buffer,
@@ -287,13 +389,13 @@ void Upload(CommandRecorder* command_recorder,
                                         D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
                                         D3D12_RESOURCE_STATE_COPY_DEST);
   command_recorder->ResourceBarrier(barriers);
-  command_recorder->CopyBufferRegion(dst_resource.Get(), 0, upload_buffer.Get(), 0,
-                                     buffer_size);
+  command_recorder->CopyBufferRegion(dst_resource.Get(), 0, upload_buffer.Get(),
+                                     0, buffer_size);
   // The bound resources should be in D3D12_RESOURCE_STATE_UNORDERED_ACCESS
   // state before the execution of RecordDispatch on the GPU.
-  barriers[0] =
-      CreateTransitionBarrier(dst_resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
-                              D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+  barriers[0] = CreateTransitionBarrier(dst_resource.Get(),
+                                        D3D12_RESOURCE_STATE_COPY_DEST,
+                                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
   command_recorder->ResourceBarrier(barriers);
 
   // Keep the upload_buffer alive until the GPU work is done.
@@ -303,8 +405,7 @@ void Upload(CommandRecorder* command_recorder,
       std::move(dst_resource));
 }
 
-void OnExecutionComplete(
-    ComPtr<ID3D12Resource> readback_buffer) {
+void OnExecutionComplete(ComPtr<ID3D12Resource> readback_buffer) {
   // // Release the resources referred by GPU execution.
   // command_recorder->GetCommandQueue()->ReleaseCompletedResources();
 
@@ -319,10 +420,11 @@ void OnExecutionComplete(
 }
 
 void Download(CommandRecorder* command_recorder,
-                                        size_t buffer_size,
-                                        ComPtr<ID3D12Resource> src_resource) {
+              size_t buffer_size,
+              ComPtr<ID3D12Resource> src_resource) {
   ComPtr<ID3D12Resource> readback_buffer;
-  HRESULT hr = command_recorder->CreateReadbackBuffer(buffer_size, readback_buffer);
+  HRESULT hr =
+      command_recorder->CreateReadbackBuffer(buffer_size, readback_buffer);
   if (FAILED(hr)) {
     DLOG(ERROR) << "Failed to CreateReadbackBuffer: "
                 << logging::SystemErrorCodeToString(hr);
@@ -334,11 +436,11 @@ void Download(CommandRecorder* command_recorder,
                                         D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
                                         D3D12_RESOURCE_STATE_COPY_SOURCE);
   command_recorder->ResourceBarrier(barriers);
-  command_recorder->CopyBufferRegion(readback_buffer.Get(), 0, src_resource.Get(), 0,
-                                     buffer_size);
-  barriers[0] =
-      CreateTransitionBarrier(src_resource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE,
-                              D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+  command_recorder->CopyBufferRegion(readback_buffer.Get(), 0,
+                                     src_resource.Get(), 0, buffer_size);
+  barriers[0] = CreateTransitionBarrier(src_resource.Get(),
+                                        D3D12_RESOURCE_STATE_COPY_SOURCE,
+                                        D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
   command_recorder->ResourceBarrier(barriers);
 
   command_recorder->GetCommandQueue()->ReferenceUntilCompleted(readback_buffer);
@@ -356,14 +458,13 @@ void Download(CommandRecorder* command_recorder,
   //               << logging::SystemErrorCodeToString(hr);
   //   return;
   // }
-  hr = command_recorder->GetCommandQueue()->WaitAsync(base::BindOnce(
-      &OnExecutionComplete, std::move(readback_buffer)));
+  hr = command_recorder->GetCommandQueue()->WaitAsync(
+      base::BindOnce(&OnExecutionComplete, std::move(readback_buffer)));
   if (FAILED(hr)) {
     DLOG(ERROR) << "Failed to wait the initialization completed: "
                 << logging::SystemErrorCodeToString(hr);
     return;
   }
-
 }
 
 ComPtr<IDMLCompiledOperator> BuildRelu(CommandRecorder* command_recorder) {
@@ -378,8 +479,8 @@ ComPtr<IDMLCompiledOperator> BuildRelu(CommandRecorder* command_recorder) {
   DML_OPERATOR_DESC operator_desc{.Type = DML_OPERATOR_ACTIVATION_RELU,
                                   .Desc = &relu_operator_desc};
   ComPtr<IDMLOperator> dml_operator;
-  command_recorder->GetDMLDevice()->CreateOperator(
-      &operator_desc, IID_PPV_ARGS(&dml_operator));
+  command_recorder->GetDMLDevice()->CreateOperator(&operator_desc,
+                                                   IID_PPV_ARGS(&dml_operator));
 
   // Compile the operator.
   ComPtr<IDMLCompiledOperator> compiled_operator;
@@ -394,29 +495,28 @@ ComPtr<IDMLCompiledOperator> BuildRelu(CommandRecorder* command_recorder) {
   command_recorder->Open();
   // Relu operator initializer deson't need to bind any input and persistent
   // resources.
-  command_recorder->InitializeOperator(
-      compiled_operator.Get(), absl::nullopt, absl::nullopt);
+  command_recorder->InitializeOperator(compiled_operator.Get(), absl::nullopt,
+                                       absl::nullopt);
   command_recorder->CloseAndExecute();
-  
-      command_recorder->GetCommandQueue()->WaitSyncForTesting();
+
+  command_recorder->GetCommandQueue()->WaitSyncForTesting();
   command_recorder->GetCommandQueue()->ReleaseCompletedResources();
   // adapter_->dml_device()->GetDeviceRemovedReason();
   // adapter_->d3d12_device()->GetDeviceRemovedReason();
   return compiled_operator;
 }
 
-GraphImpl::GraphImpl(
-    std::unique_ptr<CommandRecorder> command_recorder,
-    ComPtr<ID3D12Resource> persistent_buffer,
-    ComPtr<IDMLCompiledOperator> compiled_operator,
-    std::unique_ptr<ComputeResourceInfo> compute_resource_info)
+GraphImpl::GraphImpl(std::unique_ptr<CommandRecorder> command_recorder,
+                     ComPtr<ID3D12Resource> persistent_buffer,
+                     ComPtr<IDMLCompiledOperator> compiled_operator,
+                     std::unique_ptr<ComputeResourceInfo> compute_resource_info)
     : WebNNGraphImpl(std::move(compute_resource_info)),
       persistent_buffer_(std::move(persistent_buffer)),
       command_recorder_(std::move(command_recorder)),
       compiled_operator_(std::move(compiled_operator)) {
-  // ComPtr<IDMLCompiledOperator> compiled_operator = BuildRelu(command_recorder_);
-  // Create input and output resources that will be bound for operator for
-  // execution.
+  // ComPtr<IDMLCompiledOperator> compiled_operator =
+  // BuildRelu(command_recorder_); Create input and output resources that will
+  // be bound for operator for execution.
   const uint64_t input_buffer_size = 2 * 2 * 4;
   ComPtr<ID3D12Resource> inputA_buffer;
   HRESULT hr =
@@ -461,36 +561,47 @@ GraphImpl::GraphImpl(
 
   // Create the input and output resources binding for operator execution.
   DML_BUFFER_BINDING inputA_buffer_binding{.Buffer = inputA_buffer.Get(),
-                                          .Offset = 0,
-                                          .SizeInBytes = input_buffer_size};
+                                           .Offset = 0,
+                                           .SizeInBytes = input_buffer_size};
   DML_BUFFER_BINDING inputB_buffer_binding{.Buffer = inputB_buffer.Get(),
-                                          .Offset = 0,
-                                          .SizeInBytes = input_buffer_size};
-  std::vector<DML_BINDING_DESC> input_bindings(
-      {// InputA.
-       {.Type = DML_BINDING_TYPE_BUFFER, .Desc = &inputA_buffer_binding},
-       {.Type = DML_BINDING_TYPE_BUFFER, .Desc = &inputB_buffer_binding}});
+                                           .Offset = 0,
+                                           .SizeInBytes = input_buffer_size};
+  std::vector<DML_BINDING_DESC> input_bindings({
+      // InputA.
+      {.Type = DML_BINDING_TYPE_BUFFER, .Desc = &inputA_buffer_binding},
+      {.Type = DML_BINDING_TYPE_BUFFER, .Desc = &inputB_buffer_binding},
+      {.Type = DML_BINDING_TYPE_NONE, .Desc = nullptr},
+      {.Type = DML_BINDING_TYPE_NONE, .Desc = nullptr},
+  });
   DML_BUFFER_BINDING output_buffer_binding{.Buffer = output_buffer.Get(),
                                            .Offset = 0,
-                                           .SizeInBytes =
-                                           output_buffer_size};
+                                           .SizeInBytes = output_buffer_size};
   std::vector<DML_BINDING_DESC> output_bindings(
       {{.Type = DML_BINDING_TYPE_BUFFER, .Desc = &output_buffer_binding}});
 
   // Execute the operator with persistent, input and output bindings.
-  hr = command_recorder_->ExecuteOperator(
-      compiled_operator_.Get(), input_bindings, output_bindings,
-      absl::nullopt);
+  absl::optional<DML_BINDING_DESC> persistent_buffer_binding_desc;
+  DML_BUFFER_BINDING persistent_buffer_binding;
+  if (persistent_buffer_) {
+    uint64_t persistent_buffer_size = persistent_buffer_->GetDesc().Width;
+    persistent_buffer_binding =
+        DML_BUFFER_BINDING{.Buffer = persistent_buffer_.Get(),
+                           .Offset = 0,
+                           .SizeInBytes = persistent_buffer_size};
+    persistent_buffer_binding_desc = DML_BINDING_DESC{
+        .Type = DML_BINDING_TYPE_BUFFER, .Desc = &persistent_buffer_binding};
+  }
+  hr = command_recorder_->ExecuteOperator(compiled_operator_.Get(),
+                                          input_bindings, output_bindings,
+                                          persistent_buffer_binding_desc);
   if (FAILED(hr)) {
     DLOG(ERROR) << "Failed to ExecuteOperator: "
                 << logging::SystemErrorCodeToString(hr);
     return;
   }
-  //persistent_buffer_binding_desc
 
   // Download the result from output resource.
-  Download(command_recorder_.get(), output_buffer_size,
-           output_buffer);
+  Download(command_recorder_.get(), output_buffer_size, output_buffer);
 }
 
 //  Notice that it's the CommandQueue's responsibility to wait for all of the
@@ -507,6 +618,7 @@ ComPtr<IDMLCompiledOperator> GraphImpl::CompileOnBackgroundThread(
 void GraphImpl::OnCompilationComplete(
     mojom::WebNNContext::CreateGraphCallback callback,
     std::unique_ptr<CommandRecorder> command_recorder,
+    base::flat_map<uint64_t, mojo_base::BigBuffer> constant_id_to_buffer_map,
     std::unique_ptr<ComputeResourceInfo> compute_resource_info,
     ComPtr<IDMLCompiledOperator> compiled_operator) {
   if (!compiled_operator) {
@@ -523,8 +635,42 @@ void GraphImpl::OnCompilationComplete(
     return;
   }
 
-  // TODO(crbug.com/1273291): Create the input resource binding for
-  // operator initialization. Only the constant resource needs to be bound.
+  // Create the input resource binding for operator initialization. Only the
+  // constant resource needs to be bound.
+  std::vector<DML_BUFFER_BINDING> input_buffer_binding;
+  auto input_number =
+      compute_resource_info->input_name_to_byte_length_map.size();
+  input_buffer_binding.reserve(input_number);
+  for (size_t i = 0; i < input_number; ++i) {
+    input_buffer_binding.push_back(
+        DML_BUFFER_BINDING{.Buffer = nullptr, .Offset = 0, .SizeInBytes = 0});
+  }
+  if (!constant_id_to_buffer_map.empty()) {
+    auto constant_buffer_info = UploadConstantWeightData(
+        command_recorder.get(), constant_id_to_buffer_map);
+    if (!constant_buffer_info) {
+      DLOG(ERROR) << "Failed to upload constant weight data: "
+                  << logging::SystemErrorCodeToString(hr);
+      std::move(callback).Run(mojo::NullRemote());
+      return;
+    }
+
+    for (auto& resource_range : constant_buffer_info->second) {
+      auto size_in_bytes = resource_range.End - resource_range.Begin;
+      LOG(ERROR) << "==========constant_buffer_info->first.Get() "
+                 << constant_buffer_info->first.Get() << " size_in_bytes "
+                 << size_in_bytes;
+      input_buffer_binding.push_back(
+          DML_BUFFER_BINDING{.Buffer = constant_buffer_info->first.Get(),
+                             .Offset = resource_range.Begin,
+                             .SizeInBytes = size_in_bytes});
+    }
+  }
+  DML_BUFFER_ARRAY_BINDING input_buffer_array_binding{
+      .BindingCount = base::checked_cast<uint32_t>(input_buffer_binding.size()),
+      .Bindings = input_buffer_binding.data()};
+  DML_BINDING_DESC input_buffer_binding_desc = {DML_BINDING_TYPE_BUFFER_ARRAY,
+                                                &input_buffer_array_binding};
 
   // Create the persistent resource which is bound as output of operator
   // initializer.
@@ -555,8 +701,9 @@ void GraphImpl::OnCompilationComplete(
         .Type = DML_BINDING_TYPE_BUFFER, .Desc = &persistent_buffer_binding};
   }
 
-  hr = command_recorder->InitializeOperator(
-      compiled_operator.Get(), absl::nullopt, persistent_buffer_binding_desc);
+  hr = command_recorder->InitializeOperator(compiled_operator.Get(),
+                                            input_buffer_binding_desc,
+                                            persistent_buffer_binding_desc);
   if (FAILED(hr)) {
     DLOG(ERROR) << "Failed to initialize the operator: "
                 << logging::SystemErrorCodeToString(hr);
@@ -640,59 +787,14 @@ void GraphImpl::CreateAndBuild(
                     id_to_node_output_map);
   }
 
-   // Copy all array buffers of inputs to an upload heap and create a committed
-  // resource which is mapped to the heap.
-  //
-  // Calculate the total byte length of inputs array buffer to create an upload
-  // buffer which can be read by GPU.
-  base::CheckedNumeric<size_t> total_byte_length(0);
-  base::flat_map<std::string, size_t> input_to_byte_offset_map;
-  for (auto& [constant_id, constant_buffer] : graph_info->constant_id_to_buffer_map) {
-    // There is only one upload heap for all inputs, the byte offset is used to
-    // get the copied address for each input tensor.
-    input_to_byte_offset_map[input_name] = total_byte_length.ValueOrDie();
-
-    // The buffer has a minimum base address alignment requirement of 16 bytes
-    // in the macro `DML_MINIMUM_BUFFER_TENSOR_ALIGNMENT`:
-    // https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-directml-constants
-    total_byte_length += base::bits::AlignUp<size_t>(
-        input_buffer.size(), DML_MINIMUM_BUFFER_TENSOR_ALIGNMENT);
-    if (!total_byte_length.IsValid()) {
-      DLOG(ERROR) << "Failed to calculate the total byte length of inputs.";
-      std::move(callback).Run(mojom::ComputeResult::kUnknownError,
-                              absl::nullopt);
-      return;
-    }
-  }
-  // Create the upload heap and a resource that is mapped to the heap.
-  ComPtr<ID3D12Resource> input_upload_buffer;
-  HRESULT hr = command_recorder_->CreateUploadBuffer(
-      total_byte_length.ValueOrDie(), input_upload_buffer);
-  if (FAILED(hr)) {
-    DLOG(ERROR) << "Failed to create upload buffer for inputs: "
-                << logging::SystemErrorCodeToString(hr);
-    std::move(callback).Run(mojom::ComputeResult::kUnknownError, absl::nullopt);
-    return;
-  }
-  // Map entire resource to copy the array buffer of input one by one with byte
-  // offset.
-  void* mapped_upload_buffer = nullptr;
-  hr = input_upload_buffer->Map(0, nullptr, &mapped_upload_buffer);
-  if (FAILED(hr)) {
-    DLOG(ERROR) << "Failed to map upload buffer for inputs: "
-                << logging::SystemErrorCodeToString(hr);
-    std::move(callback).Run(mojom::ComputeResult::kUnknownError, absl::nullopt);
-    return;
-  }
-    // The order of constant
-  for (auto& [constant_id, constant_buffer] : graph_info->constant_id_to_buffer_map) {
+  // The constant operand in WebNNGraph also is treated as input node in graph
+  // desc, the tensor is identified by DML_TENSOR_FLAG_OWNED_BY_DML which must
+  // be bound to the binding table during operator initialization, and not
+  // during execution.
+  for (auto& [constant_id, _] : graph_info->constant_id_to_buffer_map) {
     CreateInputNode(id_to_operand_map, constant_id, graph_builder,
-                    id_to_node_output_map);
-    memcpy(static_cast<uint8_t*>(mapped_upload_buffer) +
-               input_to_byte_offset_map.at(input_name),
-           input_buffer.data(), input_buffer.size());
+                    id_to_node_output_map, DML_TENSOR_FLAG_OWNED_BY_DML);
   }
-  input_upload_buffer->Unmap(0, nullptr);
 
   // Add operations.
   for (auto& operation : graph_info->operators) {
@@ -765,7 +867,6 @@ void GraphImpl::CreateAndBuild(
       graph_outputs.push_back(std::move(node_output));
     }
   }
-  
 
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE,
@@ -773,6 +874,7 @@ void GraphImpl::CreateAndBuild(
                      std::move(graph_outputs), std::move(graph_builder)),
       base::BindOnce(&GraphImpl::OnCompilationComplete, std::move(callback),
                      std::move(command_recorder),
+                     std::move(graph_info->constant_id_to_buffer_map),
                      std::make_unique<ComputeResourceInfo>(graph_info)));
 }
 

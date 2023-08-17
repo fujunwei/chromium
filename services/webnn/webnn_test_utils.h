@@ -29,14 +29,16 @@ class GraphInfoBuilder final {
       mojom::Operand::DataType type,
       mojom::Operand::Kind kind = mojom::Operand::Kind::kOutput);
 
+  uint64_t BuildIntermediateOperand(const std::vector<uint32_t>& dimensions,
+                                    mojom::Operand::DataType type);
+
   uint64_t BuildInput(const std::string& name,
                       const std::vector<uint32_t>& dimensions,
                       mojom::Operand::DataType type);
 
-    uint64_t BuildConstant(
-    const std::vector<uint32_t>& dimensions,
-    mojom::Operand::DataType type,
-    const std::vector<uint8_t>& values);
+  uint64_t BuildConstant(const std::vector<uint32_t>& dimensions,
+                         mojom::Operand::DataType type,
+                         base::span<const uint8_t> values);
 
   uint64_t BuildOutput(const std::string& name,
                        const std::vector<uint32_t>& dimensions,

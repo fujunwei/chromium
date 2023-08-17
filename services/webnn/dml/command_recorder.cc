@@ -229,6 +229,9 @@ HRESULT CommandRecorder::InitializeOperator(
     command_list_->ResourceBarrier(/* NumBarriers */ 1, &uav);
   }
 
+  // dml_device_->GetDeviceRemovedReason();
+  // d3d12_device_->GetDeviceRemovedReason();
+
   return S_OK;
 }
 

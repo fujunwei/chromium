@@ -67,6 +67,7 @@ class GraphImpl final : public WebNNGraphImpl {
   static void OnCompilationComplete(
       mojom::WebNNContext::CreateGraphCallback callback,
       std::unique_ptr<CommandRecorder> command_recorder,
+      base::flat_map<uint64_t, mojo_base::BigBuffer> constant_id_to_buffer_map,
       std::unique_ptr<ComputeResourceInfo> compute_resource_info,
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_operator);
 
