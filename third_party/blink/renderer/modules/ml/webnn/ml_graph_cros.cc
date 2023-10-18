@@ -13,7 +13,10 @@
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
 #include "third_party/blink/renderer/modules/ml/ml_model_loader.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_tflite_converter.h"
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph_utils.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
+#include "third_party/flatbuffers/src/include/flatbuffers/detached_buffer.h"
 
 namespace blink {
 
@@ -47,6 +50,88 @@ base::expected<bool, String> ValidateModelLoadedTensorInfo(
   return true;
 }
 
+base::expected<flatbuffers::DetachedBuffer, String> BuildTfLiteModel(
+    const MLNamedOperands& named_outputs) {
+  auto converter = std::make_unique<MLGraphTfLiteConverter>();
+  // Map the operand to its index of `tflite::Tensor` array which holds all
+  // tensors used in the model.
+  HeapHashMap<Member<const MLOperand>, int32_t> operand_to_index_map;
+  for (const auto& [name, operand] : named_outputs) {
+    // Serialize output operand of graph into the flat buffer.
+    auto tensor_index = converter->SerializeTensor(operand.Get(), name);
+    if (!tensor_index.has_value()) {
+      return base::unexpected(tensor_index.error());
+    }
+    operand_to_index_map.insert(operand, tensor_index.value());
+  }
+
+  auto* toposorted_operators = GetOperatorsInTopologicalOrder(named_outputs);
+  CHECK(toposorted_operators);
+  // Visit the operators in topological order. For each operator,
+  // 1, Build `tflite::Tensor` for its input and output operands if needed.
+  // 2, Build `tflite::Operator` with the tensor index of inputs and outputs
+  //    operand.
+  for (const auto& current_operator : *toposorted_operators) {
+    for (const auto& operand : current_operator->Inputs()) {
+      if (operand_to_index_map.Contains(operand.Get())) {
+        // The tensor is already built for this operand, skip it.
+        continue;
+      }
+      switch (operand->Kind()) {
+        case MLOperand::OperandKind::kInput:
+        case MLOperand::OperandKind::kConstant: {
+          // Serialize tensor for input or constant operand.
+          auto tensor_index = converter->SerializeTensor(operand.Get());
+          if (!tensor_index.has_value()) {
+            return base::unexpected(tensor_index.error());
+          }
+          operand_to_index_map.insert(operand, tensor_index.value());
+          break;
+        }
+        case MLOperand::OperandKind::kOutput:
+          // Because the operators are visited in topological order, if this
+          // operand is an intermediate operand, it should already be defined as
+          // an output operand of the dependent operator.
+          NOTREACHED();
+          break;
+      }
+    }
+
+    for (const auto& operand : current_operator->Outputs()) {
+      if (operand_to_index_map.Contains(operand.Get())) {
+        // The tensor is already built for this operand, skip it.
+        continue;
+      }
+      // Because the graph's output operands are already converted before, this
+      // operand should be an intermediate operand that connects with two
+      // operators.
+      auto tensor_index = converter->SerializeTensor(operand.Get());
+      if (!tensor_index.has_value()) {
+        return base::unexpected(tensor_index.error());
+      }
+      operand_to_index_map.insert(operand, tensor_index.value());
+    }
+
+    // There are following steps to implement the `SerializeOperation` function:
+    // 1, Create `tflite::OperatorCode` with the kind of operator.
+    // 2, Create `tflite::Operator` with the tensor index of inputs and outputs
+    //    operand.
+    auto serialized_result = converter->SerializeOperation(
+        operand_to_index_map, current_operator.Get());
+    if (!serialized_result.has_value()) {
+      return base::unexpected(serialized_result.error());
+    }
+  }
+
+  // Build the model in the flat buffer and return the detached Buffer.
+  auto flatbuffer = converter->FinishAndGetFlatBuffer();
+  if (!flatbuffer.has_value()) {
+    return base::unexpected(flatbuffer.error());
+  }
+
+  return flatbuffer;
+}
+
 }  // namespace
 
 // static
@@ -78,7 +163,16 @@ void MLGraphCrOS::BuildAsyncImpl(const MLNamedOperands& outputs,
     buffer = DOMArrayBuffer::Create(g_flatbuffer_for_testing->data(),
                                     g_flatbuffer_for_testing->size());
   }
-  // TODO(crbug.com/1273291): Convert WebNN graph to flatbuffer in the `buffer`.
+
+  // Convert WebNN graph to TF-Lite model in flat buffer with the schema.
+  auto flatbuffer = BuildTfLiteModel(outputs);
+  if (!flatbuffer.has_value()) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kUnknownError, flatbuffer.error()));
+    return;
+  }
+  buffer = DOMArrayBuffer::Create(flatbuffer->data(), flatbuffer->size());
+
   auto* script_state = resolver->GetScriptState();
   auto* execution_context = ExecutionContext::From(script_state);
   auto* ml_model_loader = ml_context_->GetModelLoaderForWebNN(script_state);

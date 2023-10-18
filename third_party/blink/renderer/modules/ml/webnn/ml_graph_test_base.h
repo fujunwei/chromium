@@ -26,7 +26,10 @@ enum ExecutionMode { kAsync, kSync };
 // The backends share the unit tests in the MLGraphTest.
 enum BackendType { kFake, kXnnpack, kModelLoader, kWebNNService };
 
-using TestVariety = std::tuple<BackendType, ExecutionMode>;
+struct TestVariety {
+  BackendType backend_type;
+  ExecutionMode execution_mode;
+};
 
 std::string TestVarietyToString(
     const ::testing::TestParamInfo<TestVariety>& info);
@@ -68,6 +71,9 @@ class MLGraphTestBase : public ::testing::Test,
   static ScriptPromise CreateContext(
       V8TestingScope& scope,
       MLContextOptions* options = MLContextOptions::Create());
+
+  // The backend type for testing MLGraphTest (e.g. Xnnpack, ModelLoader).
+  BackendType GetBackendType();
 
  private:
   // The execution mode for testing build and compute graph (e.g. async, sync.).

@@ -61,6 +61,8 @@ blink_modules_sources("ml") {
     sources += [
       "webnn/ml_graph_cros.cc",
       "webnn/ml_graph_cros.h",
+      "webnn/ml_graph_tflite_converter.cc",
+      "webnn/ml_graph_tflite_converter.h",
     ]
 
     deps += [
@@ -124,8 +126,15 @@ source_set("unit_tests") {
   }
 
   if (is_chromeos && current_cpu == "x64") {
-    sources += [ "webnn/ml_graph_test_cros.cc" ]
-    deps += [ "//third_party/tflite" ]
+    sources += [
+      "webnn/ml_graph_test.cc",
+      "webnn/ml_graph_test_cros.cc",
+      "webnn/ml_graph_test_cros.h",
+    ]
+    deps += [
+      ":buildflags",
+      "//third_party/tflite",
+    ]
   }
 
   if (!is_chromeos) {
