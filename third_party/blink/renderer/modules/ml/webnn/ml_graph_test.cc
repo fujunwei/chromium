@@ -958,8 +958,7 @@ struct Conv2dTester {
 };
 
 TEST_P(MLGraphTest, Conv2dTest) {
-  SKIP_TEST_ON_UNSUPPORTED_BACKEND(BackendType::kModelLoader);
-  V8TestingScope scope;
+  MLGraphV8TestingScope scope;
   auto* builder =
       CreateMLGraphBuilder(scope.GetExecutionContext(), scope.GetScriptState(),
                            scope.GetExceptionState());
@@ -1460,8 +1459,7 @@ struct Pool2dTester {
 };
 
 TEST_P(MLGraphTest, Pool2dTest) {
-  SKIP_TEST_ON_UNSUPPORTED_BACKEND(BackendType::kModelLoader);
-  V8TestingScope scope;
+  MLGraphV8TestingScope scope;
   {
     // Test averagePool2d operator for nhwc input layout.
     auto* options = MLPool2dOptions::Create();
