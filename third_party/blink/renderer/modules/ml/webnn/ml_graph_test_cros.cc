@@ -154,12 +154,14 @@ class TfLiteRuntime {
   }
 
   TfLiteStatus Compute(
-      const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>& named_input,
-      WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>& named_output) {
+      const WTF::HashMap<WTF::String, mojo_base::BigBuffer>& named_input,
+      WTF::HashMap<WTF::String, mojo_base::BigBuffer>& named_output) {
     for (auto index : interpreter_->inputs()) {
       auto* tensor = interpreter_->tensor(index);
-      Vector<uint8_t> input_data = named_input.at(WTF::String(tensor->name));
-      memcpy(tensor->data.raw, input_data.data(), tensor->bytes);
+      // const auto input_data = named_input.at(WTF::String(tensor->name));
+      auto iter = named_input.find(WTF::String(tensor->name));
+      CHECK(iter != named_input.end());
+      memcpy(tensor->data.raw, iter->value.data(), tensor->bytes);
     }
 
     // Compute the graph.
@@ -167,10 +169,13 @@ class TfLiteRuntime {
 
     for (auto index : interpreter_->outputs()) {
       auto* tensor = interpreter_->tensor(index);
-      WTF::Vector<uint8_t> output_data(
-          base::checked_cast<wtf_size_t>(tensor->bytes));
-      memcpy(output_data.data(), tensor->data.raw, tensor->bytes);
-      named_output.insert(WTF::String(tensor->name), std::move(output_data));
+      // WTF::Vector<uint8_t> output_data(
+      //     base::checked_cast<wtf_size_t>(tensor->bytes));
+      // memcpy(output_data.data(), tensor->data.raw, tensor->bytes);
+      named_output.insert(
+          WTF::String(tensor->name),
+          base::make_span(reinterpret_cast<const uint8_t*>(tensor->data.raw),
+                          tensor->bytes));
     }
     return kTfLiteOk;
   }
@@ -208,11 +213,12 @@ class FakeWebNNModel : public blink_mojom::Model {
   }
 
   // Override methods from blink_mojom::Model.
-  void Compute(const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>& input,
+  void Compute(const WTF::HashMap<WTF::String, mojo_base::BigBuffer> input,
                blink_mojom::Model::ComputeCallback callback) override {
-    WTF::HashMap<WTF::String, WTF::Vector<uint8_t>> named_output;
+    WTF::HashMap<WTF::String, mojo_base::BigBuffer> named_output;
     EXPECT_EQ(runtime_->Compute(input, named_output), kTfLiteOk);
-    std::move(callback).Run(blink_mojom::ComputeResult::kOk, named_output);
+    std::move(callback).Run(blink_mojom::ComputeResult::kOk,
+                            std::move(named_output));
   }
 
   mojo::Receiver<blink_mojom::Model> receiver_{this};

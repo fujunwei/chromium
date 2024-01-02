@@ -77,7 +77,7 @@ class MODULES_EXPORT MLGraphCrOS final : public MLGraph {
       std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>>
           outputs_info,
       ml::model_loader::mojom::blink::ComputeResult mojo_result,
-      const absl::optional<HashMap<String, Vector<uint8_t>>>& mojo_outputs);
+      const absl::optional<HashMap<String, mojo_base::BigBuffer>> mojo_outputs);
 
   // Compute the converted model with synchronous call of `Model` interface.
   void ComputeSyncImpl(const MLNamedArrayBufferViews& inputs,

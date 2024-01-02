@@ -243,15 +243,14 @@ void MLGraphCrOS::ComputeAsyncImpl(const MLNamedArrayBufferViews& inputs,
   }
   // The inputs were already verified in the base class. so we can fill the
   // buffer directly with the input tensors.
-  HashMap<String, Vector<uint8_t>> input_mojo;
+  HashMap<String, mojo_base::BigBuffer> input_mojo;
   for (const auto& [name, input_info] : *inputs_info) {
-    wtf_size_t input_byte_length =
-        base::checked_cast<wtf_size_t>(input_info.contents.DataLength());
-    Vector<uint8_t> tensor(input_byte_length);
-    memcpy(tensor.data(), input_info.contents.Data(), input_byte_length);
-
-    input_mojo.insert(name, std::move(tensor));
+    const auto& array_buffer = input_info.contents;
+    input_mojo.insert(
+        name, base::make_span(static_cast<const uint8_t*>(array_buffer.Data()),
+                              array_buffer.DataLength()));
   }
+
   remote_model_->Compute(
       std::move(input_mojo),
       WTF::BindOnce(&MLGraphCrOS::OnComputeGraph, WrapPersistent(this),
@@ -265,7 +264,7 @@ void MLGraphCrOS::OnComputeGraph(
     std::unique_ptr<Vector<std::pair<String, ArrayBufferViewInfo>>>
         outputs_info,
     ComputeResult mojo_result,
-    const absl::optional<HashMap<String, Vector<uint8_t>>>& mojo_outputs) {
+    const absl::optional<HashMap<String, mojo_base::BigBuffer>> mojo_outputs) {
   if (mojo_result != ComputeResult::kOk || !mojo_outputs.has_value()) {
     resolver->Reject(MakeGarbageCollected<DOMException>(
         DOMExceptionCode::kOperationError,
@@ -273,7 +272,7 @@ void MLGraphCrOS::OnComputeGraph(
     return;
   }
 
-  for (const auto& [name, view_info] : *outputs_info) {
+  for (const auto& [name, output_view_info] : *outputs_info) {
     // The verification before computing ensures the `ml_outputs` match graph's
     // expectation, so we only need to verify the `mojo_outputs` here.
     auto output_tensor_data = mojo_outputs.value().find(name);
@@ -283,15 +282,16 @@ void MLGraphCrOS::OnComputeGraph(
           "Failed to get result for the output " + name));
       return;
     }
-    if (output_tensor_data->value.size() != view_info.contents.DataLength()) {
+    const auto output_byte_length = output_view_info.contents.DataLength();
+    if (output_tensor_data->value.size() != output_byte_length) {
       resolver->Reject(MakeGarbageCollected<DOMException>(
           DOMExceptionCode::kUnknownError,
           "The output tensor size does not match graph's expectation: " +
               name));
       return;
     }
-    memcpy(view_info.contents.Data(), output_tensor_data->value.data(),
-           output_tensor_data->value.size());
+    memcpy(output_view_info.contents.Data(), output_tensor_data->value.data(),
+           output_byte_length);
   }
   auto* result = MLComputeResult::Create();
   result->setInputs(*CreateNamedArrayBufferViews(std::move(inputs_info)));

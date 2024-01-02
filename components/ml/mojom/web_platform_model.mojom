@@ -153,7 +153,7 @@ interface Model {
   // The backend/frontend should already know the dimension needed for each
   // input/output tensors. So we only need to know the buffer content of the
   // input/output tensors.
-  Compute@0(map<string, array<uint8>> input_tensors)
+  Compute@0(map<string, mojo_base.mojom.BigBuffer> input_tensors)
       => (ComputeResult result,
-          map<string, array<uint8>>? output_tensors);
+          map<string, mojo_base.mojom.BigBuffer>? output_tensors);
 };

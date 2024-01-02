@@ -49,7 +49,7 @@ class MODULES_EXPORT MLModel final : public ScriptWrappable {
       ScriptState* script_state,
       ScriptPromiseResolver* resolver,
       ml::model_loader::mojom::blink::ComputeResult result,
-      const absl::optional<HashMap<String, Vector<uint8_t>>>& outputs);
+      const absl::optional<HashMap<String, mojo_base::BigBuffer>> outputs);
 
   HeapMojoRemote<ml::model_loader::mojom::blink::Model> remote_model_;
 

@@ -82,10 +82,10 @@ class FakeMLModel : public blink_mojom::Model {
   ~FakeMLModel() override = default;
 
   using ComputeFn = base::OnceCallback<void(
-      const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>&,
+      const WTF::HashMap<WTF::String, mojo_base::BigBuffer>&,
       blink_mojom::Model::ComputeCallback callback)>;
 
-  void Compute(const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>& input,
+  void Compute(const WTF::HashMap<WTF::String, mojo_base::BigBuffer> input,
                blink_mojom::Model::ComputeCallback callback) override {
     std::move(compute_).Run(input, std::move(callback));
   }
@@ -118,24 +118,25 @@ class FakeMLModel : public blink_mojom::Model {
 
   void SetComputeResult(
       const std::map<std::string, WTF::Vector<uint8_t>>& output) {
-    WTF::HashMap<WTF::String, WTF::Vector<uint8_t>> ml_output;
+    WTF::HashMap<WTF::String, mojo_base::BigBuffer> ml_output;
     for (const auto& [name, data] : output) {
-      ml_output.Set(WTF::String(name), data);
+      ml_output.Set(WTF::String(name),
+                    base::make_span(data.data(), data.size()));
     }
     compute_ = WTF::BindOnce(
-        [](WTF::HashMap<WTF::String, WTF::Vector<uint8_t>> output,
-           const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>&,
+        [](WTF::HashMap<WTF::String, mojo_base::BigBuffer> output,
+           const WTF::HashMap<WTF::String, mojo_base::BigBuffer>&,
            blink_mojom::Model::ComputeCallback callback) {
           std::move(callback).Run(blink_mojom::ComputeResult::kOk,
                                   std::move(output));
         },
-        ml_output);
+        std::move(ml_output));
   }
 
   void SetComputeFailure(const blink_mojom::ComputeResult result) {
     compute_ = WTF::BindOnce(
         [](const blink_mojom::ComputeResult result,
-           const WTF::HashMap<WTF::String, WTF::Vector<uint8_t>>&,
+           const WTF::HashMap<WTF::String, mojo_base::BigBuffer>&,
            blink_mojom::Model::ComputeCallback callback) {
           std::move(callback).Run(result, {});
         },

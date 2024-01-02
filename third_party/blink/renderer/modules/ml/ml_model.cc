@@ -129,15 +129,13 @@ ScriptPromise MLModel::compute(
     }
   }
   // Fills the buffer with input tensors.
-  HashMap<String, Vector<uint8_t>> input_mojo;
-
+  HashMap<String, mojo_base::BigBuffer> input_mojo;
   for (const auto& name_tensor : inputs) {
-    wtf_size_t size = base::checked_cast<wtf_size_t>(
-        name_tensor.second->data()->byteLength());
-    Vector<uint8_t> tensor(size);
-    memcpy(tensor.data(), name_tensor.second->data()->BaseAddress(), size);
-
-    input_mojo.insert(name_tensor.first, std::move(tensor));
+    const auto& array_buffer = name_tensor.second->data();
+    input_mojo.insert(name_tensor.first,
+                      base::make_span(static_cast<const uint8_t*>(
+                                          array_buffer->BaseAddress()),
+                                      array_buffer->byteLength()));
   }
 
   remote_model_->Compute(
@@ -158,7 +156,7 @@ void MLModel::OnComputeResult(
     ScriptState* script_state,
     ScriptPromiseResolver* resolver,
     ComputeResult result,
-    const absl::optional<HashMap<String, Vector<uint8_t>>>& outputs) {
+    const absl::optional<HashMap<String, mojo_base::BigBuffer>> outputs) {
   if (result != ComputeResult::kOk || !outputs.has_value()) {
     resolver->Reject(MakeGarbageCollected<DOMException>(
         DOMExceptionCode::kOperationError,
