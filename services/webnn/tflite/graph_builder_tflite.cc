@@ -255,98 +255,107 @@ GraphBuilderTflite::CreateAndBuild(ContextProperties context_properties,
                                    const mojom::GraphInfo& graph_info) {
   GraphBuilderTflite builder(std::move(context_properties), graph_info);
 
+  std::vector<int32_t> graph_inputs;
+  graph_inputs.reserve(graph_info.input_operands.size());
+  std::vector<int32_t> graph_outputs;
+  graph_outputs.reserve(graph_info.output_operands.size());
   for (const auto& [operand_id, operand] : graph_info.id_to_operand_map) {
-    RETURN_IF_ERROR(builder.SerializeOperand(operand_id, *operand));
+    RETURN_IF_ERROR(builder.SerializeOperand(operand_id, *operand, graph_inputs,
+                                             graph_outputs));
   }
 
   for (const mojom::OperationPtr& operation : graph_info.operations) {
     RETURN_IF_ERROR(builder.SerializeOperation(*operation));
   }
 
-  return builder.FinishAndTakeFlatBuffer(graph_info.input_operands,
-                                         graph_info.output_operands);
+  return builder.FinishAndTakeFlatBuffer(graph_inputs, graph_outputs);
 }
 
 // static
 ContextProperties GraphBuilderTflite::GetContextProperties() {
   // TODO: crbug.com/345271830 - specify data types for all parameters.
-  static constexpr SupportedDataTypes kFloat32{OperandDataType::kFloat32};
-  static constexpr SupportedDataTypes kFloat32AndInt32To64{
-      OperandDataType::kFloat32, OperandDataType::kInt32,
+  static constexpr SupportedDataTypes kFloatsAndInt32To64{
+      OperandDataType::kFloat32, OperandDataType::kFloat16,
+      OperandDataType::kInt32, OperandDataType::kInt64};
+  static constexpr SupportedDataTypes kFloatsAndInts32AndInt64{
+      OperandDataType::kFloat32, OperandDataType::kFloat16,
+      OperandDataType::kInt32, OperandDataType::kUint32,
       OperandDataType::kInt64};
-  static constexpr SupportedDataTypes kFloat32AndInts32AndInt64{
-      OperandDataType::kFloat32, OperandDataType::kInt32,
-      OperandDataType::kUint32, OperandDataType::kInt64};
-  static constexpr SupportedDataTypes kFloat32AndInt32{
-      OperandDataType::kFloat32, OperandDataType::kInt32};
-  static constexpr SupportedDataTypes kFloat32AndInt32To64AndUint8{
-      OperandDataType::kFloat32, OperandDataType::kInt32,
-      OperandDataType::kInt64, OperandDataType::kUint8};
-  static constexpr SupportedDataTypes kFloat32AndInt8To64AndUint32{
-      OperandDataType::kFloat32, OperandDataType::kInt32,
-      OperandDataType::kUint32, OperandDataType::kInt64,
-      OperandDataType::kInt8};
-  static constexpr SupportedDataTypes kFloat32AndInt8To32AndUint8{
-      OperandDataType::kFloat32, OperandDataType::kInt32,
-      OperandDataType::kInt8, OperandDataType::kUint8};
-  static constexpr SupportedDataTypes kFloat32AndInt8To64AndUint8{
-      OperandDataType::kFloat32, OperandDataType::kInt64,
-      OperandDataType::kInt32, OperandDataType::kInt8, OperandDataType::kUint8};
-  static constexpr SupportedDataTypes kEluSupportedDataTypes{
-      OperandDataType::kFloat32, OperandDataType::kInt8};
-  static constexpr SupportedDataTypes kSliceSupportedDataTypes{
-      OperandDataType::kFloat32, OperandDataType::kInt64,
+  static constexpr SupportedDataTypes kFloatsAndInt32{OperandDataType::kFloat32,
+                                                      OperandDataType::kFloat16,
+                                                      OperandDataType::kInt32};
+  static constexpr SupportedDataTypes kFloatsAndInt32To64AndUint8{
+      OperandDataType::kFloat32, OperandDataType::kFloat16,
+      OperandDataType::kInt32, OperandDataType::kInt64,
+      OperandDataType::kUint8};
+  static constexpr SupportedDataTypes kFloatsAndInt8To64AndUint32{
+      OperandDataType::kFloat32, OperandDataType::kFloat16,
       OperandDataType::kInt32,   OperandDataType::kUint32,
+      OperandDataType::kInt64,   OperandDataType::kInt8};
+  static constexpr SupportedDataTypes kFloatsAndInt8To32AndUint8{
+      OperandDataType::kFloat32, OperandDataType::kFloat16,
+      OperandDataType::kInt32, OperandDataType::kInt8, OperandDataType::kUint8};
+  static constexpr SupportedDataTypes kFloatsAndInt8To64AndUint8{
+      OperandDataType::kFloat32, OperandDataType::kFloat16,
+      OperandDataType::kInt64,   OperandDataType::kInt32,
       OperandDataType::kInt8,    OperandDataType::kUint8};
+  static constexpr SupportedDataTypes kEluSupportedDataTypes{
+      OperandDataType::kFloat32, OperandDataType::kFloat16,
+      OperandDataType::kInt8};
+  static constexpr SupportedDataTypes kSliceSupportedDataTypes{
+      OperandDataType::kFloat32, OperandDataType::kFloat16,
+      OperandDataType::kInt32,   OperandDataType::kUint32,
+      OperandDataType::kInt8,    OperandDataType::kUint8,
+      OperandDataType::kInt64};
   return ContextProperties(
       InputOperandLayout::kNhwc,
       {/*input=*/SupportedDataTypes::All(),
        /*constant=*/SupportedDataTypes::All(),
-       /*arg_min_max_input=*/kFloat32AndInt8To32AndUint8,
+       /*arg_min_max_input=*/kFloatsAndInt8To32AndUint8,
        /*arg_min_max_output=*/DataTypeConstraint::kInt32To64,
        /*concat_inputs=*/SupportedDataTypes::All(),
-       /*add_input=*/kFloat32AndInt32To64,
-       /*sub_input=*/kFloat32AndInt32To64,
-       /*mul_input=*/kFloat32AndInts32AndInt64,
-       /*div_input=*/kFloat32AndInt32,
-       /*max_input=*/kFloat32AndInt32To64,
-       /*min_input=*/kFloat32AndInt32To64,
-       /*pow_input=*/kFloat32AndInt32,
-       /*equal_input=*/kFloat32AndInt32To64AndUint8,
-       /*greater_input=*/kFloat32AndInt32To64,
-       /*greater_or_equal_input=*/kFloat32AndInt32To64,
-       /*lesser_input=*/kFloat32AndInt32To64,
-       /*lesser_or_equal_input=*/kFloat32AndInt32To64,
+       /*add_input=*/kFloatsAndInt32To64,
+       /*sub_input=*/kFloatsAndInt32To64,
+       /*mul_input=*/kFloatsAndInts32AndInt64,
+       /*div_input=*/kFloatsAndInt32,
+       /*max_input=*/kFloatsAndInt32To64,
+       /*min_input=*/kFloatsAndInt32To64,
+       /*pow_input=*/kFloatsAndInt32,
+       /*equal_input=*/kFloatsAndInt32To64AndUint8,
+       /*greater_input=*/kFloatsAndInt32To64,
+       /*greater_or_equal_input=*/kFloatsAndInt32To64,
+       /*lesser_input=*/kFloatsAndInt32To64,
+       /*lesser_or_equal_input=*/kFloatsAndInt32To64,
        /*logical_not_input=*/DataTypeConstraint::kUint8,
        /*logical_output=*/DataTypeConstraint::kUint8,
-       /*abs_input=*/kFloat32AndInt32,
-       /*ceil_input=*/kFloat32,
-       /*cos_input=*/kFloat32,
-       /*erf_input=*/kFloat32,
-       /*exp_input=*/kFloat32,
-       /*floor_input=*/kFloat32,
+       /*abs_input=*/kFloatsAndInt32,
+       /*ceil_input=*/DataTypeConstraint::kFloat16To32,
+       /*cos_input=*/DataTypeConstraint::kFloat16To32,
+       /*erf_input=*/DataTypeConstraint::kFloat16To32,
+       /*exp_input=*/DataTypeConstraint::kFloat16To32,
+       /*floor_input=*/DataTypeConstraint::kFloat16To32,
        // Identity is emulated by reshape.
-       /*identity_input=*/kFloat32AndInt8To64AndUint8,
-       /*log_input=*/kFloat32,
-       /*neg_input=*/kFloat32AndInt32To64,
-       /*reciprocal_input=*/kFloat32,
-       /*sin_input=*/kFloat32,
-       /*sqrt_input=*/kFloat32,
-       /*tan_input=*/kFloat32,
+       /*identity_input=*/kFloatsAndInt8To64AndUint8,
+       /*log_input=*/DataTypeConstraint::kFloat16To32,
+       /*neg_input=*/kFloatsAndInt32To64,
+       /*reciprocal_input=*/DataTypeConstraint::kFloat16To32,
+       /*sin_input=*/DataTypeConstraint::kFloat16To32,
+       /*sqrt_input=*/DataTypeConstraint::kFloat16To32,
+       /*tan_input=*/DataTypeConstraint::kFloat16To32,
        /*elu_input=*/kEluSupportedDataTypes,
-       /*gather_input=*/kFloat32AndInt8To64AndUint8,
+       /*gather_input=*/kFloatsAndInt8To64AndUint8,
        /*gather_indices=*/DataTypeConstraint::kGatherIndicesSupportedDataTypes,
-       /*gelu_input=*/kFloat32,
-       /*leaky_relu_input=*/kFloat32,
-       /*relu_input=*/kFloat32,
-       /*sigmoid_input=*/kFloat32,
+       /*gelu_input=*/DataTypeConstraint::kFloat16To32,
+       /*leaky_relu_input=*/DataTypeConstraint::kFloat16To32,
+       /*relu_input=*/DataTypeConstraint::kFloat16To32,
+       /*sigmoid_input=*/DataTypeConstraint::kFloat16To32,
        /*slice_input=*/kSliceSupportedDataTypes,
-       /*softmax_input=*/kFloat32,
-       /*softplus_input=*/kFloat32,
-       /*softsign_input=*/kFloat32,
-       /*split_input=*/kFloat32AndInt8To64AndUint8,
+       /*softmax_input=*/DataTypeConstraint::kFloat16To32,
+       /*softplus_input=*/DataTypeConstraint::kFloat16To32,
+       /*softsign_input=*/DataTypeConstraint::kFloat16To32,
+       /*split_input=*/kFloatsAndInt8To64AndUint8,
        /*where_condition=*/DataTypeConstraint::kUint8,
-       /*where_value=*/kFloat32AndInt8To64AndUint32});
+       /*where_value=*/kFloatsAndInt8To64AndUint32});
 }
 
 GraphBuilderTflite::GraphBuilderTflite(ContextProperties context_properties,
@@ -362,36 +371,97 @@ GraphBuilderTflite::~GraphBuilderTflite() = default;
 
 base::expected<void, std::string> GraphBuilderTflite::SerializeOperand(
     uint64_t operand_id,
-    const mojom::Operand& operand) {
+    const mojom::Operand& operand,
+    std::vector<int32_t>& graph_inputs,
+    std::vector<int32_t>& graph_outputs) {
   // The index of `tflite::Tensor` array, each `Operand` (input, constant,
   // output) will be converted and pushed back into the array, so it's increased
   // by one after each serialization in flat buffer.
   int32_t tensor_index = base::checked_cast<int32_t>(tensors_.size());
   CHECK_GE(tensor_index, 0);
-
-  // The buffer index 0 represents input and output operand because there is no
-  // data buffer associated.
-  uint32_t buffer_index = 0;
-  if (operand.kind == mojom::Operand::Kind::kConstant) {
-    // Serialize buffer and return buffer index which starts from 1, it is
-    // used to create the constant's tensor.
-    buffer_index =
-        SerializeBuffer(graph_info_->constant_id_to_buffer_map.at(operand_id));
-  }
-
-  // Create `Tensor` with operand shape, the index of buffer and the name.
+  const OperandDataType data_type = operand.descriptor.data_type();
   ASSIGN_OR_RETURN(std::vector<int32_t> signed_operand_dimensions,
                    ToSignedDimensions(operand.descriptor.shape()));
   const flatbuffers::Offset<flatbuffers::Vector<int32_t>> dimensions =
       builder_.CreateVector<int32_t>(std::move(signed_operand_dimensions));
-  const auto operand_type =
-      OperandDataTypeToTFLite(operand.descriptor.data_type());
+  auto operand_type = OperandDataTypeToTFLite(data_type);
+
+  // The buffer index 0 represents input and output operand because there is no
+  // data buffer associated.
+  uint32_t buffer_index = 0;
+  switch (operand.kind) {
+    case mojom::Operand::Kind::kInput:
+      break;
+    case mojom::Operand::Kind::kConstant: {
+      // Serialize buffer and return buffer index which starts from 1, it is
+      // used to create the constant's tensor.
+      buffer_index = SerializeBuffer(
+          graph_info_->constant_id_to_buffer_map.at(operand_id));
+      break;
+    }
+    case mojom::Operand::Kind::kOutput: {
+      // The intermediate operands have no the name value.
+      if (!operand.name.has_value() && data_type == OperandDataType::kFloat16) {
+        operand_type = ::tflite::TensorType_FLOAT32;
+      }
+      break;
+    }
+  }
+
+  // Create `Tensor` with operand shape, the index of buffer and the name.
   const StringOffset operand_name =
       operand.name.has_value() ? builder_.CreateString(*operand.name) : 0;
   tensors_.emplace_back(::tflite::CreateTensor(builder_, std::move(dimensions),
                                                operand_type, buffer_index,
                                                operand_name));
-  operand_to_index_map_.insert({operand_id, tensor_index});
+
+  int32_t casted_tensor_index = tensor_index;
+  switch (operand.kind) {
+    case mojom::Operand::Kind::kInput: {
+      LOG(ERROR) << "=======kInput";
+      graph_inputs.push_back(tensor_index);
+      if (data_type == OperandDataType::kFloat16) {
+        // Insert a TFLite dequantize operator to convert fp16 to fp32.
+        casted_tensor_index = SerializeDequantizeOperation(
+            tensor_index, signed_operand_dimensions);
+      }
+      operand_to_index_map_.insert({operand_id, casted_tensor_index});
+      break;
+    }
+    case mojom::Operand::Kind::kConstant: {
+      if (data_type == OperandDataType::kFloat16) {
+        // Insert a TFLite dequantize operator to convert fp16 to fp32.
+        casted_tensor_index = SerializeDequantizeOperation(
+            tensor_index, signed_operand_dimensions);
+      }
+      operand_to_index_map_.insert({operand_id, casted_tensor_index});
+      break;
+    }
+    case mojom::Operand::Kind::kOutput: {
+      // The intermediate operands have no the name value, only the graph
+      // outputs have the name.
+      if (operand.name.has_value()) {
+        LOG(ERROR) << "=======kOutput";
+        if (data_type == OperandDataType::kFloat16) {
+          // Insert a TFLite cast operator to convert fp32 to fp16.
+          casted_tensor_index = SerializeTemporaryTensor(
+              signed_operand_dimensions, ::tflite::TensorType_FLOAT16);
+          operators_.emplace_back(SerializeCastOperation(
+              tensor_index,
+              /*input_tensor_types=*/::tflite::TensorType_FLOAT32,
+              casted_tensor_index,
+              /*output_tensor_type=*/::tflite::TensorType_FLOAT16));
+        }
+        operand_to_index_map_.insert({operand_id, tensor_index});
+        graph_outputs.push_back(casted_tensor_index);
+      } else {
+        // The intermediate operand that connects with two operators has no
+        // the name value.
+        operand_to_index_map_.insert({operand_id, casted_tensor_index});
+      }
+      break;
+    }
+  }
   return base::ok();
 }
 
@@ -563,25 +633,9 @@ base::expected<void, std::string> GraphBuilderTflite::SerializeOperation(
 }
 
 flatbuffers::DetachedBuffer GraphBuilderTflite::FinishAndTakeFlatBuffer(
-    base::span<const uint64_t> input_operands,
-    base::span<const uint64_t> output_operands) {
+    base::span<const int32_t> input_indices,
+    base::span<const int32_t> output_indices) {
   CHECK(!is_created_model_);
-
-  int32_t* graph_input_ids = nullptr;
-  auto graph_input_ids_index = builder_.CreateUninitializedVector<int32_t>(
-      input_operands.size(), &graph_input_ids);
-  base::ranges::transform(input_operands, graph_input_ids,
-                          [&](uint64_t operand_id) {
-                            return operand_to_index_map_.at(operand_id);
-                          });
-
-  int32_t* graph_output_ids = nullptr;
-  auto graph_output_ids_index = builder_.CreateUninitializedVector<int32_t>(
-      output_operands.size(), &graph_output_ids);
-  base::ranges::transform(output_operands, graph_output_ids,
-                          [&](uint64_t operand_id) {
-                            return operand_to_index_map_.at(operand_id);
-                          });
 
   // Create `tflite::SubGraph`, which typically represents an entire model.
   // The inputs of subgraph are the list of non-static tensors that feed into
@@ -589,7 +643,8 @@ flatbuffers::DetachedBuffer GraphBuilderTflite::FinishAndTakeFlatBuffer(
   // product of the subgraph's inference. The operators are in execution order.
   flatbuffers::Offset<::tflite::SubGraph> subgraph = ::tflite::CreateSubGraph(
       builder_, builder_.CreateVector(tensors_.data(), tensors_.size()),
-      graph_input_ids_index, graph_output_ids_index,
+      builder_.CreateVector<int32_t>(input_indices),
+      builder_.CreateVector<int32_t>(output_indices),
       builder_.CreateVector(operators_.data(), operators_.size()));
 
   StringOffset description =
@@ -748,6 +803,22 @@ auto GraphBuilderTflite::SerializeConcatOperation(
       builder_.CreateVector<int32_t>(input_tensor_indices),
       builder_.CreateVector<int32_t>(operator_outputs),
       ::tflite::BuiltinOptions_ConcatenationOptions, concat_options.Union());
+}
+
+int32_t GraphBuilderTflite::SerializeDequantizeOperation(
+    int32_t input_tensor_index,
+    base::span<const int32_t> input_dimensions) {
+  const int32_t output_tensor_index =
+      SerializeTemporaryTensor(input_dimensions, ::tflite::TensorType_FLOAT32);
+  const uint32_t operator_code_index =
+      GetOperatorCodeIndex(::tflite::BuiltinOperator_DEQUANTIZE);
+  const std::array<int32_t, 1> op_inputs = {input_tensor_index};
+  const std::array<int32_t, 1> op_outputs = {output_tensor_index};
+  operators_.emplace_back(::tflite::CreateOperator(
+      builder_, operator_code_index, builder_.CreateVector<int32_t>(op_inputs),
+      builder_.CreateVector<int32_t>(op_outputs)));
+
+  return output_tensor_index;
 }
 
 auto GraphBuilderTflite::SerializeMatmulOperation(int32_t a_tensor_index,
@@ -1250,11 +1321,6 @@ auto GraphBuilderTflite::SerializeConv2d(const mojom::Conv2d& conv2d)
   }
 
   const mojom::Operand& input_operand = GetOperand(conv2d.input_operand_id);
-  // TODO(crbug.com/328733319): Support other tensor data types.
-  if (input_operand.descriptor.data_type() != OperandDataType::kFloat32) {
-    return base::unexpected("The data type of input is not supported.");
-  }
-
   // Get tflite padding mode with the size2d of input, filter, dilation.
   const auto& input_shape = input_operand.descriptor.shape();
   CHECK_EQ(input_shape.size(), 4u);

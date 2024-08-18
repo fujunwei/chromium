@@ -77,7 +77,9 @@ class GraphBuilderTflite final {
   // in the `tflite::Tensor` array if it's successful.
   base::expected<void, std::string> SerializeOperand(
       uint64_t operand_id,
-      const mojom::Operand& operand);
+      const mojom::Operand& operand,
+      std::vector<int32_t>& graph_inputs,
+      std::vector<int32_t>& graph_outputs);
 
   // The following steps implement the `SerializeOperation` function:
   // 1. Create `tflite::OperatorCode` with the kind of operator.
@@ -148,6 +150,12 @@ class GraphBuilderTflite final {
       base::span<const int32_t> input_tensor_indices,
       int32_t output_tensor_index,
       uint32_t axis);
+
+  // This function serializes a TFLite dequantize operator to convert fp16 data
+  // type to fp32.
+  int32_t SerializeDequantizeOperation(
+      int32_t input_tensor_index,
+      base::span<const int32_t> input_dimensions);
 
   // This function is called by `SerializeMatmul` to serialize WebNN
   // matmul operator or used to emulate WebNN operations.
@@ -479,8 +487,8 @@ class GraphBuilderTflite final {
   // No further methods may be called on this class after calling this method
   // because the buffer of `buffer_` is now owned by the detached buffer.
   flatbuffers::DetachedBuffer FinishAndTakeFlatBuffer(
-      base::span<const uint64_t> input_operands,
-      base::span<const uint64_t> output_operands);
+      base::span<const int32_t> input_indices,
+      base::span<const int32_t> output_indices);
 
   const ContextProperties context_properties_;
 
