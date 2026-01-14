@@ -16,7 +16,8 @@ namespace switches {
 // has trouble deducing the type and size of the array, even if you specify the
 // type. If you add new build flags to items of the array, be sure and also add
 // them to the #if right below guarding the definition.
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(WEBNN_USE_TFLITE) || BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_MAC) || BUILDFLAG(WEBNN_USE_TFLITE) || BUILDFLAG(IS_WIN) || \
+    BUILDFLAG(WEBNN_USE_LITERT)
 
 // Returns the list of WebNN switches passed from the GpuProcessHost to the
 // GPU process. Add your switch to this list if you need to read it in the

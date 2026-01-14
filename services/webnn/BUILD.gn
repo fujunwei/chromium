@@ -136,7 +136,7 @@ component("webnn_service") {
     ]
   }
 
-  if (webnn_use_tflite) {
+  if (webnn_use_tflite || webnn_use_litert) {
     sources += [
       "tflite/buffer_content_tflite.cc",
       "tflite/buffer_content_tflite.h",
@@ -228,7 +228,7 @@ component("webnn_service") {
     configs += [ "//build/config/compiler:no_exit_time_destructors" ]
   }
 
-  if (is_apple || webnn_use_tflite) {
+  if (is_apple || webnn_use_tflite || webnn_use_litert) {
     sources += [
       "queueable_resource_state.h",
       "queueable_resource_state_base.cc",
