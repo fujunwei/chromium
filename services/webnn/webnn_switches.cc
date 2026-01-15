@@ -29,6 +29,7 @@ base::span<const char* const> GetWebNNSwitchesCopiedFromGpuProcessHost() {
 #endif
 #if BUILDFLAG(WEBNN_USE_TFLITE)
       kWebNNTfliteDumpModel,
+      kWebNNLiteRTPluginLibraryPathForTesting,
 #endif
 #if BUILDFLAG(IS_WIN)
       kWebNNOrtLoggingLevel,

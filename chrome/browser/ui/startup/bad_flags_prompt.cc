@@ -152,6 +152,9 @@ const char* const kBadFlags[] = {
     switches::kWebNNOrtLibraryPathForTesting,
     switches::kWebNNOrtEpLibraryPathForTesting,
 #endif
+    // These flags allow loading LiteRT plugin libraries from specified paths,
+    // which may compromise process integrity and security.
+    switches::kWebNNLiteRTPluginLibraryPathForTesting,
 
 #if !BUILDFLAG(IS_ANDROID)
     // A flag to bypass the WebHID blocklist for testing purposes.

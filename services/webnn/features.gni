@@ -12,7 +12,7 @@ declare_args() {
   webnn_use_tflite = is_android || is_chromeos || is_linux || is_apple || is_win
 
   # TODO(crbug.com/454732289): Enable LiteRT after migration is complete.
-  webnn_use_litert = false
+  webnn_use_litert = true
 
   # Enable the GPU delegate provided by the Optimization Guide library.
   webnn_use_chrome_ml_api = enable_ml_internal

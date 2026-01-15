@@ -124,6 +124,35 @@ base::expected<T, mojom::ErrorPtr> AsBaseExpected(
                                             result.Error().Message()));
 }
 
+base::expected<::litert::Environment, mojom::ErrorPtr> GetEnvironment() {
+  std::vector<::litert::Environment::Option> environment_options;
+  // If the switch `kWebNNLiteRTPluginLibraryPathForTesting` is used, try
+  // to load the LiteRT plugin (e.g. OpenVINO) library from the specified path.
+  const base::CommandLine* command_line =
+      base::CommandLine::ForCurrentProcess();
+  std::string litert_plugin_path;
+  if (command_line->HasSwitch(
+          switches::kWebNNLiteRTPluginLibraryPathForTesting)) {
+    litert_plugin_path = command_line->GetSwitchValueASCII(
+        switches::kWebNNLiteRTPluginLibraryPathForTesting);
+    if (litert_plugin_path.empty()) {
+      return base::unexpected(mojom::Error::New(
+          mojom::Error::Code::kUnknownError,
+          "The specified LiteRT plugin library path is empty."));
+    }
+
+    environment_options.push_back(::litert::Environment::Option{
+        ::litert::Environment::OptionTag::DispatchLibraryDir,
+        litert_plugin_path});
+    environment_options.push_back(::litert::Environment::Option{
+        ::litert::Environment::OptionTag::CompilerPluginLibraryDir,
+        litert_plugin_path});
+  }
+
+  return AsBaseExpected(
+      ::litert::Environment::Create(std::move(environment_options)));
+}
+
 }  // namespace
 
 // Represents the non-thread-safe collection of resources associated with a
@@ -157,9 +186,7 @@ class GraphImplLiteRt::ComputeResources {
     // compilation_options.SetExternalWeightScopedFile(
     //     *self->weights_file_,
     //     std::move(build_graph_result.weights_section_map));
-
-    ASSIGN_OR_RETURN(self->env_,
-                     AsBaseExpected(::litert::Environment::Create({})));
+    ASSIGN_OR_RETURN(self->env_, GetEnvironment());
 
     ASSIGN_OR_RETURN(
         self->model_,

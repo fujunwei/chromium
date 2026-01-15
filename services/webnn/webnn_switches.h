@@ -25,6 +25,15 @@ inline constexpr char kWebNNCoreMlDumpModel[] = "webnn-coreml-dump-model";
 // GPU process sandbox or --no-sandbox must be used.
 // Usage: --no-sandbox --webnn-tflite-dump-model=/tmp/tflite_models
 inline constexpr char kWebNNTfliteDumpModel[] = "webnn-tflite-dump-model";
+
+// Force LiteRT plugin libraries to be loaded from a location specified
+// by the switch for testing development LiteRT plugin (e.g. OpenVINO) builds.
+// This switch is not to be used in shipping scenarios and is ignored by
+// default. Usage:
+// --webnn-litert-plugin-library-path-for-testing="/path/to/litert/openvino/plugins"
+// --allow-third-party-modules
+inline constexpr char kWebNNLiteRTPluginLibraryPathForTesting[] =
+    "webnn-litert-plugin-library-path-for-testing";
 #endif  // BUILDFLAG(WEBNN_USE_TFLITE) || BUILDFLAG(WEBNN_USE_LITERT)
 
 #if BUILDFLAG(IS_WIN)
