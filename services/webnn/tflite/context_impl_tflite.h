@@ -38,6 +38,13 @@ class ContextImplTflite final : public WebNNContextImpl {
       ScopedTrace scoped_trace,
       bool is_incognito);
 
+  // Factory method for running without GPU dependencies (e.g., in the renderer
+  // process).
+  static WebNNContextImplPtr CreateForRenderer(
+      mojo::PendingReceiver<mojom::WebNNContext> receiver,
+      mojom::CreateContextOptionsPtr options,
+      scoped_refptr<base::SequencedTaskRunner> task_runner);
+
   ContextImplTflite(
       mojo::PendingReceiver<mojom::WebNNContext> receiver,
       base::WeakPtr<WebNNContextProviderImpl> context_provider,
@@ -50,6 +57,12 @@ class ContextImplTflite final : public WebNNContextImpl {
       gpu::SharedImageManager* shared_image_manager,
       scoped_refptr<base::SingleThreadTaskRunner> main_task_runner,
       bool is_incognito);
+
+  // Constructor for running without GPU dependencies.
+  ContextImplTflite(
+      mojo::PendingReceiver<mojom::WebNNContext> receiver,
+      mojom::CreateContextOptionsPtr options,
+      scoped_refptr<base::SequencedTaskRunner> task_runner);
 
   ContextImplTflite(const WebNNContextImpl&) = delete;
   ContextImplTflite& operator=(const ContextImplTflite&) = delete;
@@ -93,7 +106,7 @@ class ContextImplTflite final : public WebNNContextImpl {
 
   std::string_view GetBackendName() const override;
 
-  const bool is_incognito_;
+   bool is_incognito_;
   base::WeakPtrFactory<ContextImplTflite> weak_factory_{this};
 };
 

@@ -69,7 +69,7 @@ void WebNNTensorImpl::ReadTensor(ReadTensorCallback callback) {
       context_->scheduler_task_runner(), std::move(callback));
 
   // Call ReadTensorImpl() implemented by a backend.
-  context_->gpu_sequence()->ScheduleGpuTask(base::BindOnce(
+  context_->ScheduleGpuTask(base::BindOnce(
       [](WebNNTensorImpl* self, ReadTensorCallback callback,
          ScopedTrace scoped_trace,
          mojo::ReportBadMessageCallback bad_message_cb) {
@@ -102,7 +102,7 @@ void WebNNTensorImpl::WriteTensor(mojo_base::BigBuffer src_buffer) {
   }
 
   // Call WriteTensorImpl() implemented by a backend.
-  context_->gpu_sequence()->ScheduleGpuTask(base::BindOnce(
+  context_->ScheduleGpuTask(base::BindOnce(
       [](WebNNTensorImpl* self, mojo_base::BigBuffer src_buffer,
          ScopedTrace scoped_trace,
          mojo::ReportBadMessageCallback bad_message_cb) {
@@ -128,7 +128,7 @@ void WebNNTensorImpl::ImportTensor(uint64_t flow_id,
 
   // Defer the next task until the fence is released, after prior scheduled
   // tasks run.
-  context_->gpu_sequence()->ScheduleGpuTask(
+  context_->ScheduleGpuTask(
       base::BindOnce(
           [](WebNNTensorImpl* self, ScopedTrace scoped_trace, uint64_t flow_id,
              mojo::ReportBadMessageCallback bad_message_cb) {
@@ -171,7 +171,7 @@ void WebNNTensorImpl::ExportTensor(uint64_t flow_id,
       context_->scheduler_task_runner(), std::move(callback));
 
   // TODO(crbug.com/462489691): run the Mojo callback with a returned SyncToken.
-  context_->gpu_sequence()->ScheduleGpuTask(
+  context_->ScheduleGpuTask(
       base::BindOnce(
           [](WebNNTensorImpl* self, ExportTensorCallback callback,
              ScopedTrace scoped_trace, uint64_t flow_id,

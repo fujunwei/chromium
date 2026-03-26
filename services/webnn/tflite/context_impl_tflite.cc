@@ -4,6 +4,8 @@
 
 #include "services/webnn/tflite/context_impl_tflite.h"
 
+#include "base/logging.h"
+#include "base/process/process.h"
 #include "services/webnn/public/cpp/webnn_types.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
 #include "services/webnn/public/mojom/webnn_graph.mojom-shared.h"
@@ -70,6 +72,31 @@ ContextImplTflite::ContextImplTflite(
                        std::move(main_task_runner)),
       is_incognito_(is_incognito) {}
 
+// static
+WebNNContextImpl::WebNNContextImplPtr ContextImplTflite::CreateForRenderer(
+    mojo::PendingReceiver<mojom::WebNNContext> receiver,
+    mojom::CreateContextOptionsPtr options,
+    scoped_refptr<base::SequencedTaskRunner> task_runner) {
+  LOG(INFO) << "WebNN: Creating TFLite context in renderer process (pid="
+            << base::GetCurrentProcId() << ")";
+  return WebNNContextImplPtr(
+      new ContextImplTflite(std::move(receiver), std::move(options),
+                            std::move(task_runner)),
+      OnTaskRunnerDeleter(
+          base::SequencedTaskRunner::GetCurrentDefault()));
+}
+
+ContextImplTflite::ContextImplTflite(
+    mojo::PendingReceiver<mojom::WebNNContext> receiver,
+    mojom::CreateContextOptionsPtr options,
+    scoped_refptr<base::SequencedTaskRunner> task_runner)
+    : WebNNContextImpl(std::move(receiver),
+                       ContextBackendUma::kTFLite,
+                       GraphBuilderTflite::GetContextProperties(),
+                       std::move(options),
+                       std::move(task_runner)),
+      is_incognito_(false) {}
+
 ContextImplTflite::~ContextImplTflite() = default;
 
 base::WeakPtr<WebNNContextImpl> ContextImplTflite::AsWeakPtr() {
@@ -86,6 +113,8 @@ void ContextImplTflite::CreateGraphImpl(
     base::flat_map<OperandId, scoped_refptr<WebNNTensorImpl>>
         constant_tensor_operands,
     CreateGraphImplCallback callback) {
+   is_incognito_= true;
+
   if (is_incognito_) {
     // In incognito mode, weights are stored in the Flatbuffer model file
     // rather than an external weights file.

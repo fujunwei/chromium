@@ -138,8 +138,7 @@ specific_include_rules = {
   ".*test_utils?(_.+)?\.(h|cc)": [
     "+services/network/test",
   ],
-  "browser_interface_binders\.cc": [
-    "+services/webnn/public/mojom/features.mojom-features.h",
+  "browser_interface_binders\.cc": [    "+services/webnn/buildflags.h",    "+services/webnn/public/mojom/features.mojom-features.h",
   ],
   "browser_main_loop\.cc": [
     # TODO(crbug.com/40672800): Remove.

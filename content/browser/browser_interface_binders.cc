@@ -129,6 +129,7 @@
 #include "services/shape_detection/public/mojom/facedetection_provider.mojom.h"
 #include "services/shape_detection/public/mojom/shape_detection_service.mojom.h"
 #include "services/shape_detection/public/mojom/textdetection.mojom.h"
+#include "services/webnn/buildflags.h"
 #include "services/webnn/public/mojom/features.mojom-features.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
 #include "storage/browser/quota/quota_internals.mojom.h"
@@ -244,7 +245,6 @@
 
 #if BUILDFLAG(IS_MAC)
 #include "content/browser/renderer_host/text_input_host_impl.h"
-#include "services/webnn/public/cpp/coreml_initializer.h"
 #include "third_party/blink/public/mojom/input/text_input_host.mojom.h"
 #endif
 
@@ -288,35 +288,32 @@ void BindTextDetection(
 void BindWebNNContextProviderForRenderFrame(
     RenderFrameHost* host,
     mojo::PendingReceiver<webnn::mojom::WebNNContextProvider> receiver) {
+#if BUILDFLAG(WEBNN_USE_TFLITE)
+  // Bind WebNNContextProvider in the renderer process where TFLite runs.
+  host->GetProcess()->BindReceiver(
+      mojo::GenericPendingReceiver(std::move(receiver)));
+#else
   auto* process_host = static_cast<RenderProcessHostImpl*>(host->GetProcess());
   const bool is_incognito = host->GetBrowserContext()->IsOffTheRecord();
-#if BUILDFLAG(IS_MAC)
-  webnn::InitializeCacheDirAndRun(
-      base::BindOnce(&viz::GpuClient::BindWebNNContextProvider,
-                     process_host->GetGpuClient()->GetWeakPtr(),
-                     std::move(receiver), is_incognito));
-#else
   process_host->GetGpuClient()->BindWebNNContextProvider(std::move(receiver),
                                                          is_incognito);
-#endif
+#endif  // BUILDFLAG(WEBNN_USE_TFLITE)
 }
 
 template <typename WorkerHost>
 void BindWebNNContextProviderForWorker(
     WorkerHost* host,
     mojo::PendingReceiver<webnn::mojom::WebNNContextProvider> receiver) {
+#if BUILDFLAG(WEBNN_USE_TFLITE)
+  host->GetProcessHost()->BindReceiver(
+      mojo::GenericPendingReceiver(std::move(receiver)));
+#else
   auto* process_host =
       static_cast<RenderProcessHostImpl*>(host->GetProcessHost());
   const bool is_incognito = process_host->GetBrowserContext()->IsOffTheRecord();
-#if BUILDFLAG(IS_MAC)
-  webnn::InitializeCacheDirAndRun(
-      base::BindOnce(&viz::GpuClient::BindWebNNContextProvider,
-                     process_host->GetGpuClient()->GetWeakPtr(),
-                     std::move(receiver), is_incognito));
-#else
   process_host->GetGpuClient()->BindWebNNContextProvider(std::move(receiver),
                                                          is_incognito);
-#endif
+#endif  // BUILDFLAG(WEBNN_USE_TFLITE)
 }
 
 #if BUILDFLAG(IS_MAC)

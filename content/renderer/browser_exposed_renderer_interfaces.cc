@@ -32,6 +32,11 @@
 #include "mojo/public/cpp/bindings/binder_map.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
+#include "services/webnn/buildflags.h"
+#if BUILDFLAG(WEBNN_USE_TFLITE)
+#include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
+#include "services/webnn/tflite/context_provider_tflite.h"
+#endif  // BUILDFLAG(WEBNN_USE_TFLITE)
 #include "v8/include/v8-isolate.h"
 #include "v8/include/v8-statistics.h"
 
@@ -192,6 +197,19 @@ void ExposeRendererInterfacesToBrowser(
   binders->Add<mojom::ResourceUsageReporter>(
       base::BindRepeating(&CreateResourceUsageReporter, render_thread),
       base::SingleThreadTaskRunner::GetCurrentDefault());
+
+#if BUILDFLAG(WEBNN_USE_TFLITE)
+  binders->Add<webnn::mojom::WebNNContextProvider>(
+      base::BindRepeating(
+          [](mojo::PendingReceiver<webnn::mojom::WebNNContextProvider>
+                 receiver) {
+            mojo::MakeSelfOwnedReceiver(
+                std::make_unique<webnn::tflite::ContextProviderTflite>(),
+                std::move(receiver));
+          }),
+      base::SingleThreadTaskRunner::GetCurrentDefault());
+#endif  // BUILDFLAG(WEBNN_USE_TFLITE)
+
 #if BUILDFLAG(IS_ANDROID)
   binders->Add<auction_worklet::mojom::AuctionWorkletService>(
 
