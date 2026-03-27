@@ -144,7 +144,7 @@ void WebNNContextImpl::RecordContextBackendUma(ContextBackendUma backend_uma) {
 }
 
 void WebNNContextImpl::OnDisconnect() {
-  if (!context_provider_) {
+  if (!main_task_runner_) {
     // Running without a provider (e.g., in the renderer process).
     return;
   }

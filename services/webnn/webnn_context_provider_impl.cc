@@ -46,10 +46,6 @@
 #include "services/webnn/coreml/context_impl_coreml.h"
 #endif
 
-#if BUILDFLAG(WEBNN_USE_TFLITE)
-#include "services/webnn/tflite/context_impl_tflite.h"
-#endif
-
 #if BUILDFLAG(WEBNN_USE_LITERT)
 #include "services/webnn/tflite/context_impl_litert.h"
 #endif
@@ -388,19 +384,8 @@ void WebNNContextProviderImpl::CreateWebNNContext(
   }
 #endif  // BUILDFLAG(WEBNN_USE_LITERT)
 
-#if BUILDFLAG(WEBNN_USE_TFLITE)
-  if (!context_impl) {
-    CreateTFLiteContext(
-        std::move(scoped_trace), std::move(options),
-        std::move(write_tensor_producer), std::move(write_tensor_consumer),
-        std::move(read_tensor_producer), std::move(read_tensor_consumer),
-        command_buffer_id, std::move(gpu_sequence),
-        std::move(owning_task_runner), std::move(receiver), std::move(remote),
-        std::move(callback), params.is_incognito, std::move(memory_tracker));
-    return;
-  }
-#endif  // BUILDFLAG(WEBNN_USE_TFLITE)
-
+  // TFLite backend has been moved to the render process. The browser-process
+  // proxy handles the fallback to TFLite when the GPU process fails.
   OnCreateWebNNContextImpl(
       std::move(callback), std::move(remote), std::move(write_tensor_producer),
       std::move(read_tensor_consumer), std::move(context_impl));
@@ -443,43 +428,6 @@ void WebNNContextProviderImpl::CreateWeightsFile(
     viz::mojom::GpuHost::CreateWebNNWeightsFileCallback callback) {
   gpu_host_->CreateWebNNWeightsFile(std::move(callback));
 }
-
-#if BUILDFLAG(WEBNN_USE_TFLITE)
-void WebNNContextProviderImpl::CreateTFLiteContext(
-    ScopedTrace scoped_trace,
-    mojom::CreateContextOptionsPtr options,
-    mojo::ScopedDataPipeProducerHandle write_tensor_producer,
-    mojo::ScopedDataPipeConsumerHandle write_tensor_consumer,
-    mojo::ScopedDataPipeProducerHandle read_tensor_producer,
-    mojo::ScopedDataPipeConsumerHandle read_tensor_consumer,
-    gpu::CommandBufferId command_buffer_id,
-    std::unique_ptr<ScopedGpuSequence> gpu_sequence,
-    scoped_refptr<base::SingleThreadTaskRunner> task_runner,
-    mojo::PendingReceiver<mojom::WebNNContext> receiver,
-    mojo::PendingRemote<mojom::WebNNContext> remote,
-    CreateWebNNContextCallback callback,
-    bool is_incognito,
-    scoped_refptr<gpu::MemoryTracker> memory_tracker) {
-  gpu_sequence.reset();
-  gpu_sequence = std::make_unique<ScopedGpuSequence>(
-      *scheduler_, task_runner, command_buffer_id,
-      kWebNNContextImplNamespaceId);
-
-  task_runner->PostTaskAndReplyWithResult(
-      FROM_HERE,
-      base::BindOnce(
-          &tflite::ContextImplTflite::Create, std::move(receiver), AsWeakPtr(),
-          std::move(options), std::move(write_tensor_consumer),
-          std::move(read_tensor_producer), std::move(gpu_sequence),
-          std::move(memory_tracker), task_runner,
-          base::Unretained(shared_image_manager_.get()),
-          main_thread_task_runner_, std::move(scoped_trace), is_incognito),
-      base::BindOnce(&WebNNContextProviderImpl::OnCreateWebNNContextImpl,
-                     AsWeakPtr(), std::move(callback), std::move(remote),
-                     std::move(write_tensor_producer),
-                     std::move(read_tensor_consumer)));
-}
-#endif  // BUILDFLAG(WEBNN_USE_TFLITE)
 
 #if BUILDFLAG(WEBNN_USE_LITERT)
 void WebNNContextProviderImpl::CreateLiteRtContext(
@@ -572,22 +520,13 @@ void WebNNContextProviderImpl::OnOrtEnvCreated(
   return;
 #endif  // BUILDFLAG(WEBNN_USE_LITERT)
 
-#if BUILDFLAG(WEBNN_USE_TFLITE)
-  CreateTFLiteContext(
-      std::move(scoped_trace), std::move(options),
-      std::move(write_tensor_producer), std::move(write_tensor_consumer),
-      std::move(read_tensor_producer), std::move(read_tensor_consumer),
-      command_buffer_id, std::move(gpu_sequence), std::move(task_runner),
-      std::move(receiver), std::move(remote), std::move(callback), is_incognito,
-      std::move(memory_tracker));
-  return;
-#else
+  // TFLite backend has been moved to the render process. Return an error
+  // and let the browser-process proxy handle the fallback to TFLite.
   WebNNContextImplPtr context_impl(nullptr, OnTaskRunnerDeleter(task_runner));
 
   OnCreateWebNNContextImpl(
       std::move(callback), std::move(remote), std::move(write_tensor_producer),
       std::move(read_tensor_consumer), std::move(context_impl));
-#endif  // BUILDFLAG(WEBNN_USE_TFLITE)
 }
 
 void WebNNContextProviderImpl::DidEnsureWebNNExecutionProvidersReady(

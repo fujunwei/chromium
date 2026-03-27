@@ -216,6 +216,9 @@ class GraphImplTflite::ComputeResources {
     self->interpreter_->SetProfiler(&self->profiler_);
 #endif
 
+    LOG(INFO) << "WebNN: ====AllocateTensors in renderer process (pid="
+            << base::GetCurrentProcId() << ")";
+
     // In addition to allocating tensors this step does performs graph
     // initialization steps such as constant folding.
     status = self->interpreter_->AllocateTensors();
