@@ -425,7 +425,7 @@ void WebNNContextProviderImpl::OnCreateWebNNContextImpl(
 }
 
 void WebNNContextProviderImpl::CreateWeightsFile(
-    viz::mojom::GpuHost::CreateWebNNWeightsFileCallback callback) {
+    base::OnceCallback<void(base::File)> callback) {
   gpu_host_->CreateWebNNWeightsFile(std::move(callback));
 }
 

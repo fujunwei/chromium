@@ -76,12 +76,14 @@ ContextImplTflite::ContextImplTflite(
 WebNNContextImpl::WebNNContextImplPtr ContextImplTflite::CreateForRenderer(
     mojo::PendingReceiver<mojom::WebNNContext> receiver,
     mojom::CreateContextOptionsPtr options,
-    scoped_refptr<base::SequencedTaskRunner> task_runner) {
+    scoped_refptr<base::SequencedTaskRunner> task_runner,
+    CreateWeightsFileFn create_weights_file_fn) {
   LOG(INFO) << "WebNN: Creating TFLite context in renderer process (pid="
             << base::GetCurrentProcId() << ")";
   return WebNNContextImplPtr(
       new ContextImplTflite(std::move(receiver), std::move(options),
-                            std::move(task_runner)),
+                            std::move(task_runner),
+                            std::move(create_weights_file_fn)),
       OnTaskRunnerDeleter(
           base::SequencedTaskRunner::GetCurrentDefault()));
 }
@@ -89,12 +91,14 @@ WebNNContextImpl::WebNNContextImplPtr ContextImplTflite::CreateForRenderer(
 ContextImplTflite::ContextImplTflite(
     mojo::PendingReceiver<mojom::WebNNContext> receiver,
     mojom::CreateContextOptionsPtr options,
-    scoped_refptr<base::SequencedTaskRunner> task_runner)
+    scoped_refptr<base::SequencedTaskRunner> task_runner,
+    CreateWeightsFileFn create_weights_file_fn)
     : WebNNContextImpl(std::move(receiver),
                        ContextBackendUma::kTFLite,
                        GraphBuilderTflite::GetContextProperties(),
                        std::move(options),
-                       std::move(task_runner)),
+                       std::move(task_runner),
+                       std::move(create_weights_file_fn)),
       is_incognito_(false) {}
 
 ContextImplTflite::~ContextImplTflite() = default;
@@ -113,8 +117,8 @@ void ContextImplTflite::CreateGraphImpl(
     base::flat_map<OperandId, scoped_refptr<WebNNTensorImpl>>
         constant_tensor_operands,
     CreateGraphImplCallback callback) {
-   is_incognito_= true;
-
+  LOG(ERROR) << "ContextImplTflite::CreateGraphImpl is called." << is_incognito_            << " incognito mode. Graph building will be done in the "
+               "renderer process. (pid=" << base::GetCurrentProcId() << ")";
   if (is_incognito_) {
     // In incognito mode, weights are stored in the Flatbuffer model file
     // rather than an external weights file.

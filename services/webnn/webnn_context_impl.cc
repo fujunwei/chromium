@@ -93,12 +93,14 @@ WebNNContextImpl::WebNNContextImpl(
     WebNNContextImpl::ContextBackendUma backend_uma,
     ContextProperties properties,
     mojom::CreateContextOptionsPtr options,
-    scoped_refptr<base::SequencedTaskRunner> owning_task_runner)
+    scoped_refptr<base::SequencedTaskRunner> owning_task_runner,
+    CreateWeightsFileFn create_weights_file_fn)
     : WebNNObjectBase<mojom::WebNNContext,
                       blink::WebNNContextToken,
                       mojo::Receiver<mojom::WebNNContext>>(
           std::move(receiver),
           owning_task_runner),
+      create_weights_file_fn_(std::move(create_weights_file_fn)),
       properties_(IntersectWithBaseProperties(std::move(properties))),
       options_(std::move(options)),
       memory_type_tracker_(base::MakeRefCounted<gpu::MemoryTracker>()),
@@ -177,26 +179,14 @@ void WebNNContextImpl::DestroyAllContextsAndKillGpuProcess() {
 void WebNNContextImpl::CreateWeightsFile(
     base::OnceCallback<void(base::File)> callback) {
   if (!context_provider_) {
-    // Running without a provider: create a temporary weights file directly.
-    base::ThreadPool::PostTaskAndReplyWithResult(
-        FROM_HERE,
-        {base::TaskPriority::USER_BLOCKING,
-         base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN, base::MayBlock()},
-        base::BindOnce([]() -> base::File {
-          base::FilePath temp_path;
-          if (!base::CreateTemporaryFile(&temp_path)) {
-            return base::File();
-          }
-          base::File weights_file;
-          weights_file.Initialize(
-              temp_path,
-              base::File::FLAG_CREATE_ALWAYS | base::File::FLAG_READ |
-                  base::File::FLAG_WRITE | base::File::FLAG_WIN_TEMPORARY |
-                  base::File::FLAG_WIN_NO_EXECUTE |
-                  base::File::FLAG_DELETE_ON_CLOSE);
-          return weights_file;
-        }),
-        std::move(callback));
+    // Running without a GPU-process provider (e.g., renderer process).
+    // Use the stored callback to request file creation from the browser
+    // process.
+    if (create_weights_file_fn_) {
+      create_weights_file_fn_.Run(std::move(callback));
+    } else {
+      std::move(callback).Run(base::File());
+    }
     return;
   }
   if (!main_task_runner_->RunsTasksInCurrentSequence()) {

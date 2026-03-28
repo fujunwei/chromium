@@ -80,6 +80,11 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
   using CreateGraphImplCallback = base::OnceCallback<void(
       base::expected<scoped_refptr<WebNNGraphImpl>, mojom::ErrorPtr>)>;
 
+  // Callback type for creating weights files. Used by renderer-process
+  // contexts that need to request file creation from the browser process.
+  using CreateWeightsFileFn =
+      base::RepeatingCallback<void(base::OnceCallback<void(base::File)>)>;
+
   using WebNNContextImplPtr =
       std::unique_ptr<WebNNContextImpl, OnTaskRunnerDeleter>;
 
@@ -104,7 +109,8 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
       WebNNContextImpl::ContextBackendUma backend_uma,
       ContextProperties properties,
       mojom::CreateContextOptionsPtr options,
-      scoped_refptr<base::SequencedTaskRunner> owning_task_runner);
+      scoped_refptr<base::SequencedTaskRunner> owning_task_runner,
+      CreateWeightsFileFn create_weights_file_fn = {});
 
   WebNNContextImpl(const WebNNContextImpl&) = delete;
   WebNNContextImpl& operator=(const WebNNContextImpl&) = delete;
@@ -292,6 +298,10 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
   // This weak pointer can only be dereferenced on the sequence where
   // `context_provider_->main_thread_task_runner()` runs tasks.
   base::WeakPtr<WebNNContextProviderImpl> context_provider_;
+
+  // Callback for creating weights files in the browser process.
+  // Used when running without a context_provider_ (renderer process).
+  CreateWeightsFileFn create_weights_file_fn_;
 
   // Context properties reported to the renderer process.
   const ContextProperties properties_;

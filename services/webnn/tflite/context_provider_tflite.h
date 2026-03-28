@@ -10,7 +10,7 @@
 
 #include "base/component_export.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
-#include "services/webnn/tflite/context_impl_tflite.h"
+#include "services/webnn/webnn_context_impl.h"
 
 namespace webnn::tflite {
 
@@ -19,7 +19,8 @@ namespace webnn::tflite {
 class COMPONENT_EXPORT(WEBNN_SERVICE) ContextProviderTflite
     : public mojom::WebNNContextProvider {
  public:
-  ContextProviderTflite();
+  explicit ContextProviderTflite(
+      WebNNContextImpl::CreateWeightsFileFn create_weights_file_fn);
   ~ContextProviderTflite() override;
 
   ContextProviderTflite(const ContextProviderTflite&) = delete;
@@ -30,6 +31,9 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) ContextProviderTflite
                           CreateWebNNContextCallback callback) override;
 
  private:
+  // Callback to create weights files in the browser process.
+  WebNNContextImpl::CreateWeightsFileFn create_weights_file_fn_;
+
   // Contexts created by this provider. Cleaned up when the provider is
   // destroyed (when the mojo pipe closes).
   std::vector<WebNNContextImpl::WebNNContextImplPtr> context_impls_;

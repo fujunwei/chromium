@@ -34,6 +34,7 @@
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "services/webnn/buildflags.h"
 #if BUILDFLAG(WEBNN_USE_TFLITE)
+#include "content/renderer/render_thread_impl.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
 #include "services/webnn/tflite/context_provider_tflite.h"
 #endif  // BUILDFLAG(WEBNN_USE_TFLITE)
@@ -203,8 +204,15 @@ void ExposeRendererInterfacesToBrowser(
       base::BindRepeating(
           [](mojo::PendingReceiver<webnn::mojom::WebNNContextProvider>
                  receiver) {
+            auto create_weights_file_fn = base::BindRepeating(
+                [](base::OnceCallback<void(base::File)> callback) {
+                  RenderThreadImpl::current()
+                      ->GetRendererHost()
+                      ->CreateWebNNWeightsFile(std::move(callback));
+                });
             mojo::MakeSelfOwnedReceiver(
-                std::make_unique<webnn::tflite::ContextProviderTflite>(),
+                std::make_unique<webnn::tflite::ContextProviderTflite>(
+                    std::move(create_weights_file_fn)),
                 std::move(receiver));
           }),
       base::SingleThreadTaskRunner::GetCurrentDefault());

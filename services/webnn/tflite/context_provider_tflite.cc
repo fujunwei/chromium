@@ -15,7 +15,9 @@
 
 namespace webnn::tflite {
 
-ContextProviderTflite::ContextProviderTflite() = default;
+ContextProviderTflite::ContextProviderTflite(
+    WebNNContextImpl::CreateWeightsFileFn create_weights_file_fn)
+    : create_weights_file_fn_(std::move(create_weights_file_fn)) {}
 ContextProviderTflite::~ContextProviderTflite() = default;
 
 void ContextProviderTflite::CreateWebNNContext(
@@ -34,7 +36,8 @@ void ContextProviderTflite::CreateWebNNContext(
   auto task_runner = base::SequencedTaskRunner::GetCurrentDefault();
 
   auto context_impl = ContextImplTflite::CreateForRenderer(
-      std::move(receiver), std::move(options), task_runner);
+      std::move(receiver), std::move(options), task_runner,
+      create_weights_file_fn_);
 
   ContextProperties context_properties = context_impl->properties();
   const blink::WebNNContextToken& context_handle = context_impl->handle();

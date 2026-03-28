@@ -43,7 +43,8 @@ class ContextImplTflite final : public WebNNContextImpl {
   static WebNNContextImplPtr CreateForRenderer(
       mojo::PendingReceiver<mojom::WebNNContext> receiver,
       mojom::CreateContextOptionsPtr options,
-      scoped_refptr<base::SequencedTaskRunner> task_runner);
+      scoped_refptr<base::SequencedTaskRunner> task_runner,
+      CreateWeightsFileFn create_weights_file_fn);
 
   ContextImplTflite(
       mojo::PendingReceiver<mojom::WebNNContext> receiver,
@@ -62,7 +63,8 @@ class ContextImplTflite final : public WebNNContextImpl {
   ContextImplTflite(
       mojo::PendingReceiver<mojom::WebNNContext> receiver,
       mojom::CreateContextOptionsPtr options,
-      scoped_refptr<base::SequencedTaskRunner> task_runner);
+      scoped_refptr<base::SequencedTaskRunner> task_runner,
+      CreateWeightsFileFn create_weights_file_fn);
 
   ContextImplTflite(const WebNNContextImpl&) = delete;
   ContextImplTflite& operator=(const ContextImplTflite&) = delete;
