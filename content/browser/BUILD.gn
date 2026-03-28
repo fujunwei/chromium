@@ -24,6 +24,7 @@ import("//net/features.gni")
 import("//printing/buildflags/buildflags.gni")
 import("//services/device/public/cpp/compute_pressure/buildflags.gni")
 import("//services/network/public/cpp/features.gni")
+import("//services/webnn/features.gni")
 import("//testing/libfuzzer/fuzzer_test.gni")
 import("//third_party/blink/public/public_features.gni")
 import("//tools/ipc_fuzzer/ipc_fuzzer.gni")
@@ -3159,6 +3160,12 @@ source_set("browser") {
       "speech/tts_win_utils.cc",
       "speech/tts_win_utils.h",
     ]
+    if (webnn_use_tflite) {
+      sources += [
+        "webnn/webnn_context_provider_proxy.cc",
+        "webnn/webnn_context_provider_proxy.h",
+      ]
+    }
     deps += [
       "//components/app_launch_prefetch",
       "//content/utility:delegate_data",

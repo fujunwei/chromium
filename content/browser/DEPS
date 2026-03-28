@@ -139,6 +139,7 @@ specific_include_rules = {
     "+services/network/test",
   ],
   "browser_interface_binders\.cc": [
+    "+services/webnn/buildflags.h",
     "+services/webnn/public/mojom/features.mojom-features.h",
   ],
   "browser_main_loop\.cc": [

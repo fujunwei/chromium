@@ -129,8 +129,13 @@
 #include "services/shape_detection/public/mojom/facedetection_provider.mojom.h"
 #include "services/shape_detection/public/mojom/shape_detection_service.mojom.h"
 #include "services/shape_detection/public/mojom/textdetection.mojom.h"
+#include "services/webnn/buildflags.h"
 #include "services/webnn/public/mojom/features.mojom-features.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
+
+#if BUILDFLAG(IS_WIN) && BUILDFLAG(WEBNN_USE_TFLITE)
+#include "content/browser/webnn/webnn_context_provider_proxy.h"
+#endif  // BUILDFLAG(IS_WIN) && BUILDFLAG(WEBNN_USE_TFLITE)
 #include "storage/browser/quota/quota_internals.mojom.h"
 #include "storage/browser/quota/quota_manager.h"
 #include "storage/browser/quota/quota_manager_proxy.h"
@@ -289,6 +294,19 @@ void BindTextDetection(
 void BindWebNNContextProviderForRenderFrame(
     RenderFrameHost* host,
     mojo::PendingReceiver<webnn::mojom::WebNNContextProvider> receiver) {
+#if BUILDFLAG(IS_WIN) && BUILDFLAG(WEBNN_USE_TFLITE)
+  // On Windows, use a proxy that first tries the GPU process (ORT/DML) and
+  // falls back to TFLite in the render process if the GPU backend fails.
+  const bool is_incognito = host->GetBrowserContext()->IsOffTheRecord();
+  mojo::MakeSelfOwnedReceiver(
+      std::make_unique<WebNNContextProviderProxy>(
+          host->GetProcess()->GetDeprecatedID(), is_incognito),
+      std::move(receiver));
+#elif BUILDFLAG(WEBNN_USE_TFLITE)
+  // Non-Windows with TFLite: bind directly in the renderer process.
+  host->GetProcess()->BindReceiver(
+      mojo::GenericPendingReceiver(std::move(receiver)));
+#else
   auto* process_host = static_cast<RenderProcessHostImpl*>(host->GetProcess());
   const bool is_incognito = host->GetBrowserContext()->IsOffTheRecord();
 #if BUILDFLAG(IS_MAC)
@@ -300,12 +318,26 @@ void BindWebNNContextProviderForRenderFrame(
   process_host->GetGpuClient()->BindWebNNContextProvider(std::move(receiver),
                                                          is_incognito);
 #endif
+#endif
 }
 
 template <typename WorkerHost>
 void BindWebNNContextProviderForWorker(
     WorkerHost* host,
     mojo::PendingReceiver<webnn::mojom::WebNNContextProvider> receiver) {
+#if BUILDFLAG(IS_WIN) && BUILDFLAG(WEBNN_USE_TFLITE)
+  // On Windows, use a proxy that first tries the GPU process (ORT/DML) and
+  // falls back to TFLite in the render process if the GPU backend fails.
+  auto* process_host = host->GetProcessHost();
+  const bool is_incognito = process_host->GetBrowserContext()->IsOffTheRecord();
+  mojo::MakeSelfOwnedReceiver(
+      std::make_unique<WebNNContextProviderProxy>(
+          process_host->GetDeprecatedID(), is_incognito),
+      std::move(receiver));
+#elif BUILDFLAG(WEBNN_USE_TFLITE)
+  host->GetProcessHost()->BindReceiver(
+      mojo::GenericPendingReceiver(std::move(receiver)));
+#else
   auto* process_host =
       static_cast<RenderProcessHostImpl*>(host->GetProcessHost());
   const bool is_incognito = process_host->GetBrowserContext()->IsOffTheRecord();
@@ -317,6 +349,7 @@ void BindWebNNContextProviderForWorker(
 #else
   process_host->GetGpuClient()->BindWebNNContextProvider(std::move(receiver),
                                                          is_incognito);
+#endif
 #endif
 }
 
