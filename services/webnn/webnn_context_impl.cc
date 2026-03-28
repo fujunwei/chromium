@@ -420,6 +420,15 @@ void WebNNContextImpl::ScheduleGpuTaskWithThisContext(
       base::BindOnce(std::move(task), std::ref(*this)), fence);
 }
 
+void WebNNContextImpl::ScheduleGpuTask(base::OnceClosure task) {
+  ScheduleGpuTask(std::move(task), {});
+}
+
+void WebNNContextImpl::ScheduleGpuTask(base::OnceClosure task,
+                                       const gpu::SyncToken& fence) {
+  gpu_sequence_->ScheduleGpuTask(std::move(task), fence);
+}
+
 scoped_refptr<WebNNTensorImpl> WebNNContextImpl::GetWebNNTensorImpl(
     const blink::WebNNTensorToken& tensor_handle) {
   const auto it = tensor_impls_.find(tensor_handle);

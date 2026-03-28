@@ -225,6 +225,10 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
   void ScheduleGpuTaskWithThisContext(ScheduleGpuTaskCallback task,
                                       const gpu::SyncToken& fence);
 
+  // Schedules a task on the GPU sequence.
+  void ScheduleGpuTask(base::OnceClosure task);
+  void ScheduleGpuTask(base::OnceClosure task, const gpu::SyncToken& fence);
+
   int tracing_id() const { return tracing_id_; }
 
   virtual std::string_view GetBackendName() const = 0;
