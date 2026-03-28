@@ -8,11 +8,13 @@
 #include <utility>
 
 #include "base/atomic_sequence_num.h"
+#include "base/files/file_util.h"
 #include "base/functional/callback_helpers.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/sequence_checker.h"
 #include "base/strings/stringprintf.h"
 #include "base/task/bind_post_task.h"
+#include "base/task/thread_pool.h"
 #include "base/trace_event/memory_dump_manager.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_manager.h"
 #include "services/webnn/error.h"
@@ -80,8 +82,39 @@ WebNNContextImpl::WebNNContextImpl(
   const xnn_status status = xnn_initialize(/*allocator=*/nullptr);
   CHECK_EQ(status, xnn_status_success);
 #endif  // BUILDFLAG(BUILD_TFLITE_WITH_XNNPACK)
-  base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
-      this, "WebNN", owning_task_runner_);
+  base::trace_event::MemoryDumpManager::GetInstance()
+      ->RegisterDumpProviderWithSequencedTaskRunner(
+          this, "WebNN", owning_task_runner_,
+          base::trace_event::MemoryDumpProvider::Options());
+}
+
+WebNNContextImpl::WebNNContextImpl(
+    mojo::PendingReceiver<mojom::WebNNContext> receiver,
+    WebNNContextImpl::ContextBackendUma backend_uma,
+    ContextProperties properties,
+    mojom::CreateContextOptionsPtr options,
+    scoped_refptr<base::SequencedTaskRunner> owning_task_runner,
+    CreateWeightsFileFn create_weights_file_fn)
+    : WebNNObjectBase<mojom::WebNNContext,
+                      blink::WebNNContextToken,
+                      mojo::Receiver<mojom::WebNNContext>>(
+          std::move(receiver),
+          owning_task_runner),
+      create_weights_file_fn_(std::move(create_weights_file_fn)),
+      properties_(IntersectWithBaseProperties(std::move(properties))),
+      options_(std::move(options)),
+      memory_type_tracker_(base::MakeRefCounted<gpu::MemoryTracker>()),
+      owning_task_runner_(std::move(owning_task_runner)),
+      tracing_id_(g_next_webnn_context_tracing_id.GetNext()) {
+  RecordContextBackendUma(backend_uma);
+#if BUILDFLAG(BUILD_TFLITE_WITH_XNNPACK)
+  const xnn_status status = xnn_initialize(/*allocator=*/nullptr);
+  CHECK_EQ(status, xnn_status_success);
+#endif  // BUILDFLAG(BUILD_TFLITE_WITH_XNNPACK)
+  base::trace_event::MemoryDumpManager::GetInstance()
+      ->RegisterDumpProviderWithSequencedTaskRunner(
+          this, "WebNN", owning_task_runner_,
+          base::trace_event::MemoryDumpProvider::Options());
 }
 
 WebNNContextImpl::~WebNNContextImpl() {
@@ -113,6 +146,10 @@ void WebNNContextImpl::RecordContextBackendUma(ContextBackendUma backend_uma) {
 }
 
 void WebNNContextImpl::OnDisconnect() {
+  if (!main_task_runner_) {
+    // Running without a provider (e.g., in the renderer process).
+    return;
+  }
   if (!main_task_runner_->RunsTasksInCurrentSequence()) {
     main_task_runner_->PostTask(
         FROM_HERE,
@@ -141,6 +178,17 @@ void WebNNContextImpl::DestroyAllContextsAndKillGpuProcess() {
 
 void WebNNContextImpl::CreateWeightsFile(
     base::OnceCallback<void(base::File)> callback) {
+  if (!context_provider_) {
+    // Running without a GPU-process provider (e.g., renderer process).
+    // Use the stored callback to request file creation from the browser
+    // process.
+    if (create_weights_file_fn_) {
+      create_weights_file_fn_.Run(std::move(callback));
+    } else {
+      std::move(callback).Run(base::File());
+    }
+    return;
+  }
   if (!main_task_runner_->RunsTasksInCurrentSequence()) {
     main_task_runner_->PostTask(
         FROM_HERE,
@@ -246,9 +294,12 @@ void WebNNContextImpl::CreateTensor(
   tensor_impls_.emplace(*std::move(result));
 }
 
-const scoped_refptr<gpu::SchedulerTaskRunner>&
+scoped_refptr<base::SequencedTaskRunner>
 WebNNContextImpl::scheduler_task_runner() const {
-  return gpu_sequence_->scheduler_task_runner();
+  if (gpu_sequence_) {
+    return gpu_sequence_->scheduler_task_runner();
+  }
+  return owning_task_runner_;
 }
 
 ScopedGpuSequence* WebNNContextImpl::gpu_sequence() const {
@@ -310,6 +361,15 @@ void WebNNContextImpl::CreateTensorFromMailbox(mojom::TensorInfoPtr tensor_info,
   // WebNN graph constants cannot be shared since they may not be readable.
   if (tensor_info->usage.Has(MLTensorUsageFlags::kGraphConstant)) {
     GetMojoReceiver().ReportBadMessage(kBadMessageInvalidTensor);
+    return;
+  }
+
+  // SharedImageManager is not available when running without GPU
+  // dependencies. WebGPU interop requires GPU process resources.
+  if (!shared_image_manager_) {
+    std::move(callback).Run(ToError<mojom::CreateTensorResult>(
+        mojom::Error::Code::kNotSupportedError,
+        "WebGPU interop is not supported in this context."));
     return;
   }
 
@@ -414,6 +474,11 @@ void WebNNContextImpl::ScheduleGpuTaskWithThisContext(
 void WebNNContextImpl::ScheduleGpuTaskWithThisContext(
     ScheduleGpuTaskCallback task,
     const gpu::SyncToken& fence) {
+  if (!gpu_sequence_) {
+    // Running without a GPU sequence: run directly on the current sequence.
+    std::move(task).Run(*this);
+    return;
+  }
   // Safe to use std::ref because `this` owns gpu_sequence_ and
   // its deletion drops all pending tasks before the context is destroyed.
   gpu_sequence_->ScheduleGpuTask(
@@ -426,6 +491,10 @@ void WebNNContextImpl::ScheduleGpuTask(base::OnceClosure task) {
 
 void WebNNContextImpl::ScheduleGpuTask(base::OnceClosure task,
                                        const gpu::SyncToken& fence) {
+  if (!gpu_sequence_) {
+    std::move(task).Run();
+    return;
+  }
   gpu_sequence_->ScheduleGpuTask(std::move(task), fence);
 }
 

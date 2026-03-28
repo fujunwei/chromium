@@ -80,6 +80,11 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
   using CreateGraphImplCallback = base::OnceCallback<void(
       base::expected<scoped_refptr<WebNNGraphImpl>, mojom::ErrorPtr>)>;
 
+  // Callback type for creating weights files. Used by renderer-process
+  // contexts that need to request file creation from the browser process.
+  using CreateWeightsFileFn =
+      base::RepeatingCallback<void(base::OnceCallback<void(base::File)>)>;
+
   using WebNNContextImplPtr =
       std::unique_ptr<WebNNContextImpl, OnTaskRunnerDeleter>;
 
@@ -96,6 +101,16 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
       scoped_refptr<base::SingleThreadTaskRunner> owning_task_runner,
       gpu::SharedImageManager* shared_image_manager,
       scoped_refptr<base::SingleThreadTaskRunner> main_task_runner);
+
+  // Constructor for running without GPU dependencies (e.g., TFLite in the
+  // renderer process).
+  WebNNContextImpl(
+      mojo::PendingReceiver<mojom::WebNNContext> receiver,
+      WebNNContextImpl::ContextBackendUma backend_uma,
+      ContextProperties properties,
+      mojom::CreateContextOptionsPtr options,
+      scoped_refptr<base::SequencedTaskRunner> owning_task_runner,
+      CreateWeightsFileFn create_weights_file_fn = {});
 
   WebNNContextImpl(const WebNNContextImpl&) = delete;
   WebNNContextImpl& operator=(const WebNNContextImpl&) = delete;
@@ -161,12 +176,13 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
 
   // Exposes a SequencedTaskRunner which can be used to schedule tasks in
   // sequence with this WebNNContext -- that is, on the same gpu::Scheduler
-  // sequence. Does not support nested loops or delayed tasks.
-  const scoped_refptr<gpu::SchedulerTaskRunner>& scheduler_task_runner() const;
+  // sequence. When running without a GPU sequence, returns the owning task
+  // runner. Does not support nested loops or delayed tasks.
+  scoped_refptr<base::SequencedTaskRunner> scheduler_task_runner() const;
 
   // Exposes the ScopedGpuSequence which can be used to schedule tasks
   // in sequence with this WebNNContext -- that is, on the same gpu::Scheduler
-  // sequence.
+  // sequence. May be null when running without GPU dependencies.
   ScopedGpuSequence* gpu_sequence() const;
 
   // Returns true if the data pipe consumer handle for WriteTensor() is valid.
@@ -225,7 +241,8 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
   void ScheduleGpuTaskWithThisContext(ScheduleGpuTaskCallback task,
                                       const gpu::SyncToken& fence);
 
-  // Schedules a task on the GPU sequence.
+  // Schedules a task on the GPU sequence, or runs it directly when running
+  // without a GPU sequence.
   void ScheduleGpuTask(base::OnceClosure task);
   void ScheduleGpuTask(base::OnceClosure task, const gpu::SyncToken& fence);
 
@@ -276,6 +293,10 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
   // This weak pointer can only be dereferenced on the sequence where
   // `context_provider_->main_thread_task_runner()` runs tasks.
   base::WeakPtr<WebNNContextProviderImpl> context_provider_;
+
+  // Callback for creating weights files in the browser process.
+  // Used when running without a context_provider_ (renderer process).
+  CreateWeightsFileFn create_weights_file_fn_;
 
   // Context properties reported to the renderer process.
   const ContextProperties properties_;
@@ -331,21 +352,15 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
   mojo::ScopedDataPipeProducerHandle read_tensor_producer_;
 
   // The SharedImageManager is used for creating tensors from shared images.
-  // It is provided by the provider but stored per context, because only the
-  // SharedImageManager is thread-safe.
-  //
-  // Storing a raw pointer is safe because WebNNContextImpl is owned by its
-  // provider and cannot outlive it, while the SharedImageManager is managed by
-  // the GPU service and destroyed after the provider, ensuring the raw pointer
-  // remains valid.
-  const raw_ptr<gpu::SharedImageManager> shared_image_manager_;
+  // May be null when running without GPU dependencies.
+  const raw_ptr<gpu::SharedImageManager> shared_image_manager_ = nullptr;
 
   // Task runner used to remove this context from its provider.
+  // May be null when running without GPU dependencies.
   const scoped_refptr<base::SingleThreadTaskRunner> main_task_runner_;
 
-  // The owning_task_runner is the underlying single-thread runner for the GPU
-  // sequence.
-  scoped_refptr<base::SingleThreadTaskRunner> owning_task_runner_;
+  // The owning_task_runner is the underlying task runner for the context.
+  scoped_refptr<base::SequencedTaskRunner> owning_task_runner_;
 
   // A process-unique ID used for disambiguating memory dumps from different
   // WebNN contexts.
