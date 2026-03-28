@@ -4,6 +4,8 @@
 
 #include "services/webnn/tflite/context_impl_tflite.h"
 
+#include "base/process/process.h"
+
 #include "services/webnn/public/cpp/webnn_types.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
 #include "services/webnn/public/mojom/webnn_graph.mojom-shared.h"
@@ -69,6 +71,33 @@ ContextImplTflite::ContextImplTflite(
                        shared_image_manager,
                        std::move(main_task_runner)),
       is_incognito_(is_incognito) {}
+
+// static
+WebNNContextImpl::WebNNContextImplPtr ContextImplTflite::CreateForRenderer(
+    mojo::PendingReceiver<mojom::WebNNContext> receiver,
+    mojom::CreateContextOptionsPtr options,
+    scoped_refptr<base::SequencedTaskRunner> task_runner,
+    CreateWeightsFileFn create_weights_file_fn) {
+  return WebNNContextImplPtr(
+      new ContextImplTflite(std::move(receiver), std::move(options),
+                            std::move(task_runner),
+                            std::move(create_weights_file_fn)),
+      OnTaskRunnerDeleter(
+          base::SequencedTaskRunner::GetCurrentDefault()));
+}
+
+ContextImplTflite::ContextImplTflite(
+    mojo::PendingReceiver<mojom::WebNNContext> receiver,
+    mojom::CreateContextOptionsPtr options,
+    scoped_refptr<base::SequencedTaskRunner> task_runner,
+    CreateWeightsFileFn create_weights_file_fn)
+    : WebNNContextImpl(std::move(receiver),
+                       ContextBackendUma::kTFLite,
+                       GraphBuilderTflite::GetContextProperties(),
+                       std::move(options),
+                       std::move(task_runner),
+                       std::move(create_weights_file_fn)),
+      is_incognito_(false) {}
 
 ContextImplTflite::~ContextImplTflite() = default;
 

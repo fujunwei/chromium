@@ -1,0 +1,44 @@
+// Copyright 2025 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#ifndef SERVICES_WEBNN_TFLITE_CONTEXT_PROVIDER_TFLITE_H_
+#define SERVICES_WEBNN_TFLITE_CONTEXT_PROVIDER_TFLITE_H_
+
+#include <memory>
+#include <vector>
+
+#include "base/component_export.h"
+#include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
+#include "services/webnn/webnn_context_impl.h"
+
+namespace webnn::tflite {
+
+// A lightweight WebNNContextProvider implementation for TFLite that runs
+// without GPU dependencies (e.g., in the renderer process).
+class COMPONENT_EXPORT(WEBNN_SERVICE) ContextProviderTflite
+    : public mojom::WebNNContextProvider {
+ public:
+  explicit ContextProviderTflite(
+      WebNNContextImpl::CreateWeightsFileFn create_weights_file_fn);
+  ~ContextProviderTflite() override;
+
+  ContextProviderTflite(const ContextProviderTflite&) = delete;
+  ContextProviderTflite& operator=(const ContextProviderTflite&) = delete;
+
+  // mojom::WebNNContextProvider:
+  void CreateWebNNContext(mojom::CreateContextOptionsPtr options,
+                          CreateWebNNContextCallback callback) override;
+
+ private:
+  // Callback to create weights files in the browser process.
+  WebNNContextImpl::CreateWeightsFileFn create_weights_file_fn_;
+
+  // Contexts created by this provider. Cleaned up when the provider is
+  // destroyed (when the mojo pipe closes).
+  std::vector<WebNNContextImpl::WebNNContextImplPtr> context_impls_;
+};
+
+}  // namespace webnn::tflite
+
+#endif  // SERVICES_WEBNN_TFLITE_CONTEXT_PROVIDER_TFLITE_H_
