@@ -1,4 +1,4 @@
-// Copyright 2025 The Chromium Authors
+// Copyright 2026 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,7 +6,7 @@
 
 #include <utility>
 
-#include "base/task/sequenced_task_runner.h"
+#include "base/task/thread_pool.h"
 #include "services/webnn/error.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
 #include "services/webnn/public/mojom/webnn_error.mojom.h"
@@ -16,8 +16,10 @@
 namespace webnn::tflite {
 
 ContextProviderTflite::ContextProviderTflite(
-    WebNNContextImpl::CreateWeightsFileFn create_weights_file_fn)
-    : create_weights_file_fn_(std::move(create_weights_file_fn)) {}
+    CreateWeightsFileCallback create_weights_file_callback,
+    scoped_refptr<base::SingleThreadTaskRunner> main_task_runner)
+    : create_weights_file_callback_(std::move(create_weights_file_callback)),
+      main_task_runner_(std::move(main_task_runner)) {}
 ContextProviderTflite::~ContextProviderTflite() = default;
 
 void ContextProviderTflite::CreateWebNNContext(
@@ -33,16 +35,37 @@ void ContextProviderTflite::CreateWebNNContext(
   mojo::PendingRemote<mojom::WebNNContext> remote;
   auto receiver = remote.InitWithNewPipeAndPassReceiver();
 
-  auto task_runner = base::SequencedTaskRunner::GetCurrentDefault();
+  auto main_task_runner = main_task_runner_;
+  auto owning_task_runner = base::ThreadPool::CreateSingleThreadTaskRunner(
+      {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
+       base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN});
 
-  auto context_impl = ContextImplTflite::CreateForRenderer(
-      std::move(receiver), std::move(options), task_runner,
-      create_weights_file_fn_);
+  // Post context creation to the owning_task_runner so the Mojo receiver is
+  // bound on the correct sequence (matching the GPU-process pattern).
+  owning_task_runner->PostTaskAndReplyWithResult(
+      FROM_HERE,
+      base::BindOnce(&ContextImplTflite::CreateForRenderer, std::move(receiver),
+                     GetWeakPtr(), std::move(options), owning_task_runner,
+                     main_task_runner),
+      base::BindOnce(&ContextProviderTflite::OnCreateWebNNContextImpl,
+                     GetWeakPtr(), std::move(callback), std::move(remote)));
+}
+
+void ContextProviderTflite::OnCreateWebNNContextImpl(
+    CreateWebNNContextCallback callback,
+    mojo::PendingRemote<mojom::WebNNContext> remote,
+    WebNNContextImpl::WebNNContextImplPtr context_impl) {
+  if (!context_impl) {
+    std::move(callback).Run(ToError<mojom::CreateContextResult>(
+        mojom::Error::Code::kNotSupportedError,
+        "Failed to create TFLite context."));
+    return;
+  }
 
   ContextProperties context_properties = context_impl->properties();
   const blink::WebNNContextToken& context_handle = context_impl->handle();
 
-  context_impls_.push_back(std::move(context_impl));
+  context_impls_.emplace(std::move(context_impl));
 
   auto success = mojom::CreateContextSuccess::New(
       std::move(remote), std::move(context_properties),
@@ -51,6 +74,18 @@ void ContextProviderTflite::CreateWebNNContext(
       /*read_tensor_consumer=*/mojo::ScopedDataPipeConsumerHandle());
   std::move(callback).Run(
       mojom::CreateContextResult::NewSuccess(std::move(success)));
+}
+
+void ContextProviderTflite::CreateWeightsFile(
+    base::OnceCallback<void(base::File)> callback) {
+  create_weights_file_callback_.Run(std::move(callback));
+}
+
+void ContextProviderTflite::RemoveWebNNContextImpl(
+    const blink::WebNNContextToken& handle) {
+  auto it = context_impls_.find(handle);
+  CHECK(it != context_impls_.end());
+  context_impls_.erase(it);
 }
 
 }  // namespace webnn::tflite

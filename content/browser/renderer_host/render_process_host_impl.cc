@@ -196,7 +196,6 @@
 #include "services/resource_coordinator/public/mojom/memory_instrumentation/memory_instrumentation.mojom.h"
 #include "services/service_manager/public/cpp/interface_provider.h"
 #include "services/tracing/public/cpp/trace_startup.h"
-#include "services/webnn/host/weights_file_provider.h"
 #include "skia/ext/switches.h"
 #include "storage/browser/quota/quota_manager.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_registry.h"
@@ -5668,11 +5667,6 @@ void RenderProcessHostImpl::SetSubframeProcessReuseThresholdForTesting(
 
 void RenderProcessHostImpl::HasGpuProcess(HasGpuProcessCallback callback) {
   GpuProcessHost::GetHasGpuProcess(std::move(callback));
-}
-
-void RenderProcessHostImpl::CreateWebNNWeightsFile(
-    CreateWebNNWeightsFileCallback callback) {
-  webnn::CreateWeightsFile(std::move(callback));
 }
 
 void RenderProcessHostImpl::UpdateProcessPriorityInputs() {

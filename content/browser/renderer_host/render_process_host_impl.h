@@ -1091,8 +1091,6 @@ class CONTENT_EXPORT RenderProcessHostImpl
       uint64_t private_memory_footprint_bytes) override;
 #endif
   void HasGpuProcess(HasGpuProcessCallback callback) override;
-  void CreateWebNNWeightsFile(
-      CreateWebNNWeightsFileCallback callback) override;
 
   void CreateEmbeddedFrameSinkProvider(
       mojo::PendingReceiver<blink::mojom::EmbeddedFrameSinkProvider> receiver);

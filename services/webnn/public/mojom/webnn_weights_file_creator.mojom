@@ -1,0 +1,19 @@
+// Copyright 2026 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+module webnn.mojom;
+
+import "mojo/public/mojom/base/file.mojom";
+
+// This interface runs in the browser process and is called from the renderer
+// process to create temporary files for saving WebNN model weights. This is
+// needed because sandboxed renderers cannot create files directly.
+//
+// The browser process checks whether the profile is in incognito mode:
+// - In normal mode: creates a temporary file and returns a valid file handle.
+// - In incognito mode: returns a null file handle, signaling the TFLite
+//   backend to store weights inline in the Flatbuffer model instead.
+interface WebNNWeightsFileCreator {
+  CreateWeightsFile() => (mojo_base.mojom.File? file);
+};

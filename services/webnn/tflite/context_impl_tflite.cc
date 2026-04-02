@@ -5,7 +5,6 @@
 #include "services/webnn/tflite/context_impl_tflite.h"
 
 #include "base/process/process.h"
-
 #include "services/webnn/public/cpp/webnn_types.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
 #include "services/webnn/public/mojom/webnn_graph.mojom-shared.h"
@@ -67,7 +66,7 @@ ContextImplTflite::ContextImplTflite(
                        std::move(read_tensor_producer),
                        std::move(gpu_sequence),
                        std::move(memory_tracker),
-                       std::move(owning_task_runner),
+                       owning_task_runner,
                        shared_image_manager,
                        std::move(main_task_runner)),
       is_incognito_(is_incognito) {}
@@ -75,28 +74,32 @@ ContextImplTflite::ContextImplTflite(
 // static
 WebNNContextImpl::WebNNContextImplPtr ContextImplTflite::CreateForRenderer(
     mojo::PendingReceiver<mojom::WebNNContext> receiver,
+    base::WeakPtr<ContextProviderTflite> context_provider,
     mojom::CreateContextOptionsPtr options,
-    scoped_refptr<base::SequencedTaskRunner> task_runner,
-    CreateWeightsFileFn create_weights_file_fn) {
+    scoped_refptr<base::SingleThreadTaskRunner> owning_task_runner,
+    scoped_refptr<base::SingleThreadTaskRunner> main_task_runner) {
+  DCHECK(owning_task_runner->RunsTasksInCurrentSequence());
+  auto task_runner = owning_task_runner;
   return WebNNContextImplPtr(
-      new ContextImplTflite(std::move(receiver), std::move(options),
-                            std::move(task_runner),
-                            std::move(create_weights_file_fn)),
-      OnTaskRunnerDeleter(
-          base::SequencedTaskRunner::GetCurrentDefault()));
+      new ContextImplTflite(std::move(receiver), std::move(context_provider),
+                            std::move(options), std::move(owning_task_runner),
+                            std::move(main_task_runner)),
+      OnTaskRunnerDeleter(std::move(task_runner)));
 }
 
 ContextImplTflite::ContextImplTflite(
     mojo::PendingReceiver<mojom::WebNNContext> receiver,
+    base::WeakPtr<ContextProviderTflite> context_provider,
     mojom::CreateContextOptionsPtr options,
-    scoped_refptr<base::SequencedTaskRunner> task_runner,
-    CreateWeightsFileFn create_weights_file_fn)
+    scoped_refptr<base::SingleThreadTaskRunner> owning_task_runner,
+    scoped_refptr<base::SingleThreadTaskRunner> main_task_runner)
     : WebNNContextImpl(std::move(receiver),
+                       std::move(context_provider),
                        ContextBackendUma::kTFLite,
                        GraphBuilderTflite::GetContextProperties(),
                        std::move(options),
-                       std::move(task_runner),
-                       std::move(create_weights_file_fn)),
+                       std::move(owning_task_runner),
+                       std::move(main_task_runner)),
       is_incognito_(false) {}
 
 ContextImplTflite::~ContextImplTflite() = default;
@@ -142,13 +145,11 @@ void ContextImplTflite::DidCreateWeightsFile(
         constant_tensor_operands,
     CreateGraphImplCallback callback,
     base::File weights_file) {
-  if (!weights_file.IsValid()) {
-    std::move(callback).Run(base::unexpected(
-        mojom::Error::New(mojom::Error::Code::kUnknownError,
-                          "Failed to create temporary file to save weights.")));
-    return;
-  }
-
+  // If the file is invalid, it means either:
+  // 1. The profile is in incognito mode (browser intentionally returned null),
+  //    in which case weights will be stored inline in the Flatbuffer model.
+  // 2. File creation genuinely failed (non-incognito). In this case,
+  //    CreateAndBuild will handle the error gracefully.
   GraphImplTflite::CreateAndBuild(std::move(receiver), std::move(graph_info),
                                   std::move(compute_resource_info),
                                   std::move(constant_operands),

@@ -63,8 +63,7 @@ void WebNNContextProviderProxy::FallbackToTFLite(
     return;
   }
 
-  tflite_provider_->CreateWebNNContext(std::move(options),
-                                       std::move(callback));
+  tflite_provider_->CreateWebNNContext(std::move(options), std::move(callback));
 }
 
 void WebNNContextProviderProxy::EnsureGpuProviderConnection() {

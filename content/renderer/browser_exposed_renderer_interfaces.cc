@@ -31,11 +31,13 @@
 #include "content/services/auction_worklet/auction_worklet_service_impl.h"
 #include "mojo/public/cpp/bindings/binder_map.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
+#include "mojo/public/cpp/bindings/remote.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
 #include "services/webnn/buildflags.h"
 #if BUILDFLAG(WEBNN_USE_TFLITE)
-#include "content/renderer/render_thread_impl.h"
+#include "content/public/child/child_thread.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
+#include "services/webnn/public/mojom/webnn_weights_file_creator.mojom.h"
 #include "services/webnn/tflite/context_provider_tflite.h"
 #endif  // BUILDFLAG(WEBNN_USE_TFLITE)
 #include "v8/include/v8-isolate.h"
@@ -204,15 +206,27 @@ void ExposeRendererInterfacesToBrowser(
       base::BindRepeating(
           [](mojo::PendingReceiver<webnn::mojom::WebNNContextProvider>
                  receiver) {
-            auto create_weights_file_fn = base::BindRepeating(
+            auto create_weights_file_callback = base::BindRepeating(
                 [](base::OnceCallback<void(base::File)> callback) {
-                  RenderThreadImpl::current()
-                      ->GetRendererHost()
-                      ->CreateWebNNWeightsFile(std::move(callback));
+                  mojo::Remote<webnn::mojom::WebNNWeightsFileCreator>
+                      weights_file_creator;
+                  ChildThread::Get()->BindHostReceiver(
+                      weights_file_creator.BindNewPipeAndPassReceiver());
+                  // Use the raw pointer to avoid preventing the Remote from
+                  // being destroyed after the call completes.
+                  auto* raw_ptr = weights_file_creator.get();
+                  raw_ptr->CreateWeightsFile(base::BindOnce(
+                      [](mojo::Remote<webnn::mojom::WebNNWeightsFileCreator>,
+                         base::OnceCallback<void(base::File)> callback,
+                         base::File file) {
+                        std::move(callback).Run(std::move(file));
+                      },
+                      std::move(weights_file_creator), std::move(callback)));
                 });
             mojo::MakeSelfOwnedReceiver(
                 std::make_unique<webnn::tflite::ContextProviderTflite>(
-                    std::move(create_weights_file_fn)),
+                    std::move(create_weights_file_callback),
+                    base::SingleThreadTaskRunner::GetCurrentDefault()),
                 std::move(receiver));
           }),
       base::SingleThreadTaskRunner::GetCurrentDefault());

@@ -39,6 +39,7 @@ mojom_component("mojom") {
     "webnn_graph.mojom",
     "webnn_graph_builder.mojom",
     "webnn_tensor.mojom",
+    "webnn_weights_file_creator.mojom",
   ]
 
   if (is_win) {

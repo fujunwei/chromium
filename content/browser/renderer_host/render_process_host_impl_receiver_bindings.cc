@@ -86,6 +86,13 @@
 #include "content/browser/renderer_host/plugin_registry_impl.h"
 #endif
 
+#include "services/webnn/buildflags.h"
+#if BUILDFLAG(WEBNN_USE_TFLITE)
+#include "content/public/browser/browser_context.h"
+#include "services/webnn/host/webnn_weights_file_creator_impl.h"
+#include "services/webnn/public/mojom/webnn_weights_file_creator.mojom.h"
+#endif
+
 #if BUILDFLAG(USE_MINIKIN_HYPHENATION)
 #include "content/browser/hyphenation/hyphenation_impl.h"
 #endif
@@ -320,6 +327,24 @@ void RenderProcessHostImpl::RegisterMojoInterfaces() {
       base::BindRepeating(&RenderProcessHostImpl::BindMediaCodecProvider,
                           instance_weak_factory_.GetWeakPtr()));
 #endif
+
+#if BUILDFLAG(WEBNN_USE_TFLITE)
+  AddUIThreadInterface(
+      registry.get(),
+      base::BindRepeating(
+          [](base::WeakPtr<RenderProcessHostImpl> host,
+             mojo::PendingReceiver<webnn::mojom::WebNNWeightsFileCreator>
+                 receiver) {
+            if (!host) {
+              return;
+            }
+            const bool is_incognito =
+                host->GetBrowserContext()->IsOffTheRecord();
+            webnn::WebNNWeightsFileCreatorImpl::Create(is_incognito,
+                                                       std::move(receiver));
+          },
+          instance_weak_factory_.GetWeakPtr()));
+#endif  // BUILDFLAG(WEBNN_USE_TFLITE)
 
   // ---- Please do not register interfaces below this line ------
   //

@@ -184,7 +184,7 @@ void WebNNGraphImpl::Dispatch(
   }
 
   // Call DispatchImpl() implemented by an `mojom::WebNNGraph` backend.
-  context_->ScheduleGpuTask(
+  context_->RunOrScheduleGpuTask(
       base::BindOnce(
           [](WebNNGraphImpl* self,
              base::flat_map<std::string, scoped_refptr<WebNNTensorImpl>>

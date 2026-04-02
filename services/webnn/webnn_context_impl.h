@@ -44,6 +44,10 @@
 
 namespace webnn {
 
+namespace tflite {
+class ContextProviderTflite;
+}
+
 class WebNNContextProviderImpl;
 class WebNNGraphBuilderImpl;
 class WebNNTensorImpl;
@@ -80,11 +84,6 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
   using CreateGraphImplCallback = base::OnceCallback<void(
       base::expected<scoped_refptr<WebNNGraphImpl>, mojom::ErrorPtr>)>;
 
-  // Callback type for creating weights files. Used by renderer-process
-  // contexts that need to request file creation from the browser process.
-  using CreateWeightsFileFn =
-      base::RepeatingCallback<void(base::OnceCallback<void(base::File)>)>;
-
   using WebNNContextImplPtr =
       std::unique_ptr<WebNNContextImpl, OnTaskRunnerDeleter>;
 
@@ -106,11 +105,12 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
   // renderer process).
   WebNNContextImpl(
       mojo::PendingReceiver<mojom::WebNNContext> receiver,
+      base::WeakPtr<tflite::ContextProviderTflite> tflite_context_provider,
       WebNNContextImpl::ContextBackendUma backend_uma,
       ContextProperties properties,
       mojom::CreateContextOptionsPtr options,
-      scoped_refptr<base::SequencedTaskRunner> owning_task_runner,
-      CreateWeightsFileFn create_weights_file_fn = {});
+      scoped_refptr<base::SingleThreadTaskRunner> owning_task_runner,
+      scoped_refptr<base::SingleThreadTaskRunner> main_task_runner);
 
   WebNNContextImpl(const WebNNContextImpl&) = delete;
   WebNNContextImpl& operator=(const WebNNContextImpl&) = delete;
@@ -243,8 +243,9 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
 
   // Schedules a task on the GPU sequence, or runs it directly when running
   // without a GPU sequence.
-  void ScheduleGpuTask(base::OnceClosure task);
-  void ScheduleGpuTask(base::OnceClosure task, const gpu::SyncToken& fence);
+  gpu::SyncToken RunOrScheduleGpuTask(base::OnceClosure task);
+  void RunOrScheduleGpuTask(base::OnceClosure task,
+                            const gpu::SyncToken& fence);
 
   int tracing_id() const { return tracing_id_; }
 
@@ -294,9 +295,13 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
   // `context_provider_->main_thread_task_runner()` runs tasks.
   base::WeakPtr<WebNNContextProviderImpl> context_provider_;
 
-  // Callback for creating weights files in the browser process.
-  // Used when running without a context_provider_ (renderer process).
-  CreateWeightsFileFn create_weights_file_fn_;
+  // For tflite renderer process. Only dereference on main_task_runner_.
+  base::WeakPtr<tflite::ContextProviderTflite> tflite_context_provider_;
+
+  // True when this context is owned by a ContextProviderTflite (renderer
+  // process). This flag is thread-safe to read since it is set at construction
+  // and never modified.
+  const bool is_tflite_context_provider_ = false;
 
   // Context properties reported to the renderer process.
   const ContextProperties properties_;
@@ -323,6 +328,9 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
 
  private:
   friend class base::DeleteHelper<WebNNContextImpl>;
+
+  // Common initialization shared by both constructors.
+  void InitializeContext(ContextBackendUma backend_uma);
 
   void OnDisconnect() override;
 
@@ -353,14 +361,21 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextImpl
 
   // The SharedImageManager is used for creating tensors from shared images.
   // May be null when running without GPU dependencies.
+  //
+  // It is provided by the provider but stored per context, because only the
+  // SharedImageManager is thread-safe.
+  //
+  // Storing a raw pointer is safe because WebNNContextImpl is owned by its
+  // provider and cannot outlive it, while the SharedImageManager is managed by
+  // the GPU service and destroyed after the provider, ensuring the raw pointer
+  // remains valid.
   const raw_ptr<gpu::SharedImageManager> shared_image_manager_ = nullptr;
 
   // Task runner used to remove this context from its provider.
-  // May be null when running without GPU dependencies.
   const scoped_refptr<base::SingleThreadTaskRunner> main_task_runner_;
 
   // The owning_task_runner is the underlying task runner for the context.
-  scoped_refptr<base::SequencedTaskRunner> owning_task_runner_;
+  scoped_refptr<base::SingleThreadTaskRunner> owning_task_runner_;
 
   // A process-unique ID used for disambiguating memory dumps from different
   // WebNN contexts.

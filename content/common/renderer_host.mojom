@@ -4,8 +4,6 @@
 
 module content.mojom;
 
-import "mojo/public/mojom/base/file.mojom";
-
 // The primordial interface implemented by a render process host. This should be
 // used for implementing renderer-to-browser messages.
 interface RendererHost {
@@ -44,9 +42,4 @@ interface RendererHost {
 
   // A renderer sends this when it wants to know whether a gpu process exists.
   [Sync] HasGpuProcess() => (bool has_gpu_process);
-
-  // Creates a temporary file for saving WebNN model weights in the browser
-  // process. Used by the TFLite backend running in the renderer process,
-  // since sandboxed renderers cannot create files directly.
-  CreateWebNNWeightsFile() => (mojo_base.mojom.File? file);
 };
